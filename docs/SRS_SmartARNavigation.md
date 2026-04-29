@@ -192,12 +192,14 @@ Primary users are assumed to be comfortable with basic smartphone usage. No tech
 
 ### 3.5 User Interface
 
-**Description:** The app shall provide a simple, minimal UI that does not obstruct the AR camera view.
+**Description:** The app shall provide a simple, minimal UI inspired by Waze. The Home Screen displays a full-screen interactive 2D map with a floating search bar at the bottom and a settings button at the top left. The AR screen does not obstruct the camera view.
 
 | ID | Requirement |
 |---|---|
-| FR-17 | The system shall provide a search bar or input field for the user to enter a destination. |
-| FR-18 | The system shall display a start navigation button. |
+| FR-17 | The system shall display a full-screen interactive 2D Google Map as the Home Screen background. |
+| FR-17a | The system shall provide a floating search bar anchored to the bottom of the Home Screen for destination entry. |
+| FR-17b | The system shall display a Settings button (icon) at the top-left corner of the Home Screen. |
+| FR-18 | The system shall display a "Start AR Navigation" button once the user has selected a destination. |
 | FR-19 | The system shall display a stop/end navigation button during an active session. |
 | FR-20 | The system shall show a status indicator for GPS signal strength. |
 | FR-21 | The UI shall follow Material Design guidelines for consistency and accessibility. |
@@ -263,10 +265,10 @@ Primary users are assumed to be comfortable with basic smartphone usage. No tech
 
 ### 5.1 User Interface
 
-- The main screen displays the live camera feed full-screen.
-- AR overlays are rendered transparently on top of the camera view.
-- A minimalist bottom panel or floating input allows destination entry.
-- Overlay elements include: directional arrow icons, distance labels, and status text.
+- The **Home Screen** displays a full-screen interactive 2D Google Map (Waze-style), with a floating search bar at the bottom and a settings icon at the top left.
+- The **AR Navigation Screen** displays the live camera feed full-screen, with AR overlays rendered transparently on top.
+- A floating bottom panel shows destination search and autocomplete results.
+- Overlay elements on the AR screen include: directional arrow icons, distance labels, and status text.
 
 ### 5.2 Hardware Interfaces
 

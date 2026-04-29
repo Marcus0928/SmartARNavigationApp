@@ -18,9 +18,7 @@ class LocationService {
   }
 
   Future<LatLng> getCurrentLocation() async {
-    final position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
+    final position = await Geolocator.getCurrentPosition();
     return LatLng(position.latitude, position.longitude);
   }
 

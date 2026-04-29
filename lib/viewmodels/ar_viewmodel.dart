@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
-import 'package:ar_flutter_plugin/managers/ar_object_manager.dart';
-import 'package:ar_flutter_plugin/managers/ar_session_manager.dart';
+import 'package:ar_flutter_plugin_2/managers/ar_object_manager.dart';
+import 'package:ar_flutter_plugin_2/managers/ar_session_manager.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'package:smart_ar_navigation/core/enums/turn_direction.dart';

@@ -164,7 +164,7 @@ View rebuilds AR overlays based on new ViewModel state
 | Screen | File | Description |
 |---|---|---|
 | **Splash Screen** | `splash_screen.dart` | App logo, initialization, permission checks |
-| **Home Screen** | `home_screen.dart` | Search bar, destination input, map preview |
+| **Home Screen** | `home_screen.dart` | Full-screen 2D map (Waze-style), floating bottom search bar, top-left settings button |
 | **AR Navigation Screen** | `ar_navigation_screen.dart` | Live camera + AR overlays + navigation info |
 
 > 🔮 **Future Screen (if time permits):**
@@ -189,15 +189,18 @@ View rebuilds AR overlays based on new ViewModel state
 ┌─────────────────────────────────────────┐
 │              Home Screen                │
 │                                         │
-│  ┌───────────────────────────────────┐  │
-│  │  🔍 Search / Enter Destination    │  │
-│  └───────────────────────────────────┘  │
+│  [⚙ Settings]                          │  ← top-left floating icon button
 │                                         │
-│  • User types destination address       │
-│  • Google Places Autocomplete appears   │
-│  • User selects destination             │
-│  • Route preview shown on mini-map      │
-│  • "Start AR Navigation" button appears │
+│                                         │
+│        [Full-Screen Google Map]         │  ← interactive 2D map (Waze-style)
+│          (user's location centred)      │
+│                                         │
+│                                         │
+│  ┌───────────────────────────────────┐  │
+│  │  🔍 Where to?                     │  │  ← floating bottom search bar
+│  └───────────────────────────────────┘  │
+│  (autocomplete dropdown expands upward) │
+│  [Start AR Nav ▶] (after destination)  │
 └────────────────┬────────────────────────┘
                  │ user taps "Start AR Navigation"
                  ▼
@@ -525,9 +528,10 @@ GET https://maps.googleapis.com/maps/api/directions/json
 
 ### 9.1 Design Principles
 
-- **Minimal UI** — The AR camera view is the hero. UI elements should not obstruct it.
-- **High Contrast** — All text and overlays must be readable in bright sunlight
-- **Material Design 3** — Follow Flutter's Material Design guidelines
+- **Waze-style Home** — The Home Screen uses a full-screen interactive 2D map as its base. All controls float on top without a traditional app bar.
+- **Minimal UI** — The AR camera view is the hero on the navigation screen. UI elements should not obstruct it.
+- **High Contrast** — All text and overlays must be readable in bright sunlight.
+- **Material Design 3** — Follow Flutter's Material Design guidelines.
 
 ### 9.2 Screen Layouts
 
@@ -548,16 +552,17 @@ GET https://maps.googleapis.com/maps/api/directions/json
 #### Home Screen
 ```
 ┌─────────────────────┐
-│  Smart AR Navigate  │  ← App bar
-├─────────────────────┤
-│ 🔍 Where to?        │  ← Search bar
-├─────────────────────┤
+│ ⚙                   │  ← Settings icon (top-left, floating)
 │                     │
-│   [Google Maps      │
-│    mini preview]    │  ← Static map preview
 │                     │
-├─────────────────────┤
-│  [Start AR Nav ▶]   │  ← CTA button (appears after destination selected)
+│   [Full-Screen      │
+│    Google Map]      │  ← Interactive 2D map, user location centred
+│                     │
+│                     │
+│  ┌───────────────┐  │
+│  │ 🔍 Where to? │  │  ← Floating search bar (bottom)
+│  └───────────────┘  │
+│  [Start AR Nav ▶]   │  ← Appears after destination selected
 └─────────────────────┘
 ```
 

@@ -25,8 +25,14 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _initialize() async {
     setState(() => _statusText = 'Checking permissions...');
 
-    final locationGranted = await _handleLocationPermission();
-    if (!mounted || !locationGranted) return;
+    // Handle permission dialogs — always proceed to home regardless of outcome.
+    try {
+      await _handleLocationPermission();
+    } catch (_) {
+      // Permission check failed (e.g. location services off) — proceed anyway.
+    }
+
+    if (!mounted) return;
 
     setState(() => _statusText = 'Ready');
     await Future.delayed(const Duration(milliseconds: 400));
@@ -37,43 +43,36 @@ class _SplashScreenState extends State<SplashScreen> {
 
   // ── Location permission flow ──────────────────────────────────────────────
 
-  Future<bool> _handleLocationPermission() async {
+  Future<void> _handleLocationPermission() async {
     LocationPermission permission = await Geolocator.checkPermission();
 
     if (permission == LocationPermission.whileInUse ||
         permission == LocationPermission.always) {
-      return true;
+      return; // Already granted — nothing to do.
     }
 
     if (permission == LocationPermission.deniedForever) {
       await _showSettingsDialog();
-      return false;
+      return;
     }
 
-    // permission == denied — show rationale then request
+    // Denied but requestable — show rationale then trigger system prompt.
     final proceed = await _showRationaleDialog();
-    if (!mounted || !proceed) return false;
+    if (!mounted || !proceed) return;
 
     permission = await Geolocator.requestPermission();
-
-    if (!mounted) return false;
-
-    if (permission == LocationPermission.whileInUse ||
-        permission == LocationPermission.always) {
-      return true;
-    }
+    if (!mounted) return;
 
     if (permission == LocationPermission.deniedForever) {
       await _showSettingsDialog();
-    } else {
+    } else if (permission == LocationPermission.denied) {
       await _showDeniedDialog();
     }
-    return false;
+    // whileInUse / always → granted, nothing more to show.
   }
 
   // ── Dialogs ───────────────────────────────────────────────────────────────
 
-  /// Explains why location is needed — shown before the system prompt.
   Future<bool> _showRationaleDialog() async {
     final result = await showDialog<bool>(
       context: context,
@@ -88,10 +87,10 @@ class _SplashScreenState extends State<SplashScreen> {
           ],
         ),
         content: const Text(
-          'Smart AR Navigate needs access to your location to calculate '
-          'routes and show real-time navigation directions.\n\n'
-          'Your location is only used while the app is open and is '
-          'never stored or shared.',
+          'Smart AR Navigate needs your location to calculate routes and '
+          'show real-time AR navigation directions.\n\n'
+          'Your location is only used while the app is open and is never '
+          'stored or shared.',
         ),
         actions: [
           TextButton(
@@ -99,8 +98,10 @@ class _SplashScreenState extends State<SplashScreen> {
             child: const Text('Deny', style: TextStyle(color: Colors.grey)),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: primaryColor,
-                foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryColor,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text('Allow'),
           ),
@@ -110,7 +111,6 @@ class _SplashScreenState extends State<SplashScreen> {
     return result ?? false;
   }
 
-  /// Shown when the user taps Deny on the system prompt (but not permanently).
   Future<void> _showDeniedDialog() async {
     await showDialog<void>(
       context: context,
@@ -125,23 +125,24 @@ class _SplashScreenState extends State<SplashScreen> {
           ],
         ),
         content: const Text(
-          locationPermissionMessage +
-              '\n\nPlease restart the app and allow location access to use '
-              'AR navigation.',
+          '$locationPermissionMessage\n\n'
+          'Navigation features will be limited. You can grant access later '
+          'from Settings → Apps → Smart AR Navigate → Permissions.',
         ),
         actions: [
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: primaryColor,
-                foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryColor,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('OK'),
+            child: const Text('Continue Anyway'),
           ),
         ],
       ),
     );
   }
 
-  /// Shown when permission is permanently denied — directs user to Settings.
   Future<void> _showSettingsDialog() async {
     await showDialog<void>(
       context: context,
@@ -157,17 +158,19 @@ class _SplashScreenState extends State<SplashScreen> {
         ),
         content: const Text(
           'Location permission has been permanently denied.\n\n'
-          'To use AR navigation, please go to:\n'
+          'To enable AR navigation, go to:\n'
           'Settings → Apps → Smart AR Navigate → Permissions → Location',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+            child: const Text('Later', style: TextStyle(color: Colors.grey)),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: primaryColor,
-                foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryColor,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () async {
               Navigator.of(ctx).pop();
               await Geolocator.openAppSettings();
@@ -189,10 +192,18 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset(
-              'assets/images/app_logo.png',
+            Container(
               width: 120,
               height: 120,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.navigation,
+                size: 64,
+                color: Colors.white,
+              ),
             ),
             const SizedBox(height: 24),
             const Text(
