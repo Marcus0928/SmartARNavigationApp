@@ -164,7 +164,7 @@ View rebuilds AR overlays based on new ViewModel state
 | Screen | File | Description |
 |---|---|---|
 | **Splash Screen** | `splash_screen.dart` | App logo, initialization, permission checks |
-| **Home Screen** | `home_screen.dart` | Full-screen 2D map (Waze-style), floating bottom search bar, top-left settings button |
+| **Home Screen** | `home_screen.dart` | Full-screen 2D map (Waze-style), floating bottom search bar, top-left hamburger button opening a Waze-style side drawer |
 | **AR Navigation Screen** | `ar_navigation_screen.dart` | Live camera + AR overlays + navigation info |
 | **Settings Screen** | `settings_screen.dart` | User preferences: display options, AR settings, and About info |
 
@@ -190,7 +190,7 @@ View rebuilds AR overlays based on new ViewModel state
 ┌─────────────────────────────────────────┐
 │              Home Screen                │
 │                                         │
-│  [⚙ Settings]                          │  ← top-left floating icon button
+│  [≡ Menu]                               │  ← top-left hamburger button
 │                                         │
 │                                         │
 │        [Full-Screen Google Map]         │  ← interactive 2D map (Waze-style)
@@ -227,24 +227,39 @@ View rebuilds AR overlays based on new ViewModel state
                  ▼
          Back to Home Screen
 
-─ ─ ─ ─ ─ ─ ─ ─ Settings Branch ─ ─ ─ ─ ─ ─ ─ ─
-         Home Screen [⚙ Settings] tapped
+─ ─ ─ ─ ─ ─ ─ ─ Menu Drawer Branch ─ ─ ─ ─ ─ ─ ─
+         Home Screen [≡ Menu] tapped
                  │
                  ▼
 ┌─────────────────────────────────────────┐
-│            Settings Screen              │
+│       Side Drawer (slides from left)    │
 │                                         │
-│  • Navigation Mode toggle (locked: AR)  │
-│  • Distance unit (km / miles)           │
-│  • Show / hide speed display            │
-│  • Show / hide ETA display              │
-│  • AR arrow size (Small/Medium/Large)   │
-│  • AR overlay opacity (50%–100%)        │
-│  • About (app version + developer info) │
-└────────────────┬────────────────────────┘
-                 │ user taps Back
-                 ▼
-         Back to Home Screen
+│  ┌───────────────────────────────────┐  │
+│  │  [M]  Marcus                      │  │  ← avatar + name
+│  │       Smart AR Navigator          │  │
+│  └───────────────────────────────────┘  │
+│  ─────────────────────────────────────  │
+│  ↗  Plan a drive                        │
+│  ✉  Inbox                              │
+│  ⚙  Settings ──────────────────────────┼──┐
+│  ?  Help & Feedback                     │  │
+│                                         │  │
+│  ⏻  Shutdown (confirmation dialog)      │  │
+└────────────────┬────────────────────────┘  │
+                 │ user taps Back             │
+                 ▼                           ▼
+         Back to Home Screen        Settings Screen
+                                             │
+                                    • Navigation Mode (locked: AR)
+                                    • Distance unit (km / miles)
+                                    • Show / hide speed display
+                                    • Show / hide ETA display
+                                    • AR arrow size (S/M/L)
+                                    • AR overlay opacity (50–100%)
+                                    • About (version + developer)
+                                             │ user taps Back
+                                             ▼
+                                    Back to Home Screen
 ```
 
 ### 4.3 Permission Flow (Splash Screen)
@@ -297,8 +312,10 @@ Check Location Permission
 
 | Property / Method | Type | Description |
 |---|---|---|
-| `currentLocation` | `LatLng` | User's real-time GPS coordinates |
-| `startLocationTracking()` | `void` | Begins GPS stream |
+| `currentLocation` | `LatLng?` | User's real-time GPS coordinates |
+| `currentHeading` | `double?` | Direction of travel in degrees (0 = North, clockwise); null when stationary |
+| `currentAccuracy` | `double?` | GPS accuracy radius in metres |
+| `startLocationTracking()` | `Future<void>` | One-shot fix then continuous GPS stream |
 | `stopLocationTracking()` | `void` | Ends GPS stream |
 | `searchPlaces(query)` | `Future<List<PlaceModel>>` | Returns autocomplete results |
 
@@ -505,6 +522,7 @@ smart_ar_navigation/
 │   └── app.dart                     # MaterialApp setup & routing
 │
 ├── assets/
+│   ├── map_style.json               # Custom Waze-inspired Google Maps style
 │   ├── images/
 │   │   └── app_logo.png
 │   └── icons/
@@ -551,7 +569,15 @@ GET https://maps.googleapis.com/maps/api/directions/json
 - **Endpoint:** `https://maps.googleapis.com/maps/api/place/autocomplete/json`
 - **Key Parameters:** `input`, `key`
 
-### 8.3 ARCore (via `ar_flutter_plugin`)
+### 8.3 flutter_map + CartoDB Positron Tiles
+
+- **Purpose:** Renders the Home Screen map without the Google Maps SDK — no Google branding
+- **Tile URL:** `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png`
+- **Style:** CartoDB Voyager — Waze-like coloured rendering: blue water, green parks/forests, amber highways, white local roads
+- **Attribution:** © OpenStreetMap contributors, © CARTO
+- **Key Packages:** `flutter_map: ^6.1.0`, `latlong2: ^0.9.0`
+
+### 8.4 ARCore (via `ar_flutter_plugin`)
 
 - **Purpose:** Renders 3D AR overlays on the live camera feed
 - **Key Functions Used:**
@@ -560,7 +586,7 @@ GET https://maps.googleapis.com/maps/api/directions/json
   - Place and update AR anchor nodes (arrows, text)
   - Handle AR session lifecycle (pause on app background)
 
-### 8.4 Geolocator Package
+### 8.5 Geolocator Package
 
 - **Purpose:** Continuous real-time GPS location stream
 - **Key Functions Used:**
@@ -575,6 +601,8 @@ GET https://maps.googleapis.com/maps/api/directions/json
 ### 9.1 Design Principles
 
 - **Waze-style Home** — The Home Screen uses a full-screen interactive 2D map as its base. All controls float on top without a traditional app bar.
+- **Custom Map Style** — The Home Screen map uses CartoDB Voyager tiles via `flutter_map`, delivering a Waze-like aesthetic (blue water, green parks, amber highways, white local roads) without any Google Maps SDK or branding. Route data is still fetched from the Google Maps Directions API.
+- **Animated Map Transitions** — All programmatic map movements (initial GPS centre, "my location" button) use `AnimatedMapController` with a 650 ms `easeInOut` curve, avoiding jarring instant jumps.
 - **Minimal UI** — The AR camera view is the hero on the navigation screen. UI elements should not obstruct it.
 - **High Contrast** — All text and overlays must be readable in bright sunlight.
 - **Material Design 3** — Follow Flutter's Material Design guidelines.
@@ -598,7 +626,7 @@ GET https://maps.googleapis.com/maps/api/directions/json
 #### Home Screen
 ```
 ┌─────────────────────┐
-│ ⚙                   │  ← Settings icon (top-left, floating)
+│ ≡                   │  ← Hamburger menu (top-left, opens side drawer)
 │                     │
 │                     │
 │   [Full-Screen      │

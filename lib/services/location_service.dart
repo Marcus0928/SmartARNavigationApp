@@ -8,6 +8,12 @@ class LocationService {
   final StreamController<LatLng> _locationController =
       StreamController<LatLng>.broadcast();
 
+  /// Latest heading in degrees (0 = North, clockwise). Null when unavailable.
+  double? currentHeading;
+
+  /// Latest GPS accuracy in metres.
+  double? currentAccuracy;
+
   Future<bool> checkPermission() async {
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
@@ -19,6 +25,8 @@ class LocationService {
 
   Future<LatLng> getCurrentLocation() async {
     final position = await Geolocator.getCurrentPosition();
+    currentHeading = position.heading >= 0 ? position.heading : null;
+    currentAccuracy = position.accuracy;
     return LatLng(position.latitude, position.longitude);
   }
 
@@ -29,6 +37,8 @@ class LocationService {
         distanceFilter: 5,
       ),
     ).listen((position) {
+      currentHeading = position.heading >= 0 ? position.heading : null;
+      currentAccuracy = position.accuracy;
       _locationController.add(LatLng(position.latitude, position.longitude));
     });
     return _locationController.stream;

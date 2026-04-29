@@ -127,14 +127,14 @@ class SettingsScreen extends StatelessWidget {
           ListTile(
             title: const Text('App Version'),
             trailing: Text(
-              '1.0.0',
+              'Beta 0.0.1',
               style: TextStyle(color: Colors.grey.shade600),
             ),
           ),
           ListTile(
             title: const Text('Developer'),
             trailing: Text(
-              'Liew Sau Yang',
+              'Marcus Liew',
               style: TextStyle(color: Colors.grey.shade600),
             ),
           ),

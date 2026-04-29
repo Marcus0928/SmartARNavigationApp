@@ -511,18 +511,47 @@ void resetOverlay()
 ### `startLocationTracking()`
 
 ```dart
-void startLocationTracking()
+Future<void> startLocationTracking()
 ```
 
-**Purpose:** Begins listening to the GPS stream and updates `currentLocation`.
+**Purpose:** Begins listening to the GPS stream and updates `currentLocation`, `currentHeading`, and `currentAccuracy`.
 
 **Parameters:** None
 
 **Returns:** Nothing
 
 **Notes:**
-- Subscribes to `LocationService.getLocationStream()`
-- On each GPS update, calls `NavigationViewModel.checkIfArrived()` and `ARViewModel.updateAROverlay()`
+- First calls `LocationService.getCurrentLocation()` for an immediate one-shot GPS fix so the map centres without waiting for the stream's `distanceFilter` to trigger
+- Then subscribes to `LocationService.getLocationStream()` for continuous updates
+- Updates `currentHeading` and `currentAccuracy` from `LocationService` on every GPS event
+- On each update during active navigation, calls `NavigationViewModel.checkIfArrived()` and `ARViewModel.updateAROverlay()`
+
+---
+
+### `currentHeading`
+
+```dart
+double? currentHeading
+```
+
+**Purpose:** The user's current direction of travel in degrees (0 = North, clockwise). Null when stationary or unavailable.
+
+**Notes:**
+- Sourced from `Position.heading` via `geolocator`; values less than 0 (returned when heading is unavailable) are converted to `null`
+- Used by `HomeScreen` to rotate the Waze-style location arrow marker
+
+---
+
+### `currentAccuracy`
+
+```dart
+double? currentAccuracy
+```
+
+**Purpose:** The GPS accuracy radius in metres for the most recent position fix.
+
+**Notes:**
+- Used by `HomeScreen` to draw the semi-transparent accuracy ring around the user's map position
 
 ---
 

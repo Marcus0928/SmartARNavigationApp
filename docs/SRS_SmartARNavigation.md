@@ -197,13 +197,16 @@ Primary users are assumed to be comfortable with basic smartphone usage. No tech
 
 | ID | Requirement |
 |---|---|
-| FR-17 | The system shall display a full-screen interactive 2D Google Map as the Home Screen background. |
+| FR-17 | The system shall display a full-screen interactive 2D map (OpenStreetMap tiles via CartoDB Positron) as the Home Screen background. |
 | FR-17a | The system shall provide a floating search bar anchored to the bottom of the Home Screen for destination entry. |
-| FR-17b | The system shall display a Settings button (icon) at the top-left corner of the Home Screen. |
+| FR-17b | The system shall display a hamburger menu icon (≡) at the top-left corner of the Home Screen that opens a side drawer panel when tapped. |
 | FR-18 | The system shall display a "Start AR Navigation" button once the user has selected a destination. |
 | FR-19 | The system shall display a stop/end navigation button during an active session. |
 | FR-20 | The system shall show a status indicator for GPS signal strength. |
 | FR-21 | The UI shall follow Material Design guidelines for consistency and accessibility. |
+| FR-33 | The Home Screen map shall use CartoDB Voyager tiles to render a Waze-inspired style (blue water, green parks/forests, amber highways, white local roads) without Google Maps branding. |
+| FR-34 | The hamburger menu drawer shall contain the following items, in order: a Profile section (avatar + name) separated by a divider, then Plan a drive, Inbox, Settings, Help & Feedback, and Shutdown. |
+| FR-35 | The map shall animate to the user's location with a smooth eased transition (approximately 650 ms, ease-in-out curve) when the location button is tapped or on the first GPS fix after app launch. |
 
 ---
 
@@ -225,7 +228,7 @@ Primary users are assumed to be comfortable with basic smartphone usage. No tech
 
 | ID | Requirement |
 |---|---|
-| FR-25 | The system shall provide a Settings screen accessible via the settings icon on the Home Screen. |
+| FR-25 | The system shall provide a Settings screen accessible via the Settings option in the hamburger menu drawer on the Home Screen. |
 | FR-26 | The Settings screen shall include a Navigation Mode toggle (AR / 2D Map); the toggle shall be locked to AR mode in the current version. |
 | FR-27 | The Settings screen shall allow the user to set a distance unit preference (kilometres or miles). |
 | FR-28 | The Settings screen shall include a toggle to show or hide the speed display during navigation. |
@@ -283,7 +286,7 @@ Primary users are assumed to be comfortable with basic smartphone usage. No tech
 
 ### 5.1 User Interface
 
-- The **Home Screen** displays a full-screen interactive 2D Google Map (Waze-style), with a floating search bar at the bottom and a settings icon at the top left.
+- The **Home Screen** displays a full-screen interactive 2D map (CartoDB Voyager, Waze-style), with a floating search bar at the bottom, a "my location" button at the top right, and a hamburger menu icon (≡) at the top left that opens a side drawer with navigation options.
 - The **AR Navigation Screen** displays the live camera feed full-screen, with AR overlays rendered transparently on top.
 - A floating bottom panel shows destination search and autocomplete results.
 - Overlay elements on the AR screen include: directional arrow icons, distance labels, and status text.

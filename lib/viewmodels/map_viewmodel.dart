@@ -29,18 +29,38 @@ class MapViewModel extends ChangeNotifier {
         _arViewModel = arViewModel;
 
   LatLng? _currentLocation;
+  double? _currentHeading;
+  double? _currentAccuracy;
   List<PlaceModel> _searchResults = [];
   PlaceModel? _selectedDestination;
   StreamSubscription<LatLng>? _locationSubscription;
 
   LatLng? get currentLocation => _currentLocation;
+
+  /// Direction of travel in degrees (0 = North, clockwise). Null when stationary.
+  double? get currentHeading => _currentHeading;
+
+  /// GPS accuracy radius in metres.
+  double? get currentAccuracy => _currentAccuracy;
+
   List<PlaceModel> get searchResults => _searchResults;
   PlaceModel? get selectedDestination => _selectedDestination;
 
-  void startLocationTracking() {
+  Future<void> startLocationTracking() async {
+    // Fast one-shot fix so the map centres immediately on open
+    try {
+      _currentLocation = await _locationService.getCurrentLocation();
+      _currentHeading = _locationService.currentHeading;
+      _currentAccuracy = _locationService.currentAccuracy;
+      notifyListeners();
+    } catch (_) {}
+
+    // Continuous stream for navigation and live indicator updates
     _locationSubscription =
         _locationService.getLocationStream().listen((location) {
       _currentLocation = location;
+      _currentHeading = _locationService.currentHeading;
+      _currentAccuracy = _locationService.currentAccuracy;
       notifyListeners();
 
       if (_navigationViewModel.navigationStatus != NavigationStatus.navigating) {

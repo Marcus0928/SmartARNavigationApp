@@ -25,7 +25,42 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
     final mapVM = context.watch<MapViewModel>();
 
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
+        // Results expand upward above the search bar
+        if (mapVM.searchResults.isNotEmpty)
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 250),
+            child: Card(
+              margin: const EdgeInsets.only(bottom: 4),
+              elevation: 6,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: ListView.separated(
+                shrinkWrap: true,
+                padding: EdgeInsets.zero,
+                itemCount: mapVM.searchResults.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final place = mapVM.searchResults[index];
+                  return ListTile(
+                    leading: const Icon(Icons.location_on_outlined),
+                    title: Text(place.name),
+                    subtitle: Text(
+                      place.address,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    onTap: () {
+                      _controller.text = place.name;
+                      context.read<MapViewModel>().selectDestination(place);
+                    },
+                  );
+                },
+              ),
+            ),
+          ),
         TextField(
           controller: _controller,
           decoration: InputDecoration(
@@ -42,6 +77,15 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
                 : null,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
             ),
             filled: true,
             fillColor: Colors.white,
@@ -49,33 +93,6 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
           onChanged: (value) =>
               context.read<MapViewModel>().searchDestination(value),
         ),
-        if (mapVM.searchResults.isNotEmpty)
-          Card(
-            margin: EdgeInsets.zero,
-            elevation: 4,
-            child: ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: mapVM.searchResults.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final place = mapVM.searchResults[index];
-                return ListTile(
-                  leading: const Icon(Icons.location_on_outlined),
-                  title: Text(place.name),
-                  subtitle: Text(
-                    place.address,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  onTap: () {
-                    _controller.text = place.name;
-                    context.read<MapViewModel>().selectDestination(place);
-                  },
-                );
-              },
-            ),
-          ),
       ],
     );
   }

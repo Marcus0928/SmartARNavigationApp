@@ -25,6 +25,10 @@ dependencies:
   # HTTP requests to Google APIs
   http: ^1.1.0
 
+  # Map display (tile-based, no Google SDK required)
+  flutter_map: ^6.1.0
+  latlong2: ^0.9.0
+
   # State Management
   provider: ^6.1.0
 
@@ -44,5 +48,6 @@ flutter:
 
   assets:
     - .env
+    - assets/map_style.json
     - assets/images/
     - assets/icons/

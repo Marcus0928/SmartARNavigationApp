@@ -19,11 +19,14 @@ Think of it as **Google Maps or Waze, but with AR directions on your camera view
 ### 🎯 Key Features
 
 - 📷 **Live Camera AR View** — Real-time camera feed with AR overlays
-- 🗺️ **Google Maps Integration** — Accurate route and navigation data
+- 🗺️ **Google Maps Integration** — Accurate route and navigation data via Directions & Places API
+- 🎨 **Waze-Inspired Map Style** — CartoDB Voyager tiles: blue water, green parks, amber highways, no Google branding
 - 🧭 **Turn-by-Turn AR Directions** — Arrows and distance shown on camera
-- 📍 **Real-Time GPS Tracking** — Continuous location updates
+- 📍 **Real-Time GPS Tracking** — Continuous location with Waze-style directional arrow and accuracy ring
 - 🔄 **Auto Rerouting** — Recalculates route when you go off path
 - ✅ **Arrival Detection** — Notifies when you reach your destination
+- 📋 **Waze-Style Side Menu** — Hamburger (≡) button opens a drawer with Profile, Plan a drive, Inbox, Settings, Help & Feedback, and Shutdown
+- 🎬 **Animated Map Transitions** — Smooth eased fly-to animation (650 ms, `easeInOut`) when centering on location
 
 ---
 
@@ -33,8 +36,10 @@ Think of it as **Google Maps or Waze, but with AR directions on your camera view
 |---|---|
 | [Flutter](https://flutter.dev) | Cross-platform mobile UI framework |
 | [Dart](https://dart.dev) | Programming language |
-| [ARCore](https://developers.google.com/ar) | AR rendering via `ar_flutter_plugin` |
-| [Google Maps Flutter SDK](https://pub.dev/packages/google_maps_flutter) | Maps and navigation data |
+| [ARCore](https://developers.google.com/ar) | AR rendering via `ar_flutter_plugin_2` |
+| [flutter_map](https://pub.dev/packages/flutter_map) | Tile-based map display (no Google Maps SDK) |
+| [CartoDB Voyager](https://carto.com/basemaps/) | OpenStreetMap-based tile style — Waze-like colours (blue water, green parks, amber highways) |
+| [Google Maps Directions API](https://developers.google.com/maps/documentation/directions) | Route and turn-by-turn data |
 | [Geolocator](https://pub.dev/packages/geolocator) | Real-time GPS location |
 | [Google Maps Directions API](https://developers.google.com/maps/documentation/directions) | Turn-by-turn route data |
 | [Google Maps Places API](https://developers.google.com/maps/documentation/places) | Destination search autocomplete |
@@ -64,6 +69,7 @@ smart_ar_navigation/
 │   └── views/                   # Screens & widgets (UI)
 │
 ├── assets/
+│   ├── map_style.json           # Waze-inspired Google Maps custom style
 │   ├── images/                  # App logo
 │   └── icons/                   # AR arrow icons
 │
@@ -173,13 +179,16 @@ build/app/outputs/flutter-apk/app-release.apk
 dependencies:
   flutter:
     sdk: flutter
-  ar_flutter_plugin: ^0.7.3        # ARCore integration
-  google_maps_flutter: ^2.5.0      # Google Maps SDK
-  geolocator: ^10.0.0              # GPS location
+  ar_flutter_plugin_2: ^0.0.3      # ARCore integration
+  flutter_map: ^6.1.0              # Tile-based map display (no Google Maps SDK)
+  latlong2: ^0.9.0                 # LatLng coordinate type for flutter_map
+  google_maps_flutter: ^2.5.0      # LatLng type + platform channel for route API
+  geolocator: ^12.0.0              # GPS location
   http: ^1.1.0                     # HTTP requests to Google APIs
   flutter_polyline_points: ^2.0.0  # Route polyline rendering
   provider: ^6.1.0                 # State management (MVVM)
   flutter_dotenv: ^5.1.0           # Load API keys from .env
+  shared_preferences: ^2.2.0       # Persistent settings storage
 ```
 
 ---
@@ -209,10 +218,15 @@ All project documentation is located in the `/docs` folder:
 ## 🗺️ Roadmap
 
 - [x] Project documentation
-- [ ] Project setup & folder structure
-- [ ] Permissions & splash screen
-- [ ] Home screen with destination search
-- [ ] Google Maps route fetching
+- [x] Project setup & folder structure
+- [x] Permissions & splash screen
+- [x] Home screen with Waze-style map (CartoDB Voyager tiles)
+- [x] Waze-style location indicator (directional arrow + accuracy ring)
+- [x] Animated map fly-to transitions (easeInOut, 650 ms)
+- [x] Destination search with autocomplete (Places API)
+- [x] Waze-style hamburger side menu (Profile, Plan a drive, Inbox, Settings, Help, Shutdown)
+- [x] Settings screen (display prefs, AR options, persisted via shared_preferences)
+- [ ] Google Maps route fetching (Directions API)
 - [ ] AR Navigation screen with live camera
 - [ ] AR overlay rendering (arrows + distance)
 - [ ] Real-time GPS tracking & AR updates
