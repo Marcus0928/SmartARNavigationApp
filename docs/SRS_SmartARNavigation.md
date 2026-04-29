@@ -22,6 +22,7 @@
 1. [Introduction](#1-introduction)
 2. [Overall Description](#2-overall-description)
 3. [System Features & Functional Requirements](#3-system-features--functional-requirements)
+   - [3.7 Settings Screen](#37-settings-screen)
 4. [Non-Functional Requirements](#4-non-functional-requirements)
 5. [External Interface Requirements](#5-external-interface-requirements)
 6. [Technology Stack](#6-technology-stack)
@@ -215,6 +216,23 @@ Primary users are assumed to be comfortable with basic smartphone usage. No tech
 | FR-22 | The system shall begin AR navigation upon user confirmation of destination. |
 | FR-23 | The system shall end the navigation session and clear AR overlays when the user arrives at the destination. |
 | FR-24 | The system shall allow the user to manually stop navigation at any time. |
+
+---
+
+### 3.7 Settings Screen
+
+**Description:** The app shall provide a Settings screen accessible from the Home Screen, allowing the user to configure display preferences and view app information.
+
+| ID | Requirement |
+|---|---|
+| FR-25 | The system shall provide a Settings screen accessible via the settings icon on the Home Screen. |
+| FR-26 | The Settings screen shall include a Navigation Mode toggle (AR / 2D Map); the toggle shall be locked to AR mode in the current version. |
+| FR-27 | The Settings screen shall allow the user to set a distance unit preference (kilometres or miles). |
+| FR-28 | The Settings screen shall include a toggle to show or hide the speed display during navigation. |
+| FR-29 | The Settings screen shall include a toggle to show or hide the estimated time of arrival (ETA) display during navigation. |
+| FR-30 | The Settings screen shall allow the user to select a preferred AR arrow size (Small / Medium / Large). |
+| FR-31 | The Settings screen shall include an AR overlay opacity slider adjustable between 50% and 100%. |
+| FR-32 | The Settings screen shall display an About section showing the current app version and developer information. |
 
 ---
 

@@ -166,6 +166,7 @@ View rebuilds AR overlays based on new ViewModel state
 | **Splash Screen** | `splash_screen.dart` | App logo, initialization, permission checks |
 | **Home Screen** | `home_screen.dart` | Full-screen 2D map (Waze-style), floating bottom search bar, top-left settings button |
 | **AR Navigation Screen** | `ar_navigation_screen.dart` | Live camera + AR overlays + navigation info |
+| **Settings Screen** | `settings_screen.dart` | User preferences: display options, AR settings, and About info |
 
 > 🔮 **Future Screen (if time permits):**
 > | **2D Map Screen** | `map_screen.dart` | Traditional Google Maps 2D navigation view |
@@ -225,6 +226,25 @@ View rebuilds AR overlays based on new ViewModel state
                  │ user taps Stop OR arrives
                  ▼
          Back to Home Screen
+
+─ ─ ─ ─ ─ ─ ─ ─ Settings Branch ─ ─ ─ ─ ─ ─ ─ ─
+         Home Screen [⚙ Settings] tapped
+                 │
+                 ▼
+┌─────────────────────────────────────────┐
+│            Settings Screen              │
+│                                         │
+│  • Navigation Mode toggle (locked: AR)  │
+│  • Distance unit (km / miles)           │
+│  • Show / hide speed display            │
+│  • Show / hide ETA display              │
+│  • AR arrow size (Small/Medium/Large)   │
+│  • AR overlay opacity (50%–100%)        │
+│  • About (app version + developer info) │
+└────────────────┬────────────────────────┘
+                 │ user taps Back
+                 ▼
+         Back to Home Screen
 ```
 
 ### 4.3 Permission Flow (Splash Screen)
@@ -281,6 +301,30 @@ Check Location Permission
 | `startLocationTracking()` | `void` | Begins GPS stream |
 | `stopLocationTracking()` | `void` | Ends GPS stream |
 | `searchPlaces(query)` | `Future<List<PlaceModel>>` | Returns autocomplete results |
+
+#### `SettingsViewModel`
+**Responsibility:** Manages user preferences, persisted via `shared_preferences`.
+
+| Property / Method | Type | Description |
+|---|---|---|
+| `navigationMode` | `String` | Active navigation mode (`'AR'` — locked in current version) |
+| `distanceUnit` | `String` | Preferred unit: `'km'` or `'miles'` |
+| `showSpeed` | `bool` | Whether speed display is shown during navigation |
+| `showETA` | `bool` | Whether ETA display is shown during navigation |
+| `arrowSize` | `String` | AR arrow size: `'Small'`, `'Medium'`, or `'Large'` |
+| `overlayOpacity` | `double` | AR overlay opacity between `0.5` and `1.0` |
+| `getNavigationMode()` | `Future<String>` | Reads navigation mode from persistent storage |
+| `setNavigationMode(mode)` | `Future<void>` | Saves navigation mode preference |
+| `getDistanceUnit()` | `Future<String>` | Reads distance unit preference |
+| `setDistanceUnit(unit)` | `Future<void>` | Saves distance unit preference |
+| `getShowSpeed()` | `Future<bool>` | Reads show-speed toggle state |
+| `setShowSpeed(value)` | `Future<void>` | Saves show-speed toggle state |
+| `getShowETA()` | `Future<bool>` | Reads show-ETA toggle state |
+| `setShowETA(value)` | `Future<void>` | Saves show-ETA toggle state |
+| `getArrowSize()` | `Future<String>` | Reads AR arrow size preference |
+| `setArrowSize(size)` | `Future<void>` | Saves AR arrow size preference |
+| `getOverlayOpacity()` | `Future<double>` | Reads AR overlay opacity value |
+| `setOverlayOpacity(opacity)` | `Future<void>` | Saves AR overlay opacity value |
 
 ---
 
@@ -443,13 +487,15 @@ smart_ar_navigation/
 │   ├── viewmodels/                  # Business logic (ViewModel layer)
 │   │   ├── navigation_viewmodel.dart
 │   │   ├── ar_viewmodel.dart
-│   │   └── map_viewmodel.dart
+│   │   ├── map_viewmodel.dart
+│   │   └── settings_viewmodel.dart
 │   │
 │   ├── views/                       # Screens & Widgets (View layer)
 │   │   ├── screens/
 │   │   │   ├── splash_screen.dart
 │   │   │   ├── home_screen.dart
-│   │   │   └── ar_navigation_screen.dart
+│   │   │   ├── ar_navigation_screen.dart
+│   │   │   └── settings_screen.dart
 │   │   └── widgets/                 # Reusable UI components
 │   │       ├── ar_overlay_widget.dart     # AR arrows and distance text
 │   │       ├── search_bar_widget.dart     # Destination search input

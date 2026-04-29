@@ -26,8 +26,9 @@
 6. [NavigationViewModel](#6-navigationviewmodel)
 7. [ARViewModel](#7-arviewmodel)
 8. [MapViewModel](#8-mapviewmodel)
-9. [Utility Functions](#9-utility-functions)
-10. [Enums & Constants](#10-enums--constants)
+9. [SettingsViewModel](#9-settingsviewmodel)
+10. [Utility Functions](#10-utility-functions)
+11. [Enums & Constants](#11-enums--constants)
 
 ---
 
@@ -586,7 +587,245 @@ Future<void> selectDestination(PlaceModel place)
 
 ---
 
-## 9. Utility Functions
+## 9. SettingsViewModel
+
+**File:** `lib/viewmodels/settings_viewmodel.dart`  
+**Purpose:** Manages user preferences, persisted via `shared_preferences`. Extends `ChangeNotifier`.
+
+> **Dependency:** Add `shared_preferences: ^2.2.0` to `pubspec.yaml`.
+
+---
+
+### `getNavigationMode()`
+
+```dart
+Future<String> getNavigationMode()
+```
+
+**Purpose:** Reads the saved navigation mode preference from persistent storage.
+
+**Parameters:** None
+
+**Returns:** `String` — `'AR'` (default; locked to AR in the current version)
+
+**Notes:**
+- Key: `'navigation_mode'`
+- Always returns `'AR'` for now; the toggle is visible but disabled until 2D mode is implemented
+
+---
+
+### `setNavigationMode()`
+
+```dart
+Future<void> setNavigationMode(String mode)
+```
+
+**Purpose:** Saves the navigation mode preference.
+
+**Parameters:**
+| Parameter | Type | Description |
+|---|---|---|
+| `mode` | `String` | Navigation mode — `'AR'` or `'2D'` |
+
+**Returns:** Nothing
+
+**Notes:**
+- Key: `'navigation_mode'`
+- Currently only `'AR'` is accepted; setting `'2D'` has no effect until the 2D screen is built
+
+---
+
+### `getDistanceUnit()`
+
+```dart
+Future<String> getDistanceUnit()
+```
+
+**Purpose:** Reads the saved distance unit preference.
+
+**Parameters:** None
+
+**Returns:** `String` — `'km'` (default) or `'miles'`
+
+**Notes:**
+- Key: `'distance_unit'`
+- Used by `ARViewModel` when formatting distance labels on the AR overlay
+
+---
+
+### `setDistanceUnit()`
+
+```dart
+Future<void> setDistanceUnit(String unit)
+```
+
+**Purpose:** Saves the distance unit preference.
+
+**Parameters:**
+| Parameter | Type | Description |
+|---|---|---|
+| `unit` | `String` | `'km'` or `'miles'` |
+
+**Returns:** Nothing
+
+**Notes:**
+- Key: `'distance_unit'`
+- Notifies listeners so the AR overlay updates immediately
+
+---
+
+### `getShowSpeed()`
+
+```dart
+Future<bool> getShowSpeed()
+```
+
+**Purpose:** Reads whether the speed display should be visible during navigation.
+
+**Parameters:** None
+
+**Returns:** `bool` — `true` (default, speed shown) or `false`
+
+**Notes:**
+- Key: `'show_speed'`
+
+---
+
+### `setShowSpeed()`
+
+```dart
+Future<void> setShowSpeed(bool value)
+```
+
+**Purpose:** Saves the show-speed toggle state.
+
+**Parameters:**
+| Parameter | Type | Description |
+|---|---|---|
+| `value` | `bool` | `true` to show speed, `false` to hide it |
+
+**Returns:** Nothing
+
+**Notes:**
+- Key: `'show_speed'`
+
+---
+
+### `getShowETA()`
+
+```dart
+Future<bool> getShowETA()
+```
+
+**Purpose:** Reads whether the ETA display should be visible during navigation.
+
+**Parameters:** None
+
+**Returns:** `bool` — `true` (default, ETA shown) or `false`
+
+**Notes:**
+- Key: `'show_eta'`
+
+---
+
+### `setShowETA()`
+
+```dart
+Future<void> setShowETA(bool value)
+```
+
+**Purpose:** Saves the show-ETA toggle state.
+
+**Parameters:**
+| Parameter | Type | Description |
+|---|---|---|
+| `value` | `bool` | `true` to show ETA, `false` to hide it |
+
+**Returns:** Nothing
+
+**Notes:**
+- Key: `'show_eta'`
+
+---
+
+### `getArrowSize()`
+
+```dart
+Future<String> getArrowSize()
+```
+
+**Purpose:** Reads the preferred AR arrow size.
+
+**Parameters:** None
+
+**Returns:** `String` — `'Medium'` (default), `'Small'`, or `'Large'`
+
+**Notes:**
+- Key: `'arrow_size'`
+- Used by `ARService` when placing or updating AR arrow anchors
+
+---
+
+### `setArrowSize()`
+
+```dart
+Future<void> setArrowSize(String size)
+```
+
+**Purpose:** Saves the AR arrow size preference.
+
+**Parameters:**
+| Parameter | Type | Description |
+|---|---|---|
+| `size` | `String` | `'Small'`, `'Medium'`, or `'Large'` |
+
+**Returns:** Nothing
+
+**Notes:**
+- Key: `'arrow_size'`
+
+---
+
+### `getOverlayOpacity()`
+
+```dart
+Future<double> getOverlayOpacity()
+```
+
+**Purpose:** Reads the preferred AR overlay opacity.
+
+**Parameters:** None
+
+**Returns:** `double` — value between `0.5` and `1.0`; default is `1.0`
+
+**Notes:**
+- Key: `'overlay_opacity'`
+- Applied to the AR overlay widget's `Opacity` wrapper
+
+---
+
+### `setOverlayOpacity()`
+
+```dart
+Future<void> setOverlayOpacity(double opacity)
+```
+
+**Purpose:** Saves the AR overlay opacity preference.
+
+**Parameters:**
+| Parameter | Type | Description |
+|---|---|---|
+| `opacity` | `double` | Opacity value clamped to `0.5`–`1.0` |
+
+**Returns:** Nothing
+
+**Notes:**
+- Key: `'overlay_opacity'`
+- Values outside `[0.5, 1.0]` are clamped before saving
+
+---
+
+## 10. Utility Functions
 
 **File:** `lib/core/utils/location_utils.dart`  
 **Purpose:** Helper functions for location calculations.
@@ -637,7 +876,7 @@ TurnInstruction? findNextTurn(LatLng currentLocation, List<TurnInstruction> turn
 
 ---
 
-## 10. Enums & Constants
+## 11. Enums & Constants
 
 **File:** `lib/core/enums/turn_direction.dart`
 
