@@ -25,6 +25,11 @@ class HomeScreen extends StatelessWidget {
         backgroundColor: primaryColor,
         foregroundColor: Colors.white,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.settings),
+          tooltip: 'Settings',
+          onPressed: () => Navigator.of(context).pushNamed('/settings'),
+        ),
       ),
       body: Column(
         children: [

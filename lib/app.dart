@@ -10,8 +10,10 @@ import 'package:smart_ar_navigation/services/location_service.dart';
 import 'package:smart_ar_navigation/viewmodels/ar_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/map_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/navigation_viewmodel.dart';
+import 'package:smart_ar_navigation/viewmodels/settings_viewmodel.dart';
 import 'package:smart_ar_navigation/views/screens/ar_navigation_screen.dart';
 import 'package:smart_ar_navigation/views/screens/home_screen.dart';
+import 'package:smart_ar_navigation/views/screens/settings_screen.dart';
 import 'package:smart_ar_navigation/views/screens/splash_screen.dart';
 
 class SmartARNavigationApp extends StatelessWidget {
@@ -63,6 +65,11 @@ class SmartARNavigationApp extends StatelessWidget {
             arViewModel: ctx.read<ARViewModel>(),
           ),
         ),
+
+        // SettingsViewModel — no external dependencies, persists via shared_preferences
+        ChangeNotifierProvider<SettingsViewModel>(
+          create: (_) => SettingsViewModel(),
+        ),
       ],
       child: MaterialApp(
         title: appName,
@@ -76,6 +83,7 @@ class SmartARNavigationApp extends StatelessWidget {
           '/': (_) => const SplashScreen(),
           '/home': (_) => const HomeScreen(),
           '/ar-navigation': (_) => const ARNavigationScreen(),
+          '/settings': (_) => const SettingsScreen(),
         },
       ),
     );

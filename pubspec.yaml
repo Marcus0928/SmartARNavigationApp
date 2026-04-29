@@ -28,6 +28,9 @@ dependencies:
   # State Management
   provider: ^6.1.0
 
+  # Persistent settings storage
+  shared_preferences: ^2.2.0
+
   # API Key management
   flutter_dotenv: ^5.1.0
 
