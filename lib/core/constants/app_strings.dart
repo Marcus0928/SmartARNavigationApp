@@ -1,0 +1,9 @@
+const String appName                   = 'Smart AR Navigate';
+const String searchHint                = 'Where to?';
+const String startNavigation           = 'Start AR Navigation';
+const String stopNavigation            = 'Stop';
+const String arrivedMessage            = 'You have arrived!';
+const String reroutingMessage          = 'Recalculating route...';
+const String noInternetMessage         = 'No internet connection.';
+const String locationPermissionMessage = 'Location permission is required for navigation.';
+const String cameraPermissionMessage   = 'Camera permission is required for AR navigation.';
