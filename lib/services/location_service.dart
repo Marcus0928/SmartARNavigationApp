@@ -14,6 +14,9 @@ class LocationService {
   /// Latest GPS accuracy in metres.
   double? currentAccuracy;
 
+  /// Latest speed in metres per second. Null or negative when unavailable.
+  double? currentSpeed;
+
   Future<bool> checkPermission() async {
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
@@ -27,6 +30,7 @@ class LocationService {
     final position = await Geolocator.getCurrentPosition();
     currentHeading = position.heading >= 0 ? position.heading : null;
     currentAccuracy = position.accuracy;
+    currentSpeed = position.speed >= 0 ? position.speed : null;
     return LatLng(position.latitude, position.longitude);
   }
 
@@ -39,6 +43,7 @@ class LocationService {
     ).listen((position) {
       currentHeading = position.heading >= 0 ? position.heading : null;
       currentAccuracy = position.accuracy;
+      currentSpeed = position.speed >= 0 ? position.speed : null;
       _locationController.add(LatLng(position.latitude, position.longitude));
     });
     return _locationController.stream;

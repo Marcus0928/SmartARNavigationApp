@@ -25,6 +25,7 @@ class ARService {
       showPlanes: false,
       customPlaneTexturePath: null,
       showWorldOrigin: false,
+      showAnimatedGuide: false,
       handleTaps: false,
     );
     await _objectManager!.onInitialize();

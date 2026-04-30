@@ -1,3 +1,4 @@
+import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:smart_ar_navigation/core/enums/turn_direction.dart';
 import 'package:smart_ar_navigation/models/route_model.dart';
@@ -9,6 +10,13 @@ RouteModel parseRouteResponse(Map<String, dynamic> json) {
 
   final totalDistance = (leg['distance']['value'] as num).toDouble();
   final estimatedDuration = leg['duration']['value'] as int;
+
+  // Decode the full route geometry from the overview polyline.
+  final encoded = route['overview_polyline']['points'] as String;
+  final polylinePoints = PolylinePoints()
+      .decodePolyline(encoded)
+      .map((p) => LatLng(p.latitude, p.longitude))
+      .toList();
 
   final List<TurnInstruction> turns = [];
   final List<LatLng> waypoints = [];
@@ -32,6 +40,7 @@ RouteModel parseRouteResponse(Map<String, dynamic> json) {
 
   return RouteModel(
     waypoints: waypoints,
+    polylinePoints: polylinePoints,
     turns: turns,
     totalDistance: totalDistance,
     estimatedDuration: estimatedDuration,
@@ -56,7 +65,5 @@ TurnDirection _parseManeuver(String? maneuver) {
   }
 }
 
-// Google returns HTML-tagged instructions — strip tags for plain text display.
-String _stripHtml(String html) {
-  return html.replaceAll(RegExp(r'<[^>]*>'), '');
-}
+String _stripHtml(String html) =>
+    html.replaceAll(RegExp(r'<[^>]*>'), '');

@@ -27,7 +27,7 @@ class RouteRepository {
     final uri = Uri.parse(_baseUrl).replace(queryParameters: {
       'origin': '${origin.latitude},${origin.longitude}',
       'destination': '${destination.latitude},${destination.longitude}',
-      'mode': 'walking',
+      'mode': 'driving',
       'key': googleMapsApiKey,
     });
 

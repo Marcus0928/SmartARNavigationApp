@@ -8,6 +8,7 @@ import 'package:smart_ar_navigation/core/utils/location_utils.dart';
 import 'package:smart_ar_navigation/models/place_model.dart';
 import 'package:smart_ar_navigation/models/route_model.dart';
 import 'package:smart_ar_navigation/repositories/places_repository.dart';
+import 'package:smart_ar_navigation/repositories/route_repository.dart';
 import 'package:smart_ar_navigation/services/location_service.dart';
 import 'package:smart_ar_navigation/viewmodels/ar_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/navigation_viewmodel.dart';
@@ -15,52 +16,56 @@ import 'package:smart_ar_navigation/viewmodels/navigation_viewmodel.dart';
 class MapViewModel extends ChangeNotifier {
   final LocationService _locationService;
   final PlacesRepository _placesRepository;
+  final RouteRepository _routeRepository;
   final NavigationViewModel _navigationViewModel;
   final ARViewModel _arViewModel;
 
   MapViewModel({
     required LocationService locationService,
     required PlacesRepository placesRepository,
+    required RouteRepository routeRepository,
     required NavigationViewModel navigationViewModel,
     required ARViewModel arViewModel,
   })  : _locationService = locationService,
         _placesRepository = placesRepository,
+        _routeRepository = routeRepository,
         _navigationViewModel = navigationViewModel,
         _arViewModel = arViewModel;
 
   LatLng? _currentLocation;
   double? _currentHeading;
   double? _currentAccuracy;
+  double? _currentSpeed;
   List<PlaceModel> _searchResults = [];
   PlaceModel? _selectedDestination;
+  RouteModel? _previewRoute;
+  bool _isFetchingRoute = false;
   StreamSubscription<LatLng>? _locationSubscription;
 
   LatLng? get currentLocation => _currentLocation;
-
-  /// Direction of travel in degrees (0 = North, clockwise). Null when stationary.
   double? get currentHeading => _currentHeading;
-
-  /// GPS accuracy radius in metres.
   double? get currentAccuracy => _currentAccuracy;
-
+  double? get currentSpeed => _currentSpeed;
   List<PlaceModel> get searchResults => _searchResults;
   PlaceModel? get selectedDestination => _selectedDestination;
+  RouteModel? get previewRoute => _previewRoute;
+  bool get isFetchingRoute => _isFetchingRoute;
 
   Future<void> startLocationTracking() async {
-    // Fast one-shot fix so the map centres immediately on open
     try {
       _currentLocation = await _locationService.getCurrentLocation();
       _currentHeading = _locationService.currentHeading;
       _currentAccuracy = _locationService.currentAccuracy;
+      _currentSpeed = _locationService.currentSpeed;
       notifyListeners();
     } catch (_) {}
 
-    // Continuous stream for navigation and live indicator updates
     _locationSubscription =
         _locationService.getLocationStream().listen((location) {
       _currentLocation = location;
       _currentHeading = _locationService.currentHeading;
       _currentAccuracy = _locationService.currentAccuracy;
+      _currentSpeed = _locationService.currentSpeed;
       notifyListeners();
 
       if (_navigationViewModel.navigationStatus != NavigationStatus.navigating) {
@@ -89,19 +94,59 @@ class MapViewModel extends ChangeNotifier {
   }
 
   Future<void> selectDestination(PlaceModel place) async {
-    final detailed = await _placesRepository.getPlaceDetails(place.placeId);
-    _selectedDestination = detailed;
+    _isFetchingRoute = true;
+    _previewRoute = null;
     _searchResults = [];
     notifyListeners();
+
+    try {
+      final detailed = await _placesRepository.getPlaceDetails(place.placeId);
+      _selectedDestination = detailed;
+      notifyListeners();
+      await _fetchPreviewRoute();
+    } catch (_) {
+      _isFetchingRoute = false;
+      notifyListeners();
+    }
+  }
+
+  // Sets a fully-resolved place (coordinates already present) as destination.
+  void setSelectedDestination(PlaceModel place) {
+    _selectedDestination = place;
+    _previewRoute = null;
+    _searchResults = [];
+    notifyListeners();
+    _fetchPreviewRoute();
+  }
+
+  Future<void> _fetchPreviewRoute() async {
+    if (_selectedDestination == null) return;
+    _isFetchingRoute = true;
+    notifyListeners();
+
+    try {
+      final origin =
+          _currentLocation ?? await _locationService.getCurrentLocation();
+      _previewRoute = await _routeRepository.getRoute(
+        origin: origin,
+        destination: _selectedDestination!.coordinates,
+      );
+    } catch (_) {
+      // Route fetch failure is non-critical — destination stays selected.
+    } finally {
+      _isFetchingRoute = false;
+      notifyListeners();
+    }
   }
 
   void clearDestination() {
     _selectedDestination = null;
+    _previewRoute = null;
+    _isFetchingRoute = false;
     _searchResults = [];
     notifyListeners();
   }
 
-  /// Returns true if the user is more than 30m away from every waypoint on the route.
   bool _isOffRoute(LatLng location, RouteModel route) {
     for (final waypoint in route.waypoints) {
       if (calculateDistance(location, waypoint) <= 30.0) return false;

@@ -10,6 +10,7 @@ import 'package:smart_ar_navigation/services/location_service.dart';
 import 'package:smart_ar_navigation/viewmodels/ar_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/map_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/navigation_viewmodel.dart';
+import 'package:smart_ar_navigation/viewmodels/saved_places_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/settings_viewmodel.dart';
 import 'package:smart_ar_navigation/views/screens/ar_navigation_screen.dart';
 import 'package:smart_ar_navigation/views/screens/home_screen.dart';
@@ -61,6 +62,7 @@ class SmartARNavigationApp extends StatelessWidget {
           create: (ctx) => MapViewModel(
             locationService: ctx.read<LocationService>(),
             placesRepository: ctx.read<PlacesRepository>(),
+            routeRepository: ctx.read<RouteRepository>(),
             navigationViewModel: ctx.read<NavigationViewModel>(),
             arViewModel: ctx.read<ARViewModel>(),
           ),
@@ -69,6 +71,13 @@ class SmartARNavigationApp extends StatelessWidget {
         // SettingsViewModel — no external dependencies, persists via shared_preferences
         ChangeNotifierProvider<SettingsViewModel>(
           create: (_) => SettingsViewModel(),
+        ),
+
+        // SavedPlacesViewModel — persists Home / Work / Favourite via shared_preferences
+        ChangeNotifierProvider<SavedPlacesViewModel>(
+          create: (ctx) => SavedPlacesViewModel(
+            placesRepository: ctx.read<PlacesRepository>(),
+          ),
         ),
       ],
       child: MaterialApp(
