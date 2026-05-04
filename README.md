@@ -21,12 +21,16 @@ Think of it as **Google Maps or Waze, but with AR directions on your camera view
 - 📷 **Live Camera AR View** — Real-time camera feed with AR overlays
 - 🗺️ **Google Maps Integration** — Accurate route and navigation data via Directions & Places API
 - 🎨 **Waze-Inspired Map Style** — CartoDB Voyager tiles: blue water, green parks, amber highways, no Google branding
-- 🧭 **Turn-by-Turn AR Directions** — Arrows and distance shown on camera
+- 🧭 **Turn-by-Turn AR Directions** — Seven distinct arrow types: straight, turn left/right, keep left/right, U-turn, and roundabout with exit number
+- 🔄 **Roundabout Guidance** — Custom-painted diagram showing the roundabout ring, entry arrow, exit arrow, and the exit number in the centre
+- 🏷️ **Road Name Display** — AR overlay shows only the upcoming street name, extracted from the bold text in Google Maps step instructions
 - 📍 **Real-Time GPS Tracking** — Continuous location with Waze-style directional arrow and accuracy ring
 - 🔄 **Auto Rerouting** — Recalculates route when you go off path
 - ✅ **Arrival Detection** — Notifies when you reach your destination
 - 📋 **Waze-Style Side Menu** — Hamburger (≡) button opens a drawer with Profile, Plan a drive, Inbox, Settings, Help & Feedback, and Shutdown
 - 🎬 **Animated Map Transitions** — Smooth eased fly-to animation (650 ms, `easeInOut`) when centering on location
+- 🏠 **Quick-Access Saved Places** — Home, Work, and Favourite one-tap buttons persist destinations via `shared_preferences`
+- 🔖 **Bookmarked Locations** — Bookmark any search result; a SQLite-backed list of saved places is accessible via the "Saved Places" button in the bottom sheet
 
 ---
 
@@ -40,9 +44,10 @@ Think of it as **Google Maps or Waze, but with AR directions on your camera view
 | [flutter_map](https://pub.dev/packages/flutter_map) | Tile-based map display (no Google Maps SDK) |
 | [CartoDB Voyager](https://carto.com/basemaps/) | OpenStreetMap-based tile style — Waze-like colours (blue water, green parks, amber highways) |
 | [Google Maps Directions API](https://developers.google.com/maps/documentation/directions) | Route and turn-by-turn data |
-| [Geolocator](https://pub.dev/packages/geolocator) | Real-time GPS location |
-| [Google Maps Directions API](https://developers.google.com/maps/documentation/directions) | Turn-by-turn route data |
 | [Google Maps Places API](https://developers.google.com/maps/documentation/places) | Destination search autocomplete |
+| [Geolocator](https://pub.dev/packages/geolocator) | Real-time GPS location |
+| [sqflite](https://pub.dev/packages/sqflite) | SQLite database for saved locations list |
+| [shared_preferences](https://pub.dev/packages/shared_preferences) | Persistent key-value storage for Home / Work / Favourite places and settings |
 
 ---
 
@@ -60,11 +65,13 @@ smart_ar_navigation/
 │
 ├── lib/
 │   ├── main.dart                # App entry point
-│   ├── app.dart                 # MaterialApp setup & routing
+│   ├── app.dart                 # MaterialApp setup, routing & Provider tree
 │   ├── core/                    # Shared constants, enums, utilities
+│   │   ├── enums/turn_direction.dart   # forward, left, right, keepLeft, keepRight, uTurn, roundabout
+│   │   └── utils/route_parser.dart    # Parses Google Maps steps; extracts street name & exit number
 │   ├── models/                  # Data classes
-│   ├── services/                # ARCore & GPS service wrappers
-│   ├── repositories/            # Google Maps API communication
+│   ├── services/                # ARCore, GPS, and SQLite service wrappers
+│   ├── repositories/            # Google Maps API and SQLite communication
 │   ├── viewmodels/              # Business logic (MVVM)
 │   └── views/                   # Screens & widgets (UI)
 │
@@ -188,7 +195,9 @@ dependencies:
   flutter_polyline_points: ^2.0.0  # Route polyline rendering
   provider: ^6.1.0                 # State management (MVVM)
   flutter_dotenv: ^5.1.0           # Load API keys from .env
-  shared_preferences: ^2.2.0       # Persistent settings storage
+  shared_preferences: ^2.2.0       # Persistent key-value storage (settings, Home/Work/Favourite)
+  sqflite: ^2.3.3                  # SQLite database for bookmarked saved locations list
+  path: ^1.9.0                     # File path utilities (required by sqflite)
 ```
 
 ---
@@ -226,12 +235,17 @@ All project documentation is located in the `/docs` folder:
 - [x] Destination search with autocomplete (Places API)
 - [x] Waze-style hamburger side menu (Profile, Plan a drive, Inbox, Settings, Help, Shutdown)
 - [x] Settings screen (display prefs, AR options, persisted via shared_preferences)
-- [ ] Google Maps route fetching (Directions API)
-- [ ] AR Navigation screen with live camera
-- [ ] AR overlay rendering (arrows + distance)
-- [ ] Real-time GPS tracking & AR updates
+- [x] Quick-access saved places (Home, Work, Favourite — SharedPreferences)
+- [x] Bookmarked locations list (SQLite — unlimited saved places)
+- [x] Google Maps route fetching (Directions API) with multi-route preview
+- [x] AR Navigation screen with live camera feed (ARCore)
+- [x] AR overlay rendering — 7 arrow types: straight, left, right, keep left/right, U-turn, roundabout
+- [x] Roundabout overlay with custom-painted exit number diagram
+- [x] Street name extraction from Google Maps step instructions
+- [x] Real-time GPS tracking & AR overlay updates
+- [x] Arrival detection (20 m proximity threshold)
 - [ ] Auto rerouting
-- [ ] Arrival detection
+- [ ] Voice guidance
 - [ ] Manual testing & bug fixes
 - [ ] Final APK build & submission
 
@@ -242,7 +256,6 @@ All project documentation is located in the `/docs` folder:
 - Android only — no iOS support
 - Requires active internet connection
 - No voice guidance in this version
-- No 2D map toggle in this version
 - AR performance may vary in tunnels or low-light conditions
 
 ---

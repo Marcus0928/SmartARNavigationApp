@@ -11,8 +11,8 @@
 | **Supervisor** | Dr Javid Iqbal Thirupattur |
 | **Institution** | Sunway University — School of Computing and Artificial Intelligence |
 | **Programme** | Bachelor of Software Engineering (Hons) |
-| **Version** | 1.0 |
-| **Last Updated** | October 2025 |
+| **Version** | 2.0 |
+| **Last Updated** | May 2026 |
 
 ---
 
@@ -301,11 +301,14 @@ Check Location Permission
 
 | Property / Method | Type | Description |
 |---|---|---|
-| `nextTurnDirection` | `TurnDirection` | Enum: forward / left / right / u-turn |
-| `distanceToNextTurn` | `double` | Distance in metres to the next turn |
-| `currentStreetName` | `String` | Name of the current street |
-| `updateAROverlay(location)` | `void` | Recalculates overlay based on GPS position |
+| `nextTurnDirection` | `TurnDirection?` | Current maneuver: forward, left, right, keepLeft, keepRight, uTurn, or roundabout |
+| `distanceToNextTurn` | `double?` | Distance in metres to the next turn |
+| `currentStreetName` | `String?` | Name of the upcoming street (extracted from Google Maps step instruction) |
+| `exitNumber` | `int?` | Roundabout exit number (1–4); non-null only when `nextTurnDirection == roundabout` |
 | `isARInitialized` | `bool` | Whether ARCore session is ready |
+| `initializeOverlay(route)` | `Future<void>` | Seeds the turn queue from a `RouteModel` and sets initial overlay state |
+| `updateAROverlay(location)` | `void` | Drops passed turns (< 10 m) and recalculates overlay from current GPS position |
+| `resetOverlay()` | `void` | Clears all overlay state (called on navigation stop or arrival) |
 
 #### `MapViewModel`
 **Responsibility:** Handles GPS location tracking and map data.
@@ -318,6 +321,31 @@ Check Location Permission
 | `startLocationTracking()` | `Future<void>` | One-shot fix then continuous GPS stream |
 | `stopLocationTracking()` | `void` | Ends GPS stream |
 | `searchPlaces(query)` | `Future<List<PlaceModel>>` | Returns autocomplete results |
+
+#### `SavedPlacesViewModel`
+**Responsibility:** Manages the three fixed saved-place slots (Home, Work, Favourite), persisted via `shared_preferences`.
+
+| Property / Method | Type | Description |
+|---|---|---|
+| `home` | `PlaceModel?` | Saved Home location |
+| `work` | `PlaceModel?` | Saved Work location |
+| `favourite` | `PlaceModel?` | Saved Favourite location |
+| `searchResults` | `List<PlaceModel>` | Live search results for the place-search sheet |
+| `getPlace(type)` | `PlaceModel?` | Returns the saved place for a given `SavedPlaceType` |
+| `selectAndSavePlace(type, place)` | `Future<void>` | Fetches full place details then persists to SharedPreferences |
+| `clearPlace(type)` | `Future<void>` | Removes the saved place for a given slot |
+| `searchPlace(query)` | `Future<void>` | Searches the Places API and updates `searchResults` |
+
+#### `SavedLocationsViewModel`
+**Responsibility:** Manages the user's unbounded list of bookmarked places, persisted via SQLite.
+
+| Property / Method | Type | Description |
+|---|---|---|
+| `locations` | `List<PlaceModel>` | All saved locations, ordered newest-first |
+| `count` | `int` | Number of saved locations |
+| `isSaved(placeId)` | `bool` | O(1) check via an in-memory `Set<String>` |
+| `toggle(place)` | `Future<void>` | Adds the place if not saved; removes it if already saved |
+| `remove(placeId)` | `Future<void>` | Removes a specific location by its Google Places ID |
 
 #### `SettingsViewModel`
 **Responsibility:** Manages user preferences, persisted via `shared_preferences`.
@@ -357,13 +385,26 @@ class RouteModel {
 }
 ```
 
+#### `TurnDirection` (enum)
+
+| Value | Icon rendered | Google Maps maneuver strings |
+|---|---|---|
+| `forward` | Arrow up | *(default / straight)* |
+| `left` | Turn left | `turn-left`, `turn-sharp-left` |
+| `right` | Turn right | `turn-right`, `turn-sharp-right` |
+| `keepLeft` | Slight left | `turn-slight-left`, `keep-left`, `ramp-left`, `fork-left` |
+| `keepRight` | Slight right | `turn-slight-right`, `keep-right`, `ramp-right`, `fork-right` |
+| `uTurn` | U-turn | `uturn-left`, `uturn-right` |
+| `roundabout` | Custom diagram | `roundabout-left`, `roundabout-right` |
+
 #### `TurnInstruction`
 ```dart
 class TurnInstruction {
-  final TurnDirection direction;  // forward, left, right, u_turn
+  final TurnDirection direction;  // One of the 7 TurnDirection values
   final double distanceFromPrev;  // Distance from previous waypoint in metres
-  final String streetName;        // Name of the street for this instruction
-  final LatLng position;          // GPS position of this turn
+  final String streetName;        // Road name extracted from bold tag in html_instructions
+  final LatLng position;          // GPS position of the end of this step
+  final int? exitNumber;          // Roundabout exit number (null for non-roundabout steps)
 }
 ```
 
@@ -392,8 +433,22 @@ class PlaceModel {
 - Handles API errors and network failures
 
 #### `PlacesRepository`
-- Makes HTTP calls to **Google Maps Places API**
-- Returns autocomplete suggestions as `List<PlaceModel>`
+- Makes HTTP calls to **Google Maps Places API** (Text Search + Place Details endpoints)
+- Returns search results as `List<PlaceModel>` with coordinates already included
+- `getPlaceDetails(placeId)` fetches the full address and coordinates for a selected place
+
+#### `SavedLocationsDatabase`
+- SQLite database helper using the `sqflite` package
+- Creates and manages the `saved_locations` table (columns: `id`, `place_id`, `name`, `address`, `lat`, `lng`, `saved_at`)
+- `place_id` has a `UNIQUE` constraint to prevent duplicate bookmarks
+- Provides raw CRUD methods: `insert`, `delete`, `getAll` (ordered by `saved_at DESC`), `exists`
+
+#### `SavedLocationsRepository`
+- Sits above `SavedLocationsDatabase` and converts raw rows to/from `PlaceModel` objects
+- `save(place)` — inserts a `PlaceModel` with the current timestamp
+- `remove(placeId)` — deletes by Google Places ID
+- `getAll()` — returns all bookmarks as `List<PlaceModel>`
+- `isSaved(placeId)` — checks existence without loading all rows
 
 #### `ARService`
 - Wraps `ar_flutter_plugin`
@@ -482,54 +537,68 @@ smart_ar_navigation/
 │   │   │   ├── app_strings.dart     # All text strings
 │   │   │   └── api_keys.dart        # API key references (loaded from .env)
 │   │   ├── enums/
-│   │   │   ├── turn_direction.dart  # forward, left, right, u_turn
+│   │   │   ├── turn_direction.dart  # forward, left, right, keepLeft, keepRight, uTurn, roundabout
 │   │   │   └── navigation_status.dart # idle, navigating, arrived
 │   │   └── utils/
-│   │       ├── location_utils.dart  # Distance calculation helpers
-│   │       └── route_parser.dart    # Parses Google Maps API JSON
+│   │       ├── location_utils.dart  # Distance / findNextTurn helpers
+│   │       └── route_parser.dart    # Parses Google Maps JSON; extracts street name & roundabout exit number
 │   │
 │   ├── models/                      # Data classes (Model layer)
 │   │   ├── route_model.dart
-│   │   ├── turn_instruction.dart
+│   │   ├── turn_instruction.dart    # Includes exitNumber for roundabout steps
 │   │   └── place_model.dart
 │   │
 │   ├── services/                    # External service wrappers (Model layer)
-│   │   ├── location_service.dart    # GPS / geolocator wrapper
-│   │   └── ar_service.dart          # ARCore / ar_flutter_plugin wrapper
+│   │   ├── location_service.dart        # GPS / geolocator wrapper
+│   │   ├── ar_service.dart              # ARCore / ar_flutter_plugin wrapper
+│   │   └── saved_locations_database.dart # SQLite database helper (sqflite)
 │   │
-│   ├── repositories/                # API communication (Model layer)
-│   │   ├── route_repository.dart    # Google Maps Directions API
-│   │   └── places_repository.dart   # Google Maps Places API
+│   ├── repositories/                # API & DB communication (Model layer)
+│   │   ├── route_repository.dart         # Google Maps Directions API
+│   │   ├── places_repository.dart        # Google Maps Places API
+│   │   └── saved_locations_repository.dart # CRUD over SavedLocationsDatabase
 │   │
 │   ├── viewmodels/                  # Business logic (ViewModel layer)
 │   │   ├── navigation_viewmodel.dart
-│   │   ├── ar_viewmodel.dart
+│   │   ├── ar_viewmodel.dart              # Tracks nextTurnDirection, exitNumber, streetName
 │   │   ├── map_viewmodel.dart
-│   │   └── settings_viewmodel.dart
+│   │   ├── settings_viewmodel.dart
+│   │   ├── saved_places_viewmodel.dart    # Home / Work / Favourite (SharedPreferences)
+│   │   └── saved_locations_viewmodel.dart # Bookmarked places list (SQLite)
 │   │
 │   ├── views/                       # Screens & Widgets (View layer)
 │   │   ├── screens/
 │   │   │   ├── splash_screen.dart
 │   │   │   ├── home_screen.dart
 │   │   │   ├── ar_navigation_screen.dart
-│   │   │   └── settings_screen.dart
+│   │   │   ├── settings_screen.dart
+│   │   │   └── home/
+│   │   │       └── widgets/
+│   │   │           ├── compass_button.dart
+│   │   │           ├── floating_icon_button.dart
+│   │   │           ├── location_indicator.dart
+│   │   │           ├── place_options_sheet.dart
+│   │   │           ├── place_search_sheet.dart
+│   │   │           ├── quick_place_button.dart
+│   │   │           ├── route_preview_card.dart
+│   │   │           ├── saved_locations_sheet.dart  # Bookmark list bottom sheet
+│   │   │           ├── speed_indicator.dart
+│   │   │           └── waze_drawer.dart
 │   │   └── widgets/                 # Reusable UI components
-│   │       ├── ar_overlay_widget.dart     # AR arrows and distance text
-│   │       ├── search_bar_widget.dart     # Destination search input
-│   │       ├── navigation_bottom_bar.dart # ETA / distance bottom panel
-│   │       └── turn_arrow_widget.dart     # Directional arrow display
+│   │       ├── ar_overlay_widget.dart      # Turn card HUD (switches between TurnArrowWidget / RoundaboutWidget)
+│   │       ├── roundabout_widget.dart      # CustomPainter: ring + entry/exit arrows + exit number
+│   │       ├── search_bar_widget.dart      # Destination search input
+│   │       ├── navigation_bottom_bar.dart  # ETA / distance bottom panel
+│   │       └── turn_arrow_widget.dart      # Material icon arrows for all 7 TurnDirection values
 │   │
-│   └── app.dart                     # MaterialApp setup & routing
+│   └── app.dart                     # MaterialApp setup, routing & MultiProvider tree
 │
 ├── assets/
-│   ├── map_style.json               # Custom Waze-inspired Google Maps style
+│   ├── map_style.json               # Custom Waze-inspired map style
 │   ├── images/
-│   │   └── app_logo.png
+│   │   └── logo.png
 │   └── icons/
-│       ├── arrow_forward.png
-│       ├── arrow_left.png
-│       ├── arrow_right.png
-│       └── arrow_uturn.png
+│       └── logo.svg
 │
 ├── test/                            # Unit & widget tests
 │   ├── viewmodels/
@@ -593,6 +662,17 @@ GET https://maps.googleapis.com/maps/api/directions/json
   - `Geolocator.getPositionStream()` — returns live GPS updates
   - `Geolocator.checkPermission()` — verifies location access
   - `Geolocator.distanceBetween()` — calculates distance between two coordinates
+
+### 8.6 SQLite (via `sqflite`)
+
+- **Purpose:** Persistent local storage for the user's unbounded list of bookmarked places
+- **Database file:** `saved_locations.db` (stored in the app's default databases path)
+- **Table:** `saved_locations` — columns: `id` (PK), `place_id` (UNIQUE), `name`, `address`, `lat`, `lng`, `saved_at`
+- **Key Design Decisions:**
+  - `place_id` is unique to prevent duplicate bookmarks
+  - Rows are ordered by `saved_at DESC` so newest saves appear first
+  - `ConflictAlgorithm.ignore` on insert prevents crashes on accidental re-saves
+  - The `SavedLocationsViewModel` maintains an in-memory `Set<String>` of saved IDs for O(1) `isSaved()` checks without hitting the database on every search result render
 
 ---
 
@@ -677,13 +757,14 @@ These features are **out of scope for the current FYP phase** but the design has
 
 | Feature | Design Note |
 |---|---|
-| **2D Map Toggle** | Add `map_screen.dart` as a new View. `NavigationViewModel` already holds the `RouteModel` — just pass it to a `GoogleMap` widget. A toggle button on `ARNavigationScreen` can push/pop between screens. |
-| **Voice Instructions** | Add a `VoiceService` in the services layer. `ARViewModel` already has `nextTurnDirection` and `distanceToNextTurn` — just pass these to a text-to-speech call. |
+| **Auto Rerouting** | `NavigationViewModel` already holds the `RouteModel`. Add a deviation check in the GPS update loop (> 30 m from polyline) and call `RouteRepository.getRoute()` again. `ARViewModel.resetOverlay()` and `initializeOverlay()` already handle the reset/re-seed cycle. |
+| **Voice Instructions** | Add a `VoiceService` in the services layer. `ARViewModel` already exposes `nextTurnDirection`, `distanceToNextTurn`, and `currentStreetName` — pass these to a `flutter_tts` call at appropriate distance thresholds. |
+| **2D Map Toggle** | Add `map_screen.dart` as a new View. `NavigationViewModel` already holds the `RouteModel` — pass it to a `GoogleMap` widget. A toggle button on `ARNavigationScreen` can push/pop between screens. |
 | **Offline Navigation** | Replace `RouteRepository` with a cached route strategy. No changes needed in ViewModels or Views. |
 | **Speed Warning** | Add a `speedLimit` property to `MapViewModel` using location speed data from `geolocator`. |
 
 ---
 
-*End of SDD Document — Version 1.0*
+*End of SDD Document — Version 2.0*
 
 *Prepared by: Liew Sau Yang | Sunway University | Bachelor of Software Engineering (Hons)*

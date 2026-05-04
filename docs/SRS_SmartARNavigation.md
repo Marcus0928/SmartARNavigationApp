@@ -12,8 +12,8 @@
 | **Institution** | Sunway University — School of Computing and Artificial Intelligence |
 | **Programme** | Bachelor of Software Engineering (Hons) |
 | **Semester** | September 2025 |
-| **Version** | 1.0 |
-| **Last Updated** | October 2025 |
+| **Version** | 2.0 |
+| **Last Updated** | May 2026 |
 
 ---
 
@@ -23,6 +23,8 @@
 2. [Overall Description](#2-overall-description)
 3. [System Features & Functional Requirements](#3-system-features--functional-requirements)
    - [3.7 Settings Screen](#37-settings-screen)
+   - [3.8 Quick-Access Saved Places](#38-quick-access-saved-places-home--work--favourite)
+   - [3.9 Bookmarked Locations](#39-bookmarked-locations-saved-places-list)
 4. [Non-Functional Requirements](#4-non-functional-requirements)
 5. [External Interface Requirements](#5-external-interface-requirements)
 6. [Technology Stack](#6-technology-stack)
@@ -172,7 +174,7 @@ Primary users are assumed to be comfortable with basic smartphone usage. No tech
 |---|---|
 | FR-08 | The system shall allow the user to input a destination address or select a point on a map. |
 | FR-09 | The system shall call the Google Maps Directions API to retrieve turn-by-turn route data. |
-| FR-10 | The system shall parse route data including waypoints, turn types (left, right, forward), and distances. |
+| FR-10 | The system shall parse route data including waypoints, turn types, distances, and — for roundabout steps — the exit number extracted from the step's HTML instruction text. |
 | FR-11 | The system shall recalculate the route automatically if the user deviates from the planned path. |
 
 ---
@@ -183,11 +185,13 @@ Primary users are assumed to be comfortable with basic smartphone usage. No tech
 
 | ID | Requirement |
 |---|---|
-| FR-12 | The system shall overlay directional arrows (forward, turn left, turn right) on the camera view. |
+| FR-12 | The system shall overlay directional arrows on the camera view using seven distinct maneuver types: straight (forward), turn left, turn right, keep left, keep right, U-turn, and roundabout. |
+| FR-12a | For roundabout maneuvers, the system shall display a custom-painted diagram showing the roundabout ring, an entry arrow, an exit arrow at the correct clock position, and the exit number (e.g. "2") in the centre of the ring. |
+| FR-12b | The system shall display only the name of the upcoming road on the AR overlay (extracted from the bold text in the Google Maps step instruction), not the full instruction sentence. |
 | FR-13 | The system shall display the distance to the next turn as text on the AR overlay. |
 | FR-14 | The system shall update AR overlays in real-time as the user's GPS position changes. |
 | FR-15 | The system shall align AR overlays with the real-world environment using ARCore plane detection. |
-| FR-16 | The system shall remove or update AR cues after a turn is completed. |
+| FR-16 | The system shall remove or update AR cues after a turn is completed (within 10 m of the turn waypoint). |
 
 ---
 
@@ -236,6 +240,37 @@ Primary users are assumed to be comfortable with basic smartphone usage. No tech
 | FR-30 | The Settings screen shall allow the user to select a preferred AR arrow size (Small / Medium / Large). |
 | FR-31 | The Settings screen shall include an AR overlay opacity slider adjustable between 50% and 100%. |
 | FR-32 | The Settings screen shall display an About section showing the current app version and developer information. |
+
+---
+
+### 3.8 Quick-Access Saved Places (Home / Work / Favourite)
+
+**Description:** The app shall provide three fixed quick-access buttons on the Home Screen bottom sheet for storing a single destination per slot (Home, Work, Favourite), persisted via `shared_preferences`.
+
+| ID | Requirement |
+|---|---|
+| FR-36 | The Home Screen bottom sheet shall display three quick-access buttons labelled **Home**, **Work**, and **Favourite**. |
+| FR-37 | Tapping a quick-access button that has no saved place shall open a place-search sheet, allowing the user to search for and assign a location to that slot. |
+| FR-38 | Tapping a quick-access button that has a saved place shall immediately set that place as the selected navigation destination on the map. |
+| FR-39 | Long-pressing a populated quick-access button shall open an options sheet with the choices: Navigate, Edit location, and Remove. |
+| FR-40 | All three saved places shall be persisted across app restarts using `shared_preferences`. |
+
+---
+
+### 3.9 Bookmarked Locations (Saved Places List)
+
+**Description:** The app shall allow the user to bookmark an unlimited number of places from search results, stored in a local SQLite database.
+
+| ID | Requirement |
+|---|---|
+| FR-41 | Each search result displayed in the Home Screen bottom sheet shall include a bookmark icon toggle. |
+| FR-42 | Tapping the bookmark icon on a search result shall save that place to the local SQLite database; tapping it again shall remove it. |
+| FR-43 | The bookmark icon shall visually indicate the saved state (filled icon = saved, outlined icon = not saved). |
+| FR-44 | The Home Screen bottom sheet shall display a full-width **Saved Places** button below the quick-access buttons, showing the number of bookmarked places. |
+| FR-45 | Tapping the **Saved Places** button shall open a bottom sheet listing all bookmarked places, ordered newest-first. |
+| FR-46 | Each entry in the saved places list shall provide a **Navigate** action (sets the place as the map destination) and a **Remove** action (deletes from the database). |
+| FR-47 | Saved places shall be stored in a local SQLite database using the `sqflite` package and shall persist across app restarts. |
+| FR-48 | The system shall prevent duplicate entries: bookmarking a place that is already saved shall have no effect. |
 
 ---
 
@@ -334,15 +369,22 @@ Primary users are assumed to be comfortable with basic smartphone usage. No tech
 ### 6.1 Key Flutter Packages
 
 ```yaml
-# pubspec.yaml dependencies (planned)
+# pubspec.yaml dependencies (actual)
 dependencies:
   flutter:
     sdk: flutter
-  ar_flutter_plugin: ^0.7.3     # ARCore integration
-  google_maps_flutter: ^2.5.0   # Google Maps SDK
-  geolocator: ^10.0.0           # GPS location
-  http: ^1.1.0                  # API calls to Google Directions API
-  flutter_polyline_points: ^2.0.0  # Route polyline rendering
+  ar_flutter_plugin_2: ^0.0.3      # ARCore integration
+  google_maps_flutter: ^2.5.0      # LatLng type + platform channel for route API
+  flutter_map: ^6.1.0              # Tile-based map display (CartoDB Voyager, no Google SDK)
+  latlong2: ^0.9.0                 # LatLng coordinate type for flutter_map
+  geolocator: ^12.0.0              # GPS location stream
+  http: ^1.1.0                     # HTTP requests to Google APIs
+  flutter_polyline_points: ^2.0.0  # Route polyline decoding
+  provider: ^6.1.0                 # State management (MVVM / ChangeNotifier)
+  flutter_dotenv: ^5.1.0           # Load API keys from .env
+  shared_preferences: ^2.2.0       # Persistent key-value storage (settings, Home/Work/Favourite)
+  sqflite: ^2.3.3                  # SQLite database for bookmarked saved locations
+  path: ^1.9.0                     # File path utilities (required by sqflite)
 ```
 
 ---
@@ -383,6 +425,6 @@ dependencies:
 
 ---
 
-*End of SRS Document — Version 1.0*
+*End of SRS Document — Version 2.0*
 
 *Prepared by: Liew Sau Yang | Sunway University | Bachelor of Software Engineering (Hons)*
