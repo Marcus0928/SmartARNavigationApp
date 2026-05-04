@@ -27,8 +27,6 @@ class RoutePreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final selected = routes.isNotEmpty ? routes[selectedIndex] : null;
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
@@ -155,25 +153,6 @@ class RoutePreviewCard extends StatelessWidget {
               ),
             ),
 
-            // Selected route detail chips
-            if (selected != null) ...[
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  _Chip(
-                    icon: Icons.access_time_rounded,
-                    label: '${(selected.estimatedDuration / 60).ceil()} min',
-                    color: primaryColor,
-                  ),
-                  const SizedBox(width: 8),
-                  _Chip(
-                    icon: Icons.straighten_rounded,
-                    label: _formatDistance(selected.totalDistance),
-                    color: Colors.grey.shade600,
-                  ),
-                ],
-              ),
-            ],
           ],
 
           const SizedBox(height: 12),
@@ -206,36 +185,5 @@ class RoutePreviewCard extends StatelessWidget {
   String _formatDistance(double metres) {
     if (metres >= 1000) return '${(metres / 1000).toStringAsFixed(1)} km';
     return '${metres.toInt()} m';
-  }
-}
-
-class _Chip extends StatelessWidget {
-  const _Chip({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: color),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: color,
-          ),
-        ),
-      ],
-    );
   }
 }

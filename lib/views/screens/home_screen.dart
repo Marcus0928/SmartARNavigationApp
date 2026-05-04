@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart' as gm;
 import 'package:smart_ar_navigation/core/constants/app_colors.dart';
 import 'package:smart_ar_navigation/core/utils/location_utils.dart';
+import 'package:smart_ar_navigation/models/place_model.dart';
 import 'package:smart_ar_navigation/viewmodels/map_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/navigation_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/saved_locations_viewmodel.dart';
@@ -50,6 +51,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Animation<double>? _headingAnim;
 
   MapViewModel? _mapVmRef;
+  PlaceModel? _lastDestination;
 
   void _animatedMove(LatLng dest, double zoom) {
     final latTween = Tween<double>(
@@ -408,6 +410,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       });
     }
 
+    if (mapVM.selectedDestination != _lastDestination) {
+      _lastDestination = mapVM.selectedDestination;
+      if (mapVM.selectedDestination != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _sheetController.isAttached) {
+            _sheetController.animateTo(
+              0.40,
+              duration: const Duration(milliseconds: 400),
+              curve: Curves.easeOut,
+            );
+          }
+        });
+      }
+    }
+
     return Scaffold(
       key: _scaffoldKey,
       drawer: const WazeDrawer(),
@@ -582,7 +599,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               minChildSize: 0.12,
               maxChildSize: 0.95,
               snap: true,
-              snapSizes: const [0.22, 0.5, 0.95],
+              snapSizes: const [0.22, 0.40, 0.95],
               builder: (sheetContext, scrollController) {
                 return Container(
                   decoration: const BoxDecoration(
@@ -745,6 +762,39 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                       ],
                                     ),
                                   ),
+                                ] else if (mapVM.selectedDestination != null) ...[
+                                  const SizedBox(height: 12),
+                                  RoutePreviewCard(
+                                    destination: mapVM.selectedDestination!,
+                                    routes: mapVM.previewRoutes,
+                                    selectedIndex: mapVM.selectedRouteIndex,
+                                    isFetching: mapVM.isFetchingRoute,
+                                    onSelectRoute: mapVM.selectRoute,
+                                    onClear: mapVM.clearDestination,
+                                    onStart: () async {
+                                      await navVM.startNavigation(
+                                        mapVM.selectedDestination!,
+                                        route: mapVM.selectedRoute,
+                                      );
+
+                                      if (!context.mounted) return;
+
+                                      if (navVM.errorMessage != null) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              navVM.errorMessage!,
+                                            ),
+                                          ),
+                                        );
+                                      } else {
+                                        Navigator.of(context).pushNamed(
+                                          '/ar-navigation',
+                                        );
+                                      }
+                                    },
+                                  ),
                                 ] else ...[
                                   const SizedBox(height: 12),
                                   Row(
@@ -870,43 +920,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                       ),
                                     ),
                                   ),
-
-                                  if (mapVM.selectedDestination != null) ...[
-                                    const SizedBox(height: 12),
-                                    RoutePreviewCard(
-                                      destination:
-                                          mapVM.selectedDestination!,
-                                      routes: mapVM.previewRoutes,
-                                      selectedIndex:
-                                          mapVM.selectedRouteIndex,
-                                      isFetching: mapVM.isFetchingRoute,
-                                      onSelectRoute: mapVM.selectRoute,
-                                      onClear: mapVM.clearDestination,
-                                      onStart: () async {
-                                        await navVM.startNavigation(
-                                          mapVM.selectedDestination!,
-                                          route: mapVM.selectedRoute,
-                                        );
-
-                                        if (!context.mounted) return;
-
-                                        if (navVM.errorMessage != null) {
-                                          ScaffoldMessenger.of(context)
-                                              .showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                navVM.errorMessage!,
-                                              ),
-                                            ),
-                                          );
-                                        } else {
-                                          Navigator.of(context).pushNamed(
-                                            '/ar-navigation',
-                                          );
-                                        }
-                                      },
-                                    ),
-                                  ],
                                 ],
                               ],
                             ),

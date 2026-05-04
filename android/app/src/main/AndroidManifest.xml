@@ -15,14 +15,14 @@
     <uses-feature android:name="android.hardware.camera.ar" android:required="true"/>
 
     <application
-        android:label="smart_ar_navigation"
+        android:label="Smart AR Navigation"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 
         <!-- Google Maps API key -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="TEMP_KEY"/>
+            android:value="REMOVED_API_KEY"/>
 
         <!-- ARCore — marks this app as requiring AR support -->
         <meta-data

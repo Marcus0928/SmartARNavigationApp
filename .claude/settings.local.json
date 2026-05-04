@@ -1,7 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(npm --version)",
+      "Bash(npm list *)",
+      "Read(//tmp/**)",
+      "Bash(node -e ' *)",
+      "Bash(flutter analyze *)",
+      "Bash(grep -v \"^$\")",
+      "Bash(flutter pub *)"
     ]
   }
 }

@@ -87,13 +87,21 @@ TurnDirection _parseManeuver(String? maneuver) {
   }
 }
 
-// Returns the road name from the first bold tag that isn't a pure ordinal (e.g. "2nd").
+// Returns the road name from the first bold tag that isn't an ordinal or compass direction.
+// Google Maps wraps both the compass word ("northwest") and the road name in <b> tags on
+// "Head <b>northwest</b> on <b>Jalan ABC</b>" steps — we skip the direction word.
 // Falls back to the full stripped text when no suitable bold tag exists.
 String _extractStreetName(String html) {
   final ordinal = RegExp(r'^\d+(st|nd|rd|th)$', caseSensitive: false);
+  const compassWords = {
+    'north', 'south', 'east', 'west',
+    'northeast', 'northwest', 'southeast', 'southwest',
+  };
   for (final m in RegExp(r'<b>(.*?)</b>').allMatches(html)) {
-    final text = m.group(1)!;
-    if (!ordinal.hasMatch(text)) return text;
+    final text = _stripHtml(m.group(1)!); // strip nested tags like <wbr/>
+    if (ordinal.hasMatch(text)) continue;
+    if (compassWords.contains(text.toLowerCase())) continue;
+    return text;
   }
   return _stripHtml(html);
 }

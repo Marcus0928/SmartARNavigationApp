@@ -1,0 +1,94 @@
+<svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#060D1F"/>
+      <stop offset="50%" stop-color="#0A1628"/>
+      <stop offset="100%" stop-color="#050B17"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00F0FF" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#00F0FF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="arrow" x1="50" y1="29.1" x2="50" y2="70.9" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#00F0FF"/>
+      <stop offset="55%" stop-color="#0088FF"/>
+      <stop offset="100%" stop-color="#FF6B35"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00F0FF" stop-opacity="0.9"/>
+      <stop offset="50%" stop-color="#0044AA" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#00F0FF" stop-opacity="0.9"/>
+    </linearGradient>
+    <clipPath id="clip">
+      <rect x="0" y="0" width="100" height="100" rx="22" ry="22"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background -->
+  <rect x="0" y="0" width="100" height="100" rx="22" ry="22" fill="url(#bg)"/>
+
+  <g clip-path="url(#clip)">
+    <!-- Grid lines -->
+    <g opacity="0.06">
+      <line x1="25" y1="0" x2="25" y2="100" stroke="#00F0FF" stroke-width="0.4"/>
+      <line x1="50" y1="0" x2="50" y2="100" stroke="#00F0FF" stroke-width="0.4"/>
+      <line x1="75" y1="0" x2="75" y2="100" stroke="#00F0FF" stroke-width="0.4"/>
+      <line x1="0" y1="25" x2="100" y2="25" stroke="#00F0FF" stroke-width="0.4"/>
+      <line x1="0" y1="50" x2="100" y2="50" stroke="#00F0FF" stroke-width="0.4"/>
+      <line x1="0" y1="75" x2="100" y2="75" stroke="#00F0FF" stroke-width="0.4"/>
+    </g>
+
+    <!-- Ambient glow -->
+    <circle cx="50" cy="50" r="41.8" fill="url(#glow)"/>
+
+    <!-- Outer dashed ring -->
+    <circle cx="50" cy="50" r="38" stroke="url(#ring)" stroke-width="1.2" stroke-dasharray="8.36 3.8" fill="none" opacity="0.8"/>
+
+    <!-- Inner dashed ring -->
+    <circle cx="50" cy="50" r="23.56" stroke="#00F0FF" stroke-width="0.8" stroke-dasharray="5.7 3.04" fill="none" opacity="0.45" stroke-dashoffset="1.9"/>
+
+    <!-- Crosshair lines -->
+    <line x1="29.1" y1="50" x2="42.4" y2="50" stroke="#00F0FF" stroke-width="0.9" opacity="0.5"/>
+    <line x1="57.6" y1="50" x2="70.9" y2="50" stroke="#00F0FF" stroke-width="0.9" opacity="0.5"/>
+    <line x1="50" y1="29.1" x2="50" y2="42.4" stroke="#00F0FF" stroke-width="0.9" opacity="0.5"/>
+    <line x1="50" y1="57.6" x2="50" y2="70.9" stroke="#00F0FF" stroke-width="0.9" opacity="0.5"/>
+
+    <!-- Navigation arrow (main - cyan to blue) -->
+    <polygon points="50,30.24 41.64,53.04 50,46.96 58.36,53.04" fill="url(#arrow)"/>
+
+    <!-- Navigation arrow tail (orange accent) -->
+    <polygon points="50,69.76 41.64,46.96 50,53.04 58.36,46.96" fill="#FF6B35" opacity="0.45"/>
+
+    <!-- Centre pivot -->
+    <circle cx="50" cy="50" r="2.5" fill="#FFFFFF" opacity="0.9"/>
+    <circle cx="50" cy="50" r="1.5" fill="#00F0FF"/>
+
+    <!-- Cardinal tick marks (primary = 90° intervals) -->
+    <line x1="88"    y1="50"    x2="84"    y2="50"    stroke="#00F0FF" stroke-width="1.5" opacity="0.9"/>
+    <line x1="50"    y1="88"    x2="50"    y2="84"    stroke="#00F0FF" stroke-width="1.5" opacity="0.9"/>
+    <line x1="12"    y1="50"    x2="16"    y2="50"    stroke="#00F0FF" stroke-width="1.5" opacity="0.9"/>
+    <line x1="50"    y1="12"    x2="50"    y2="16"    stroke="#00F0FF" stroke-width="1.5" opacity="0.9"/>
+
+    <!-- Diagonal tick marks (45° intervals) -->
+    <line x1="76.87" y1="76.87" x2="74.04" y2="74.04" stroke="#00F0FF" stroke-width="0.8" opacity="0.45"/>
+    <line x1="23.13" y1="76.87" x2="25.96" y2="74.04" stroke="#00F0FF" stroke-width="0.8" opacity="0.45"/>
+    <line x1="23.13" y1="23.13" x2="25.96" y2="25.96" stroke="#00F0FF" stroke-width="0.8" opacity="0.45"/>
+    <line x1="76.87" y1="23.13" x2="74.04" y2="25.96" stroke="#00F0FF" stroke-width="0.8" opacity="0.45"/>
+  </g>
+
+  <!-- Corner AR brackets -->
+  <line x1="10" y1="23" x2="10" y2="10" stroke="#00F0FF" stroke-width="3" stroke-linecap="round" opacity="0.95"/>
+  <line x1="10" y1="10" x2="23" y2="10" stroke="#00F0FF" stroke-width="3" stroke-linecap="round" opacity="0.95"/>
+
+  <line x1="77" y1="10" x2="90" y2="10" stroke="#00F0FF" stroke-width="3" stroke-linecap="round" opacity="0.95"/>
+  <line x1="90" y1="10" x2="90" y2="23" stroke="#00F0FF" stroke-width="3" stroke-linecap="round" opacity="0.95"/>
+
+  <line x1="10" y1="77" x2="10" y2="90" stroke="#00F0FF" stroke-width="3" stroke-linecap="round" opacity="0.95"/>
+  <line x1="10" y1="90" x2="23" y2="90" stroke="#00F0FF" stroke-width="3" stroke-linecap="round" opacity="0.95"/>
+
+  <line x1="77" y1="90" x2="90" y2="90" stroke="#00F0FF" stroke-width="3" stroke-linecap="round" opacity="0.95"/>
+  <line x1="90" y1="77" x2="90" y2="90" stroke="#00F0FF" stroke-width="3" stroke-linecap="round" opacity="0.95"/>
+
+  <!-- Subtle border -->
+  <rect x="1.2" y="1.2" width="97.6" height="97.6" rx="21.5" ry="21.5" stroke="#00F0FF" stroke-width="1.2" fill="none" opacity="0.18"/>
+</svg>

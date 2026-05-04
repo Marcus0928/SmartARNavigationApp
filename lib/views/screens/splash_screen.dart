@@ -11,13 +11,33 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
   String _statusText = 'Initializing...';
+  late final AnimationController _glowController;
+  late final Animation<double> _glowRadius;
+  late final Animation<double> _opacity;
 
   @override
   void initState() {
     super.initState();
+    _glowController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat(reverse: true);
+    final curve = CurvedAnimation(
+      parent: _glowController,
+      curve: Curves.easeInOut,
+    );
+    _glowRadius = Tween<double>(begin: 6.0, end: 28.0).animate(curve);
+    _opacity    = Tween<double>(begin: 0.6, end: 1.0).animate(curve);
     WidgetsBinding.instance.addPostFrameCallback((_) => _initialize());
+  }
+
+  @override
+  void dispose() {
+    _glowController.dispose();
+    super.dispose();
   }
 
   // ── Main init flow ────────────────────────────────────────────────────────
@@ -192,10 +212,38 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset(
-              'assets/icons/logo.png',
-              width: 140,
-              height: 140,
+            AnimatedBuilder(
+              animation: _glowController,
+              builder: (_, child) => Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(30.8),
+                  boxShadow: [
+                    // Inner sharp glow — cyan
+                    BoxShadow(
+                      color: const Color(0xFF00F0FF)
+                          .withValues(alpha: _opacity.value * 0.7),
+                      blurRadius: _glowRadius.value,
+                      spreadRadius: _glowRadius.value * 0.2,
+                    ),
+                    // Outer soft halo — blue
+                    BoxShadow(
+                      color: const Color(0xFF0088FF)
+                          .withValues(alpha: _opacity.value * 0.35),
+                      blurRadius: _glowRadius.value * 2.5,
+                      spreadRadius: _glowRadius.value * 0.4,
+                    ),
+                  ],
+                ),
+                child: Opacity(opacity: _opacity.value, child: child),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(30.8),
+                child: Image.asset(
+                  'assets/icons/logo.png',
+                  width: 120,
+                  height: 120,
+                ),
+              ),
             ),
             const SizedBox(height: 24),
             const Text(
@@ -207,7 +255,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 letterSpacing: 1.2,
               ),
             ),
-            const SizedBox(height: 48),
+            const SizedBox(height: 40),
             const CircularProgressIndicator(color: Colors.white),
             const SizedBox(height: 16),
             Text(

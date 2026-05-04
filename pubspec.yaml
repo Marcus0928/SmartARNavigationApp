@@ -35,6 +35,10 @@ dependencies:
   # Persistent settings storage
   shared_preferences: ^2.2.0
 
+  # SQLite database for saved locations list
+  sqflite: ^2.3.3
+  path: ^1.9.0
+
   # API Key management
   flutter_dotenv: ^5.1.0
 
