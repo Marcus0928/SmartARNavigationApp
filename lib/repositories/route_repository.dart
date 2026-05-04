@@ -20,7 +20,7 @@ class RouteRepository {
   static const String _baseUrl =
       'https://maps.googleapis.com/maps/api/directions/json';
 
-  Future<RouteModel> getRoute({
+  Future<List<RouteModel>> getRoute({
     required LatLng origin,
     required LatLng destination,
   }) async {
@@ -28,6 +28,8 @@ class RouteRepository {
       'origin': '${origin.latitude},${origin.longitude}',
       'destination': '${destination.latitude},${destination.longitude}',
       'mode': 'driving',
+      'alternatives': 'true',
+      'departure_time': 'now',
       'key': googleMapsApiKey,
     });
 

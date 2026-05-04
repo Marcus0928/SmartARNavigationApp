@@ -17,12 +17,14 @@ class ARViewModel extends ChangeNotifier {
   TurnDirection? _nextTurnDirection;
   double? _distanceToNextTurn;
   String? _currentStreetName;
+  int? _exitNumber;
   bool _isARInitialized = false;
   List<TurnInstruction> _remainingTurns = [];
 
   TurnDirection? get nextTurnDirection => _nextTurnDirection;
   double? get distanceToNextTurn => _distanceToNextTurn;
   String? get currentStreetName => _currentStreetName;
+  int? get exitNumber => _exitNumber;
   bool get isARInitialized => _isARInitialized;
 
   Future<void> initializeAR(
@@ -42,6 +44,7 @@ class ARViewModel extends ChangeNotifier {
       _nextTurnDirection = first.direction;
       _distanceToNextTurn = first.distanceFromPrev;
       _currentStreetName = first.streetName;
+      _exitNumber = first.exitNumber;
       _arService.placeArrow(first.direction, first.distanceFromPrev);
     }
     notifyListeners();
@@ -61,6 +64,7 @@ class ARViewModel extends ChangeNotifier {
       _nextTurnDirection = TurnDirection.forward;
       _distanceToNextTurn = 0;
       _currentStreetName = null;
+      _exitNumber = null;
       notifyListeners();
       return;
     }
@@ -69,6 +73,7 @@ class ARViewModel extends ChangeNotifier {
     _nextTurnDirection = next.direction;
     _distanceToNextTurn = distance;
     _currentStreetName = next.streetName;
+    _exitNumber = next.exitNumber;
     _arService.updateArrow(next.direction, distance);
     notifyListeners();
   }
@@ -77,6 +82,7 @@ class ARViewModel extends ChangeNotifier {
     _nextTurnDirection = null;
     _distanceToNextTurn = null;
     _currentStreetName = null;
+    _exitNumber = null;
     _remainingTurns = [];
     _arService.clearOverlays();
     notifyListeners();

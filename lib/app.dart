@@ -5,11 +5,14 @@ import 'package:smart_ar_navigation/core/constants/app_colors.dart';
 import 'package:smart_ar_navigation/core/constants/app_strings.dart';
 import 'package:smart_ar_navigation/repositories/places_repository.dart';
 import 'package:smart_ar_navigation/repositories/route_repository.dart';
+import 'package:smart_ar_navigation/repositories/saved_locations_repository.dart';
 import 'package:smart_ar_navigation/services/ar_service.dart';
 import 'package:smart_ar_navigation/services/location_service.dart';
+import 'package:smart_ar_navigation/services/saved_locations_database.dart';
 import 'package:smart_ar_navigation/viewmodels/ar_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/map_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/navigation_viewmodel.dart';
+import 'package:smart_ar_navigation/viewmodels/saved_locations_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/saved_places_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/settings_viewmodel.dart';
 import 'package:smart_ar_navigation/views/screens/ar_navigation_screen.dart';
@@ -36,6 +39,14 @@ class SmartARNavigationApp extends StatelessWidget {
         ),
         Provider<PlacesRepository>(
           create: (_) => PlacesRepository(),
+        ),
+        Provider<SavedLocationsDatabase>(
+          create: (_) => SavedLocationsDatabase(),
+        ),
+        Provider<SavedLocationsRepository>(
+          create: (ctx) => SavedLocationsRepository(
+            db: ctx.read<SavedLocationsDatabase>(),
+          ),
         ),
 
         // ── ViewModels (ChangeNotifier, created in dependency order) ──
@@ -77,6 +88,13 @@ class SmartARNavigationApp extends StatelessWidget {
         ChangeNotifierProvider<SavedPlacesViewModel>(
           create: (ctx) => SavedPlacesViewModel(
             placesRepository: ctx.read<PlacesRepository>(),
+          ),
+        ),
+
+        // SavedLocationsViewModel — persists bookmarked places list via SQLite
+        ChangeNotifierProvider<SavedLocationsViewModel>(
+          create: (ctx) => SavedLocationsViewModel(
+            repo: ctx.read<SavedLocationsRepository>(),
           ),
         ),
       ],

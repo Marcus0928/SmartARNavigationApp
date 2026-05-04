@@ -6,11 +6,13 @@ class TurnInstruction {
   final double distanceFromPrev;
   final String streetName;
   final LatLng position;
+  final int? exitNumber;
 
   const TurnInstruction({
     required this.direction,
     required this.distanceFromPrev,
     required this.streetName,
     required this.position,
+    this.exitNumber,
   });
 }

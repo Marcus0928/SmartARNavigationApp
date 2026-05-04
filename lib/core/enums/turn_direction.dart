@@ -5,4 +5,5 @@ enum TurnDirection {
   keepLeft,
   keepRight,
   uTurn,
+  roundabout,
 }

@@ -36,18 +36,26 @@ class NavigationViewModel extends ChangeNotifier {
   NavigationStatus get navigationStatus => _navigationStatus;
   String? get errorMessage => _errorMessage;
 
-  Future<void> startNavigation(PlaceModel destination) async {
+  Future<void> startNavigation(
+    PlaceModel destination, {
+    RouteModel? route,
+  }) async {
     _navigationStatus = NavigationStatus.loading;
     _currentDestination = destination;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      final origin = await _locationService.getCurrentLocation();
-      _currentRoute = await _routeRepository.getRoute(
-        origin: origin,
-        destination: destination.coordinates,
-      );
+      if (route != null) {
+        _currentRoute = route;
+      } else {
+        final origin = await _locationService.getCurrentLocation();
+        final routes = await _routeRepository.getRoute(
+          origin: origin,
+          destination: destination.coordinates,
+        );
+        _currentRoute = routes.first;
+      }
       await _arViewModel.initializeOverlay(_currentRoute!);
       _navigationStatus = NavigationStatus.navigating;
     } catch (e) {
@@ -74,10 +82,11 @@ class NavigationViewModel extends ChangeNotifier {
 
     try {
       final origin = await _locationService.getCurrentLocation();
-      _currentRoute = await _routeRepository.getRoute(
+      final routes = await _routeRepository.getRoute(
         origin: origin,
         destination: _currentDestination!.coordinates,
       );
+      _currentRoute = routes.first;
       await _arViewModel.initializeOverlay(_currentRoute!);
       _navigationStatus = NavigationStatus.navigating;
     } catch (e) {

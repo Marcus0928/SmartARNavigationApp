@@ -38,7 +38,8 @@ class MapViewModel extends ChangeNotifier {
   double? _currentSpeed;
   List<PlaceModel> _searchResults = [];
   PlaceModel? _selectedDestination;
-  RouteModel? _previewRoute;
+  List<RouteModel> _previewRoutes = [];
+  int _selectedRouteIndex = 0;
   bool _isFetchingRoute = false;
   StreamSubscription<LatLng>? _locationSubscription;
 
@@ -48,7 +49,10 @@ class MapViewModel extends ChangeNotifier {
   double? get currentSpeed => _currentSpeed;
   List<PlaceModel> get searchResults => _searchResults;
   PlaceModel? get selectedDestination => _selectedDestination;
-  RouteModel? get previewRoute => _previewRoute;
+  List<RouteModel> get previewRoutes => _previewRoutes;
+  int get selectedRouteIndex => _selectedRouteIndex;
+  RouteModel? get selectedRoute =>
+      _previewRoutes.isNotEmpty ? _previewRoutes[_selectedRouteIndex] : null;
   bool get isFetchingRoute => _isFetchingRoute;
 
   Future<void> startLocationTracking() async {
@@ -79,6 +83,7 @@ class MapViewModel extends ChangeNotifier {
       if (route != null && _isOffRoute(location, route)) {
         _navigationViewModel.recalculateRoute();
       }
+
     });
   }
 
@@ -89,13 +94,16 @@ class MapViewModel extends ChangeNotifier {
   }
 
   Future<void> searchDestination(String query) async {
-    _searchResults = await _placesRepository.searchPlaces(query);
+    _searchResults = await _placesRepository.searchPlaces(
+      query,
+      location: _currentLocation,
+    );
     notifyListeners();
   }
 
   Future<void> selectDestination(PlaceModel place) async {
     _isFetchingRoute = true;
-    _previewRoute = null;
+    _previewRoutes = [];
     _searchResults = [];
     notifyListeners();
 
@@ -113,7 +121,7 @@ class MapViewModel extends ChangeNotifier {
   // Sets a fully-resolved place (coordinates already present) as destination.
   void setSelectedDestination(PlaceModel place) {
     _selectedDestination = place;
-    _previewRoute = null;
+    _previewRoutes = [];
     _searchResults = [];
     notifyListeners();
     _fetchPreviewRoute();
@@ -122,12 +130,13 @@ class MapViewModel extends ChangeNotifier {
   Future<void> _fetchPreviewRoute() async {
     if (_selectedDestination == null) return;
     _isFetchingRoute = true;
+    _selectedRouteIndex = 0;
     notifyListeners();
 
     try {
       final origin =
           _currentLocation ?? await _locationService.getCurrentLocation();
-      _previewRoute = await _routeRepository.getRoute(
+      _previewRoutes = await _routeRepository.getRoute(
         origin: origin,
         destination: _selectedDestination!.coordinates,
       );
@@ -139,9 +148,16 @@ class MapViewModel extends ChangeNotifier {
     }
   }
 
+  void selectRoute(int index) {
+    if (index < 0 || index >= _previewRoutes.length) return;
+    _selectedRouteIndex = index;
+    notifyListeners();
+  }
+
   void clearDestination() {
     _selectedDestination = null;
-    _previewRoute = null;
+    _previewRoutes = [];
+    _selectedRouteIndex = 0;
     _isFetchingRoute = false;
     _searchResults = [];
     notifyListeners();

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:smart_ar_navigation/core/constants/app_colors.dart';
+import 'package:smart_ar_navigation/core/enums/turn_direction.dart';
 import 'package:smart_ar_navigation/viewmodels/ar_viewmodel.dart';
+import 'package:smart_ar_navigation/views/widgets/roundabout_widget.dart';
 import 'package:smart_ar_navigation/views/widgets/turn_arrow_widget.dart';
 
 /// Turn instruction card. Renders nothing when there is no upcoming turn.
@@ -37,10 +39,15 @@ class AROverlayWidget extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
             child: Center(
-              child: TurnArrowWidget(
-                direction: arVM.nextTurnDirection!,
-                size: 38,
-              ),
+              child: arVM.nextTurnDirection == TurnDirection.roundabout
+                  ? RoundaboutWidget(
+                      exitNumber: arVM.exitNumber ?? 1,
+                      size: 38,
+                    )
+                  : TurnArrowWidget(
+                      direction: arVM.nextTurnDirection!,
+                      size: 38,
+                    ),
             ),
           ),
           const SizedBox(width: 14),

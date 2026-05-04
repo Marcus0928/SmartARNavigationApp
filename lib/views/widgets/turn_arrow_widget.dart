@@ -16,6 +16,7 @@ class TurnArrowWidget extends StatelessWidget {
         TurnDirection.right => Icons.turn_right_rounded,
         TurnDirection.keepRight => Icons.turn_slight_right_rounded,
         TurnDirection.uTurn => Icons.u_turn_left_rounded,
+        TurnDirection.roundabout => Icons.roundabout_left_rounded,
       };
 
   @override
