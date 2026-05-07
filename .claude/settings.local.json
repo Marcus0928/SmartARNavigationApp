@@ -8,7 +8,8 @@
       "Bash(node -e ' *)",
       "Bash(flutter analyze *)",
       "Bash(grep -v \"^$\")",
-      "Bash(flutter pub *)"
+      "Bash(flutter pub *)",
+      "PowerShell(flutter analyze *)"
     ]
   }
 }

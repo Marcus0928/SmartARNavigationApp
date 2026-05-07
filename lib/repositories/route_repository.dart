@@ -23,15 +23,25 @@ class RouteRepository {
   Future<List<RouteModel>> getRoute({
     required LatLng origin,
     required LatLng destination,
+    bool avoidTolls = false,
+    bool avoidHighways = false,
   }) async {
-    final uri = Uri.parse(_baseUrl).replace(queryParameters: {
+    final params = <String, String>{
       'origin': '${origin.latitude},${origin.longitude}',
       'destination': '${destination.latitude},${destination.longitude}',
       'mode': 'driving',
       'alternatives': 'true',
       'departure_time': 'now',
       'key': googleMapsApiKey,
-    });
+    };
+
+    final avoid = <String>[
+      if (avoidTolls) 'tolls',
+      if (avoidHighways) 'highways',
+    ];
+    if (avoid.isNotEmpty) params['avoid'] = avoid.join('|');
+
+    final uri = Uri.parse(_baseUrl).replace(queryParameters: params);
 
     late http.Response response;
     try {

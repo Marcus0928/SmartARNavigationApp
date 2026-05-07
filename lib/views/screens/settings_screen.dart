@@ -49,6 +49,13 @@ class SettingsScreen extends StatelessWidget {
               onSelectionChanged: (s) => vm.setDistanceUnit(s.first),
             ),
           ),
+          SwitchListTile(
+            title: const Text('Avoid Tolls'),
+            subtitle: const Text('Route around toll roads when possible'),
+            value: vm.avoidTolls,
+            onChanged: vm.setAvoidTolls,
+            activeColor: primaryColor,
+          ),
           const Divider(height: 1),
           _sectionHeader('Display'),
           SwitchListTile(

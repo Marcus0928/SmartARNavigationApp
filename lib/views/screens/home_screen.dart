@@ -52,6 +52,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   MapViewModel? _mapVmRef;
   PlaceModel? _lastDestination;
+  bool _routeFitted = false;
 
   void _animatedMove(LatLng dest, double zoom) {
     final latTween = Tween<double>(
@@ -412,6 +413,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     if (mapVM.selectedDestination != _lastDestination) {
       _lastDestination = mapVM.selectedDestination;
+      _routeFitted = false;
       if (mapVM.selectedDestination != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted && _sheetController.isAttached) {
@@ -423,6 +425,30 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           }
         });
       }
+    }
+
+    if (!_routeFitted && mapVM.previewRoutes.isNotEmpty) {
+      _routeFitted = true;
+      final sheetHeight = MediaQuery.of(context).size.height * 0.40;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final points = mapVM.previewRoutes[mapVM.selectedRouteIndex]
+            .polylinePoints
+            .map((p) => LatLng(p.latitude, p.longitude))
+            .toList();
+        if (points.length < 2) return;
+        _mapController.fitCamera(
+          CameraFit.bounds(
+            bounds: LatLngBounds.fromPoints(points),
+            padding: EdgeInsets.fromLTRB(40, 80, 40, sheetHeight + 24),
+            maxZoom: 16,
+          ),
+        );
+        // Clamp minimum zoom so the camera never zooms out beyond city level
+        if (_mapController.camera.zoom < 12) {
+          _mapController.move(_mapController.camera.center, 12.0);
+        }
+      });
     }
 
     return Scaffold(

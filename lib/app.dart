@@ -15,8 +15,12 @@ import 'package:smart_ar_navigation/viewmodels/navigation_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/saved_locations_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/saved_places_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/settings_viewmodel.dart';
+import 'package:smart_ar_navigation/viewmodels/plan_drive_viewmodel.dart';
+import 'package:smart_ar_navigation/viewmodels/profile_viewmodel.dart';
 import 'package:smart_ar_navigation/views/screens/ar_navigation_screen.dart';
 import 'package:smart_ar_navigation/views/screens/home_screen.dart';
+import 'package:smart_ar_navigation/views/screens/plan_drive_screen.dart';
+import 'package:smart_ar_navigation/views/screens/profile_screen.dart';
 import 'package:smart_ar_navigation/views/screens/settings_screen.dart';
 import 'package:smart_ar_navigation/views/screens/splash_screen.dart';
 
@@ -51,6 +55,11 @@ class SmartARNavigationApp extends StatelessWidget {
 
         // ── ViewModels (ChangeNotifier, created in dependency order) ──
 
+        // ProfileViewModel — persists name, email, stats via shared_preferences
+        ChangeNotifierProvider<ProfileViewModel>(
+          create: (_) => ProfileViewModel(),
+        ),
+
         // ARViewModel only needs ARService
         ChangeNotifierProvider<ARViewModel>(
           create: (ctx) => ARViewModel(
@@ -58,13 +67,14 @@ class SmartARNavigationApp extends StatelessWidget {
           ),
         ),
 
-        // NavigationViewModel needs ARViewModel + services + repository
+        // NavigationViewModel needs ARViewModel + services + repository + ProfileViewModel
         ChangeNotifierProvider<NavigationViewModel>(
           create: (ctx) => NavigationViewModel(
             routeRepository: ctx.read<RouteRepository>(),
             locationService: ctx.read<LocationService>(),
             arService: ctx.read<ARService>(),
             arViewModel: ctx.read<ARViewModel>(),
+            profileViewModel: ctx.read<ProfileViewModel>(),
           ),
         ),
 
@@ -97,6 +107,7 @@ class SmartARNavigationApp extends StatelessWidget {
             repo: ctx.read<SavedLocationsRepository>(),
           ),
         ),
+
       ],
       child: MaterialApp(
         title: appName,
@@ -111,6 +122,15 @@ class SmartARNavigationApp extends StatelessWidget {
           '/home': (_) => const HomeScreen(),
           '/ar-navigation': (_) => const ARNavigationScreen(),
           '/settings': (_) => const SettingsScreen(),
+          '/profile': (_) => const ProfileScreen(),
+          '/plan-drive': (ctx) => ChangeNotifierProvider(
+                create: (c) => PlanDriveViewModel(
+                  placesRepository: c.read<PlacesRepository>(),
+                  routeRepository: c.read<RouteRepository>(),
+                  locationService: c.read<LocationService>(),
+                ),
+                child: const PlanDriveScreen(),
+              ),
         },
       ),
     );

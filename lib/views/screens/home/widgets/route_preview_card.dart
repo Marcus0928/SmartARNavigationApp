@@ -187,3 +187,4 @@ class RoutePreviewCard extends StatelessWidget {
     return '${metres.toInt()} m';
   }
 }
+

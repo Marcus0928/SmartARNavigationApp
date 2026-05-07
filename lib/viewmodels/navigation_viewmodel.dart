@@ -9,22 +9,26 @@ import 'package:smart_ar_navigation/repositories/route_repository.dart';
 import 'package:smart_ar_navigation/services/ar_service.dart';
 import 'package:smart_ar_navigation/services/location_service.dart';
 import 'package:smart_ar_navigation/viewmodels/ar_viewmodel.dart';
+import 'package:smart_ar_navigation/viewmodels/profile_viewmodel.dart';
 
 class NavigationViewModel extends ChangeNotifier {
   final RouteRepository _routeRepository;
   final LocationService _locationService;
   final ARService _arService;
   final ARViewModel _arViewModel;
+  final ProfileViewModel _profileViewModel;
 
   NavigationViewModel({
     required RouteRepository routeRepository,
     required LocationService locationService,
     required ARService arService,
     required ARViewModel arViewModel,
+    required ProfileViewModel profileViewModel,
   })  : _routeRepository = routeRepository,
         _locationService = locationService,
         _arService = arService,
-        _arViewModel = arViewModel;
+        _arViewModel = arViewModel,
+        _profileViewModel = profileViewModel;
 
   PlaceModel? _currentDestination;
   RouteModel? _currentRoute;
@@ -108,6 +112,10 @@ class NavigationViewModel extends ChangeNotifier {
       _arViewModel.resetOverlay();
       _navigationStatus = NavigationStatus.arrived;
       notifyListeners();
+      _profileViewModel.incrementDriveCount();
+      if (_currentRoute != null) {
+        _profileViewModel.addDistance(_currentRoute!.totalDistance / 1000);
+      }
     }
   }
 }

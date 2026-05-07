@@ -8,6 +8,7 @@ class SettingsViewModel extends ChangeNotifier {
   static const _keyShowETA = 'show_eta';
   static const _keyArrowSize = 'arrow_size';
   static const _keyOverlayOpacity = 'overlay_opacity';
+  static const _keyAvoidTolls = 'avoid_tolls';
 
   String _navigationMode = 'AR';
   String _distanceUnit = 'km';
@@ -15,6 +16,7 @@ class SettingsViewModel extends ChangeNotifier {
   bool _showETA = true;
   String _arrowSize = 'Medium';
   double _overlayOpacity = 1.0;
+  bool _avoidTolls = false;
 
   String get navigationMode => _navigationMode;
   String get distanceUnit => _distanceUnit;
@@ -22,6 +24,7 @@ class SettingsViewModel extends ChangeNotifier {
   bool get showETA => _showETA;
   String get arrowSize => _arrowSize;
   double get overlayOpacity => _overlayOpacity;
+  bool get avoidTolls => _avoidTolls;
 
   SettingsViewModel() {
     _loadSettings();
@@ -35,6 +38,7 @@ class SettingsViewModel extends ChangeNotifier {
     _showETA = prefs.getBool(_keyShowETA) ?? true;
     _arrowSize = prefs.getString(_keyArrowSize) ?? 'Medium';
     _overlayOpacity = prefs.getDouble(_keyOverlayOpacity) ?? 1.0;
+    _avoidTolls = prefs.getBool(_keyAvoidTolls) ?? false;
     notifyListeners();
   }
 
@@ -78,5 +82,12 @@ class SettingsViewModel extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble(_keyOverlayOpacity, _overlayOpacity);
+  }
+
+  Future<void> setAvoidTolls(bool value) async {
+    _avoidTolls = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyAvoidTolls, value);
   }
 }

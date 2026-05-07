@@ -66,6 +66,7 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
       ),
       onChanged: (value) =>
           context.read<MapViewModel>().searchDestination(value),
+      onSubmitted: (_) => FocusScope.of(context).unfocus(),
     );
   }
 }
