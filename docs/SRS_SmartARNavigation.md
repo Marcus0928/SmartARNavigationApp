@@ -25,6 +25,8 @@
    - [3.7 Settings Screen](#37-settings-screen)
    - [3.8 Quick-Access Saved Places](#38-quick-access-saved-places-home--work--favourite)
    - [3.9 Bookmarked Locations](#39-bookmarked-locations-saved-places-list)
+   - [3.10 Profile Screen](#310-profile-screen)
+   - [3.11 Plan a Drive Screen](#311-plan-a-drive-screen)
 4. [Non-Functional Requirements](#4-non-functional-requirements)
 5. [External Interface Requirements](#5-external-interface-requirements)
 6. [Technology Stack](#6-technology-stack)
@@ -240,6 +242,7 @@ Primary users are assumed to be comfortable with basic smartphone usage. No tech
 | FR-30 | The Settings screen shall allow the user to select a preferred AR arrow size (Small / Medium / Large). |
 | FR-31 | The Settings screen shall include an AR overlay opacity slider adjustable between 50% and 100%. |
 | FR-32 | The Settings screen shall display an About section showing the current app version and developer information. |
+| FR-49 | The Settings screen shall include a toggle to avoid toll roads when routing; the preference shall be persisted via `shared_preferences`. |
 
 ---
 
@@ -271,6 +274,42 @@ Primary users are assumed to be comfortable with basic smartphone usage. No tech
 | FR-46 | Each entry in the saved places list shall provide a **Navigate** action (sets the place as the map destination) and a **Remove** action (deletes from the database). |
 | FR-47 | Saved places shall be stored in a local SQLite database using the `sqflite` package and shall persist across app restarts. |
 | FR-48 | The system shall prevent duplicate entries: bookmarking a place that is already saved shall have no effect. |
+
+---
+
+### 3.10 Profile Screen
+
+**Description:** The app shall provide a Profile screen accessible from the hamburger menu drawer, allowing the user to view and edit their name and email, view navigation statistics, and manage their three quick-access saved places (Home, Work, Favourite).
+
+| ID | Requirement |
+|---|---|
+| FR-50 | The system shall provide a Profile screen accessible via the hamburger menu drawer. |
+| FR-51 | The Profile screen shall display an avatar showing the first letter of the user's name. |
+| FR-52 | The Profile screen shall allow the user to edit their display name and email address, and save the changes. |
+| FR-53 | Profile name and email shall be persisted via `shared_preferences` and restored on next launch. |
+| FR-54 | The Profile screen shall display a **My Stats** section showing: total number of completed drives, and total distance driven in kilometres. |
+| FR-55 | Drive count and total distance shall be updated automatically when a navigation session ends by arrival, and persisted via `shared_preferences`. |
+| FR-56 | The Profile screen shall display a **Saved Places** section showing the Home, Work, and Favourite quick-access slots. |
+| FR-57 | Tapping a slot in the Saved Places section shall open the same place-search sheet used on the Home Screen, allowing the user to assign or change the saved location. |
+
+---
+
+### 3.11 Plan a Drive Screen
+
+**Description:** The app shall provide a Plan a Drive screen accessible from the hamburger menu drawer. It allows the user to plan a route between a custom origin and destination, preview alternative routes on a map, and start AR navigation from the selected route.
+
+| ID | Requirement |
+|---|---|
+| FR-58 | The system shall provide a Plan a Drive screen accessible via the hamburger menu drawer. |
+| FR-59 | The Plan a Drive screen shall provide a **From** text field, defaulting to the user's current GPS location. |
+| FR-60 | The Plan a Drive screen shall provide a **To** text field for the destination. |
+| FR-61 | Both the From and To fields shall show autocomplete search results using the Google Maps Places API as the user types. |
+| FR-62 | The Plan a Drive screen shall provide a **Swap** button to interchange the origin and destination. |
+| FR-63 | The Plan a Drive screen shall provide toggleable **Avoid Tolls** and **Avoid Highways** option chips; selecting either shall trigger a route re-fetch with the corresponding constraint. |
+| FR-64 | When a valid origin and destination are set, the system shall fetch up to three alternative routes from the Google Maps Directions API and display them in a horizontal strip; the fastest route shall be marked with a "Fastest" badge. |
+| FR-65 | The selected route shall be highlighted on the embedded map; alternative routes shall be shown in a dimmed style. |
+| FR-66 | The map view shall automatically fit to the bounding box of the selected route when routes are loaded. |
+| FR-67 | Tapping **Start AR Navigation** shall hand the selected route to `NavigationViewModel` and launch the AR Navigation Screen. |
 
 ---
 

@@ -166,7 +166,9 @@ View rebuilds AR overlays based on new ViewModel state
 | **Splash Screen** | `splash_screen.dart` | App logo, initialization, permission checks |
 | **Home Screen** | `home_screen.dart` | Full-screen 2D map (Waze-style), floating bottom search bar, top-left hamburger button opening a Waze-style side drawer |
 | **AR Navigation Screen** | `ar_navigation_screen.dart` | Live camera + AR overlays + navigation info |
-| **Settings Screen** | `settings_screen.dart` | User preferences: display options, AR settings, and About info |
+| **Plan Drive Screen** | `plan_drive_screen.dart` | From/To route planner with map preview, route alternatives strip, and avoid-tolls/highways options |
+| **Profile Screen** | `profile_screen.dart` | User profile (name, email, avatar), navigation stats, and quick-access saved places management |
+| **Settings Screen** | `settings_screen.dart` | User preferences: display options, AR settings, avoid tolls, and About info |
 
 > 🔮 **Future Screen (if time permits):**
 > | **2D Map Screen** | `map_screen.dart` | Traditional Google Maps 2D navigation view |
@@ -235,31 +237,63 @@ View rebuilds AR overlays based on new ViewModel state
 │       Side Drawer (slides from left)    │
 │                                         │
 │  ┌───────────────────────────────────┐  │
-│  │  [M]  Marcus                      │  │  ← avatar + name
+│  │  [M]  Marcus                      │  │  ← avatar + name (tappable → Profile)
 │  │       Smart AR Navigator          │  │
 │  └───────────────────────────────────┘  │
 │  ─────────────────────────────────────  │
-│  ↗  Plan a drive                        │
-│  ✉  Inbox                              │
-│  ⚙  Settings ──────────────────────────┼──┐
-│  ?  Help & Feedback                     │  │
-│                                         │  │
-│  ⏻  Shutdown (confirmation dialog)      │  │
-└────────────────┬────────────────────────┘  │
-                 │ user taps Back             │
-                 ▼                           ▼
-         Back to Home Screen        Settings Screen
-                                             │
-                                    • Navigation Mode (locked: AR)
-                                    • Distance unit (km / miles)
-                                    • Show / hide speed display
-                                    • Show / hide ETA display
-                                    • AR arrow size (S/M/L)
-                                    • AR overlay opacity (50–100%)
-                                    • About (version + developer)
-                                             │ user taps Back
-                                             ▼
-                                    Back to Home Screen
+│  ↗  Plan a drive ───────────────────────┼──┐
+│  ✉  Inbox                              │  │
+│  ⚙  Settings ──────────────────────────┼──┼──┐
+│  ?  Help & Feedback                     │  │  │
+│                                         │  │  │
+│  ⏻  Shutdown (confirmation dialog)      │  │  │
+└────────────────┬────────────────────────┘  │  │
+                 │ user taps Back             │  │
+                 ▼                           ▼  ▼
+         Back to Home Screen     Plan Drive    Settings Screen
+                                  Screen       │
+                                  │            • Navigation Mode (locked: AR)
+                                  │            • Distance unit (km / miles)
+                                  │            • Avoid Tolls toggle
+                                  │            • Show / hide speed display
+                                  │            • Show / hide ETA display
+                                  │            • AR arrow size (S/M/L)
+                                  │            • AR overlay opacity (50–100%)
+                                  │            • About (version + developer)
+                                  │                    │ user taps Back
+                                  │                    ▼
+                                  │           Back to Home Screen
+                                  │
+                                  • From field (defaults to GPS location)
+                                  • To field (destination search)
+                                  • Avoid Tolls / Avoid Highways chips
+                                  • Route alternatives horizontal strip
+                                  • Map preview with selected route
+                                  • [Start AR Navigation] button
+                                          │ user taps Start
+                                          ▼
+                                  AR Navigation Screen
+
+─ ─ ─ ─ ─ ─ ─ Profile Branch ─ ─ ─ ─ ─ ─ ─
+         Drawer avatar/name tapped
+                 │
+                 ▼
+┌─────────────────────────────────────────┐
+│             Profile Screen              │
+│                                         │
+│  [Avatar: first letter of name]         │
+│  Name field / Email field               │
+│  [Save Profile]                         │
+│                                         │
+│  My Stats:                              │
+│  Drives | km driven | Top destination   │
+│                                         │
+│  Saved Places:                          │
+│  Home / Work / Favourite (editable)     │
+└─────────────────────────────────────────┘
+                 │ user taps Back
+                 ▼
+         Back to Home Screen
 ```
 
 ### 4.3 Permission Flow (Splash Screen)
@@ -285,16 +319,17 @@ Check Location Permission
 ### 5.1 ViewModels
 
 #### `NavigationViewModel`
-**Responsibility:** Manages the overall navigation session state.
+**Responsibility:** Manages the overall navigation session state. Depends on `ARViewModel` and `ProfileViewModel` — the latter is updated automatically on session end.
 
 | Property / Method | Type | Description |
 |---|---|---|
-| `currentDestination` | `String` | The user's entered destination |
-| `currentRoute` | `RouteModel` | Active route data from Google Maps API |
-| `navigationStatus` | `NavigationStatus` | Enum: idle / navigating / arrived |
-| `startNavigation(destination)` | `Future<void>` | Fetches route and starts session |
+| `currentDestination` | `PlaceModel?` | The user's selected destination |
+| `currentRoute` | `RouteModel?` | Active route data from Google Maps API |
+| `navigationStatus` | `NavigationStatus` | Enum: idle / loading / navigating / rerouting / arrived |
+| `errorMessage` | `String?` | Last navigation error, if any |
+| `startNavigation(destination, {route})` | `Future<void>` | Fetches route (or uses pre-fetched route) and starts session |
 | `stopNavigation()` | `void` | Ends navigation session, clears state |
-| `recalculateRoute()` | `Future<void>` | Called when user goes off-route |
+| `checkIfArrived(location)` | `void` | Detects arrival (< 10 m from destination); on arrival calls `ProfileViewModel.incrementDriveCount()` and `ProfileViewModel.addDistance()` |
 
 #### `ARViewModel`
 **Responsibility:** Manages AR overlay state and rendering instructions.
@@ -358,18 +393,58 @@ Check Location Permission
 | `showETA` | `bool` | Whether ETA display is shown during navigation |
 | `arrowSize` | `String` | AR arrow size: `'Small'`, `'Medium'`, or `'Large'` |
 | `overlayOpacity` | `double` | AR overlay opacity between `0.5` and `1.0` |
-| `getNavigationMode()` | `Future<String>` | Reads navigation mode from persistent storage |
+| `avoidTolls` | `bool` | Whether toll roads should be avoided when routing |
 | `setNavigationMode(mode)` | `Future<void>` | Saves navigation mode preference |
-| `getDistanceUnit()` | `Future<String>` | Reads distance unit preference |
 | `setDistanceUnit(unit)` | `Future<void>` | Saves distance unit preference |
-| `getShowSpeed()` | `Future<bool>` | Reads show-speed toggle state |
 | `setShowSpeed(value)` | `Future<void>` | Saves show-speed toggle state |
-| `getShowETA()` | `Future<bool>` | Reads show-ETA toggle state |
 | `setShowETA(value)` | `Future<void>` | Saves show-ETA toggle state |
-| `getArrowSize()` | `Future<String>` | Reads AR arrow size preference |
 | `setArrowSize(size)` | `Future<void>` | Saves AR arrow size preference |
-| `getOverlayOpacity()` | `Future<double>` | Reads AR overlay opacity value |
-| `setOverlayOpacity(opacity)` | `Future<void>` | Saves AR overlay opacity value |
+| `setOverlayOpacity(opacity)` | `Future<void>` | Saves AR overlay opacity value (clamped to 0.5–1.0) |
+| `setAvoidTolls(value)` | `Future<void>` | Saves avoid-tolls toggle state |
+
+#### `ProfileViewModel`
+**Responsibility:** Manages the user's profile data (name, email) and driving statistics, persisted via `shared_preferences`.
+
+| Property / Method | Type | Description |
+|---|---|---|
+| `name` | `String` | User's display name |
+| `email` | `String` | User's email address |
+| `totalDrives` | `int` | Cumulative count of completed navigation sessions |
+| `totalDistanceKm` | `double` | Cumulative distance driven in kilometres |
+| `isSaving` | `bool` | True while a save operation is in progress |
+| `loadProfile()` | `Future<void>` | Loads all persisted fields from `shared_preferences` |
+| `saveProfile(name, email)` | `Future<void>` | Persists name and email; sets `isSaving` during the write |
+| `incrementDriveCount()` | `Future<void>` | Increments `totalDrives` and persists (called by `NavigationViewModel` on arrival) |
+| `addDistance(km)` | `Future<void>` | Adds to `totalDistanceKm` and persists (called by `NavigationViewModel` on arrival) |
+
+#### `PlanDriveViewModel`
+**Responsibility:** Manages the Plan a Drive screen state — origin/destination search, route fetching, route selection, and routing options.
+
+| Property / Method | Type | Description |
+|---|---|---|
+| `fromLatLng` | `LatLng?` | Origin coordinates (defaults to device GPS on `init()`) |
+| `fromLabel` | `String` | Display label for the origin (e.g. `'Your location'` or place name) |
+| `fromResults` | `List<PlaceModel>` | Autocomplete results for the From field |
+| `destination` | `PlaceModel?` | Selected destination place |
+| `toResults` | `List<PlaceModel>` | Autocomplete results for the To field |
+| `routes` | `List<RouteModel>` | Fetched alternative routes (up to 3) |
+| `selectedRouteIndex` | `int` | Index of the currently highlighted route |
+| `selectedRoute` | `RouteModel?` | Convenience getter for the active route |
+| `isFetching` | `bool` | True while a route request is in flight |
+| `error` | `String?` | Error message if the route fetch failed |
+| `avoidTolls` | `bool` | Whether toll roads are excluded from the route |
+| `avoidHighways` | `bool` | Whether highways are excluded from the route |
+| `init()` | `Future<void>` | Fetches the current GPS location and seeds `fromLatLng` |
+| `searchFrom(query)` | `Future<void>` | Searches Places API and updates `fromResults` |
+| `selectFrom(place)` | `Future<void>` | Sets origin from a search result and re-fetches routes |
+| `useCurrentLocationFrom(loc)` | `void` | Resets origin to the device's GPS coordinates |
+| `searchTo(query)` | `Future<void>` | Searches Places API and updates `toResults` |
+| `selectTo(place)` | `Future<void>` | Sets destination (fetches full place details) and re-fetches routes |
+| `clearTo()` | `void` | Clears destination, routes, and error state |
+| `selectRoute(index)` | `void` | Changes the highlighted route in the alternatives strip |
+| `toggleAvoidTolls()` | `void` | Flips `avoidTolls` and re-fetches routes |
+| `toggleAvoidHighways()` | `void` | Flips `avoidHighways` and re-fetches routes |
+| `swapLocations()` | `Future<void>` | Exchanges origin and destination then re-fetches routes |
 
 ---
 
@@ -538,7 +613,7 @@ smart_ar_navigation/
 │   │   │   └── api_keys.dart        # API key references (loaded from .env)
 │   │   ├── enums/
 │   │   │   ├── turn_direction.dart  # forward, left, right, keepLeft, keepRight, uTurn, roundabout
-│   │   │   └── navigation_status.dart # idle, navigating, arrived
+│   │   │   └── navigation_status.dart # idle, loading, navigating, rerouting, arrived
 │   │   └── utils/
 │   │       ├── location_utils.dart  # Distance / findNextTurn helpers
 │   │       └── route_parser.dart    # Parses Google Maps JSON; extracts street name & roundabout exit number
@@ -554,16 +629,18 @@ smart_ar_navigation/
 │   │   └── saved_locations_database.dart # SQLite database helper (sqflite)
 │   │
 │   ├── repositories/                # API & DB communication (Model layer)
-│   │   ├── route_repository.dart         # Google Maps Directions API
+│   │   ├── route_repository.dart         # Google Maps Directions API (supports avoidTolls / avoidHighways)
 │   │   ├── places_repository.dart        # Google Maps Places API
 │   │   └── saved_locations_repository.dart # CRUD over SavedLocationsDatabase
 │   │
 │   ├── viewmodels/                  # Business logic (ViewModel layer)
-│   │   ├── navigation_viewmodel.dart
-│   │   ├── ar_viewmodel.dart              # Tracks nextTurnDirection, exitNumber, streetName
-│   │   ├── map_viewmodel.dart
-│   │   ├── settings_viewmodel.dart
-│   │   ├── saved_places_viewmodel.dart    # Home / Work / Favourite (SharedPreferences)
+│   │   ├── navigation_viewmodel.dart     # Session state; updates ProfileViewModel on arrival
+│   │   ├── ar_viewmodel.dart             # Tracks nextTurnDirection, exitNumber, streetName
+│   │   ├── map_viewmodel.dart            # GPS stream, heading, accuracy, place search
+│   │   ├── settings_viewmodel.dart       # Preferences: unit, speed, ETA, arrow size, opacity, avoidTolls
+│   │   ├── profile_viewmodel.dart        # Name, email, drive stats (SharedPreferences)
+│   │   ├── plan_drive_viewmodel.dart     # Plan Drive screen: search, routes, options
+│   │   ├── saved_places_viewmodel.dart   # Home / Work / Favourite slots (SharedPreferences)
 │   │   └── saved_locations_viewmodel.dart # Bookmarked places list (SQLite)
 │   │
 │   ├── views/                       # Screens & Widgets (View layer)
@@ -571,20 +648,47 @@ smart_ar_navigation/
 │   │   │   ├── splash_screen.dart
 │   │   │   ├── home_screen.dart
 │   │   │   ├── ar_navigation_screen.dart
+│   │   │   ├── plan_drive_screen.dart
+│   │   │   ├── profile_screen.dart
 │   │   │   ├── settings_screen.dart
-│   │   │   └── home/
-│   │   │       └── widgets/
-│   │   │           ├── compass_button.dart
-│   │   │           ├── floating_icon_button.dart
-│   │   │           ├── location_indicator.dart
-│   │   │           ├── place_options_sheet.dart
-│   │   │           ├── place_search_sheet.dart
-│   │   │           ├── quick_place_button.dart
-│   │   │           ├── route_preview_card.dart
-│   │   │           ├── saved_locations_sheet.dart  # Bookmark list bottom sheet
-│   │   │           ├── speed_indicator.dart
-│   │   │           └── waze_drawer.dart
-│   │   └── widgets/                 # Reusable UI components
+│   │   │   │
+│   │   │   ├── home/widgets/              # Extracted widgets for HomeScreen
+│   │   │   │   ├── home_map_layer.dart        # FlutterMap tile + polyline + marker stack
+│   │   │   │   ├── home_controls.dart         # Menu button (left) + my-location / compass (right)
+│   │   │   │   ├── home_bottom_sheet.dart     # DraggableScrollableSheet: search / route preview / idle
+│   │   │   │   ├── quick_actions_section.dart # Home/Work/Favourite quick buttons + Saved Places tile
+│   │   │   │   ├── search_result_item.dart    # Search result row with bookmark toggle
+│   │   │   │   ├── route_preview_card.dart    # Route summary card shown after destination selected
+│   │   │   │   ├── compass_button.dart        # Rotating compass FAB
+│   │   │   │   ├── floating_icon_button.dart  # Reusable floating circular button
+│   │   │   │   ├── location_indicator.dart    # Animated GPS location dot
+│   │   │   │   ├── place_options_sheet.dart   # Long-press options: Navigate / Edit / Remove
+│   │   │   │   ├── place_search_sheet.dart    # Bottom sheet for searching & assigning a saved place
+│   │   │   │   ├── quick_place_button.dart    # Individual Home / Work / Favourite button chip
+│   │   │   │   ├── saved_locations_sheet.dart # Full bookmarked-places list bottom sheet
+│   │   │   │   ├── speed_indicator.dart       # Live speed display during navigation
+│   │   │   │   └── waze_drawer.dart           # Side navigation drawer
+│   │   │   │
+│   │   │   ├── plan_drive/widgets/        # Extracted widgets for PlanDriveScreen
+│   │   │   │   ├── plan_drive_input_card.dart    # From / To text fields with swap button
+│   │   │   │   ├── plan_drive_options_row.dart   # Avoid Tolls / Avoid Highways option chips
+│   │   │   │   ├── plan_drive_map.dart           # FlutterMap with route polylines + pins
+│   │   │   │   ├── search_overlay.dart           # Full-height search results list
+│   │   │   │   ├── route_alternatives_strip.dart # Horizontal scrollable route cards strip
+│   │   │   │   ├── route_summary_card.dart       # Bottom card: fetching / error / route details + Start button
+│   │   │   │   ├── option_chip.dart              # Animated toggle chip (Avoid Tolls / Highways)
+│   │   │   │   ├── fetching_indicator.dart       # "Finding routes…" progress row
+│   │   │   │   └── stat_chip.dart                # Icon + label mini chip
+│   │   │   │
+│   │   │   └── profile/widgets/           # Extracted widgets for ProfileScreen
+│   │   │       ├── profile_card.dart          # White rounded card container
+│   │   │       ├── profile_section_label.dart # Uppercase muted section heading
+│   │   │       ├── profile_field.dart         # Labeled text input with styled borders
+│   │   │       ├── profile_header_card.dart   # Avatar + Name/Email fields + Save button
+│   │   │       ├── stats_section.dart         # 3-column stats: drives / km / top destination
+│   │   │       └── saved_places_section.dart  # Home / Work / Favourite place rows
+│   │   │
+│   │   └── widgets/                 # Reusable UI components (shared across screens)
 │   │       ├── ar_overlay_widget.dart      # Turn card HUD (switches between TurnArrowWidget / RoundaboutWidget)
 │   │       ├── roundabout_widget.dart      # CustomPainter: ring + entry/exit arrows + exit number
 │   │       ├── search_bar_widget.dart      # Destination search input
@@ -706,17 +810,63 @@ GET https://maps.googleapis.com/maps/api/directions/json
 #### Home Screen
 ```
 ┌─────────────────────┐
-│ ≡                   │  ← Hamburger menu (top-left, opens side drawer)
-│                     │
+│ ≡              📍 ↑ │  ← Hamburger (left) + my-location / compass (right)
 │                     │
 │   [Full-Screen      │
-│    Google Map]      │  ← Interactive 2D map, user location centred
-│                     │
+│    CartoDB Map]     │  ← Interactive 2D map, user location centred
 │                     │
 │  ┌───────────────┐  │
-│  │ 🔍 Where to? │  │  ← Floating search bar (bottom)
+│  │ 🔍 Where to? │  │  ← DraggableScrollableSheet (bottom)
+│  │               │  │    idle: quick actions + saved places
+│  │ [Home][Work]  │  │    searching: autocomplete results
+│  │ [Favourite]   │  │    destination set: route preview card
 │  └───────────────┘  │
-│  [Start AR Nav ▶]   │  ← Appears after destination selected
+└─────────────────────┘
+```
+
+#### Plan Drive Screen
+```
+┌─────────────────────┐
+│ ← Plan a Drive      │  ← AppBar with back button
+│ ┌─────────────────┐ │
+│ │ From: Your loc  │ │  ← From text field
+│ │ ⇅               │ │  ← Swap button
+│ │ To:  search...  │ │  ← To text field
+│ └─────────────────┘ │
+│ [Avoid Tolls][Avoid Highways] │  ← Toggle option chips
+│                     │
+│   [Map with route   │  ← FlutterMap: selected route highlighted,
+│    preview]         │    alternatives dimmed
+│                     │
+│ ─────────────────── │
+│ [Alt 1][Alt 2][Alt3]│  ← Route alternatives horizontal strip
+│ ─────────────────── │
+│ 25 min · 18.2 km    │  ← Route summary card
+│ [Start AR Navigation]│
+└─────────────────────┘
+```
+
+#### Profile Screen
+```
+┌─────────────────────┐
+│ ← My Profile        │  ← AppBar
+│                     │
+│      [  M  ]        │  ← CircleAvatar (first letter of name)
+│  NAME               │
+│  [________________] │  ← Name text field
+│  EMAIL              │
+│  [________________] │  ← Email text field
+│  [  Save Profile  ] │
+│                     │
+│  MY STATS           │
+│ ┌──────┬────┬─────┐ │
+│ │Drives│ km │ Top │ │  ← 3-column stat row
+│ └──────┴────┴─────┘ │
+│                     │
+│  SAVED PLACES       │
+│  🏠 Home       edit │
+│  💼 Work       edit │
+│  ⭐ Favourite  edit │
 └─────────────────────┘
 ```
 
