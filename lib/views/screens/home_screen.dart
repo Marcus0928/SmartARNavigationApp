@@ -3,15 +3,15 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
-import 'package:google_maps_flutter/google_maps_flutter.dart' as gm;
-import 'package:smart_ar_navigation/core/utils/location_utils.dart';
-import 'package:smart_ar_navigation/models/place_model.dart';
+import 'package:smart_ar_navigation/core/utils/map_utils.dart';
 import 'package:smart_ar_navigation/viewmodels/map_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/navigation_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/saved_locations_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/saved_places_viewmodel.dart';
+import 'package:smart_ar_navigation/views/screens/home/home_map_controller.dart';
+import 'package:smart_ar_navigation/views/screens/home/widgets/compass_button.dart';
+import 'package:smart_ar_navigation/views/screens/home/widgets/floating_icon_button.dart';
 import 'package:smart_ar_navigation/views/screens/home/widgets/home_bottom_sheet.dart';
-import 'package:smart_ar_navigation/views/screens/home/widgets/home_controls.dart';
 import 'package:smart_ar_navigation/views/screens/home/widgets/home_map_layer.dart';
 import 'package:smart_ar_navigation/views/screens/home/widgets/speed_indicator.dart';
 import 'package:smart_ar_navigation/views/screens/home/widgets/waze_drawer.dart';
@@ -24,181 +24,22 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
-  final _scaffoldKey = GlobalKey<ScaffoldState>();
-  final _mapController = MapController();
+  final _scaffoldKey    = GlobalKey<ScaffoldState>();
+  final _mapController  = MapController();
   final _sheetController = DraggableScrollableController();
-
-  bool _trackingStarted = false;
-  bool _centeredOnUser = false;
-  double _mapRotation = 0.0;
-
-  LatLng? _smoothedLoc;
-  double _smoothedHeading = 0.0;
-
-  AnimationController? _moveController;
-  Animation<double>? _latAnim;
-  Animation<double>? _lngAnim;
-  Animation<double>? _headingAnim;
+  late final HomeMapController _ctrl;
 
   MapViewModel? _mapVmRef;
-  PlaceModel? _lastDestination;
-  bool _routeFitted = false;
+  bool _trackingStarted = false;
 
-  // ── Map animations ────────────────────────────────────────────────────────
-
-  void _animatedMove(LatLng dest, double zoom) {
-    final latTween = Tween<double>(
-      begin: _mapController.camera.center.latitude,
-      end: dest.latitude,
-    );
-    final lngTween = Tween<double>(
-      begin: _mapController.camera.center.longitude,
-      end: dest.longitude,
-    );
-    final zoomTween = Tween<double>(
-      begin: _mapController.camera.zoom,
-      end: zoom,
-    );
-    final rotTween = Tween<double>(
-      begin: _mapController.camera.rotation,
-      end: 0.0,
-    );
-
-    final controller = AnimationController(
-      duration: const Duration(milliseconds: 650),
-      vsync: this,
-    );
-    final anim = CurvedAnimation(parent: controller, curve: Curves.easeInOut);
-
-    controller.addListener(() {
-      _mapController.moveAndRotate(
-        LatLng(latTween.evaluate(anim), lngTween.evaluate(anim)),
-        zoomTween.evaluate(anim),
-        rotTween.evaluate(anim),
-      );
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = HomeMapController(mapController: _mapController, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_sheetController.isAttached) _sheetController.jumpTo(0.22);
     });
-    controller.addStatusListener((s) {
-      if (s == AnimationStatus.completed || s == AnimationStatus.dismissed) {
-        controller.dispose();
-      }
-    });
-    controller.forward();
   }
-
-  void _animateRotation(double target) {
-    final rotTween = Tween<double>(
-      begin: _mapController.camera.rotation,
-      end: target,
-    );
-    final controller = AnimationController(
-      duration: const Duration(milliseconds: 400),
-      vsync: this,
-    );
-    final anim = CurvedAnimation(parent: controller, curve: Curves.easeInOut);
-
-    controller.addListener(() => _mapController.rotate(rotTween.evaluate(anim)));
-    controller.addStatusListener((s) {
-      if (s == AnimationStatus.completed || s == AnimationStatus.dismissed) {
-        controller.dispose();
-      }
-    });
-    controller.forward();
-  }
-
-  // ── Location smoothing ────────────────────────────────────────────────────
-
-  void _smoothMoveTo(LatLng to, double toHeading) {
-    final from = _smoothedLoc ?? to;
-    double delta = (toHeading - _smoothedHeading) % 360;
-    if (delta > 180) delta -= 360;
-    if (delta < -180) delta += 360;
-
-    _moveController?.dispose();
-    _moveController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-    final curve = CurvedAnimation(parent: _moveController!, curve: Curves.easeOut);
-
-    _latAnim = Tween<double>(begin: from.latitude, end: to.latitude).animate(curve);
-    _lngAnim = Tween<double>(begin: from.longitude, end: to.longitude).animate(curve);
-    _headingAnim = Tween<double>(
-      begin: _smoothedHeading,
-      end: _smoothedHeading + delta,
-    ).animate(curve);
-
-    _moveController!.addListener(() {
-      if (!mounted) return;
-      setState(() {
-        _smoothedLoc = LatLng(_latAnim!.value, _lngAnim!.value);
-        _smoothedHeading = _headingAnim!.value % 360;
-      });
-    });
-    _moveController!.addStatusListener((s) {
-      if (s == AnimationStatus.completed || s == AnimationStatus.dismissed) {
-        _moveController?.dispose();
-        _moveController = null;
-      }
-    });
-    _moveController!.forward();
-  }
-
-  void _onLocationChanged() {
-    final vm = _mapVmRef;
-    if (vm == null) return;
-    final loc = vm.currentLocation;
-    if (loc == null) return;
-    _smoothMoveTo(
-      LatLng(loc.latitude, loc.longitude),
-      vm.currentHeading ?? _smoothedHeading,
-    );
-  }
-
-  // ── Route tap hit-test ────────────────────────────────────────────────────
-
-  void _handleMapTap(LatLng tapPoint, MapViewModel mapVM) {
-    if (mapVM.previewRoutes.length <= 1) return;
-    final tap = gm.LatLng(tapPoint.latitude, tapPoint.longitude);
-    double minDist = double.infinity;
-    int closestIndex = -1;
-
-    for (int i = 0; i < mapVM.previewRoutes.length; i++) {
-      if (i == mapVM.selectedRouteIndex) continue;
-      final d = _minDistToPolyline(tap, mapVM.previewRoutes[i].polylinePoints);
-      if (d < minDist) {
-        minDist = d;
-        closestIndex = i;
-      }
-    }
-
-    if (closestIndex != -1 && minDist < 40.0) mapVM.selectRoute(closestIndex);
-  }
-
-  double _minDistToPolyline(gm.LatLng p, List<gm.LatLng> pts) {
-    double min = double.infinity;
-    for (int i = 0; i < pts.length - 1; i++) {
-      final d = _distToSegment(p, pts[i], pts[i + 1]);
-      if (d < min) min = d;
-    }
-    return min;
-  }
-
-  double _distToSegment(gm.LatLng p, gm.LatLng a, gm.LatLng b) {
-    final dab = calculateDistance(a, b);
-    if (dab < 1.0) return calculateDistance(p, a);
-    final t = (((p.latitude - a.latitude) * (b.latitude - a.latitude) +
-                (p.longitude - a.longitude) * (b.longitude - a.longitude)) /
-               ((b.latitude - a.latitude) * (b.latitude - a.latitude) +
-                (b.longitude - a.longitude) * (b.longitude - a.longitude)))
-        .clamp(0.0, 1.0);
-    final proj = gm.LatLng(
-      a.latitude + t * (b.latitude - a.latitude),
-      a.longitude + t * (b.longitude - a.longitude),
-    );
-    return calculateDistance(p, proj);
-  }
-
-  // ── Lifecycle ─────────────────────────────────────────────────────────────
 
   @override
   void didChangeDependencies() {
@@ -218,111 +59,85 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   void dispose() {
     _mapVmRef?.removeListener(_onLocationChanged);
-    _moveController?.dispose();
+    _ctrl.dispose();
     _mapController.dispose();
     _sheetController.dispose();
     super.dispose();
   }
 
-  // ── Build helpers (called from build — no setState, only postFrameCallbacks) ──
-
-  void _handleInitialCentering(LatLng? userLatLng) {
-    if (userLatLng != null && !_centeredOnUser) {
-      _centeredOnUser = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _animatedMove(userLatLng, 16);
-      });
-    }
-  }
-
-  void _handleDestinationChange(MapViewModel mapVM) {
-    if (mapVM.selectedDestination != _lastDestination) {
-      _lastDestination = mapVM.selectedDestination;
-      _routeFitted = false;
-      if (mapVM.selectedDestination != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && _sheetController.isAttached) {
-            _sheetController.animateTo(
-              0.40,
-              duration: const Duration(milliseconds: 400),
-              curve: Curves.easeOut,
-            );
-          }
-        });
-      }
-    }
-  }
-
-  void _handleRouteFitting(MapViewModel mapVM) {
-    if (!_routeFitted && mapVM.previewRoutes.isNotEmpty) {
-      _routeFitted = true;
-      final sheetHeight = MediaQuery.of(context).size.height * 0.40;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        final points = mapVM.previewRoutes[mapVM.selectedRouteIndex]
-            .polylinePoints
-            .map((p) => LatLng(p.latitude, p.longitude))
-            .toList();
-        if (points.length < 2) return;
-        _mapController.fitCamera(
-          CameraFit.bounds(
-            bounds: LatLngBounds.fromPoints(points),
-            padding: EdgeInsets.fromLTRB(40, 80, 40, sheetHeight + 24),
-            maxZoom: 16,
-          ),
-        );
-        if (_mapController.camera.zoom < 12) {
-          _mapController.move(_mapController.camera.center, 12.0);
-        }
-      });
-    }
-  }
-
-  // ── Build ─────────────────────────────────────────────────────────────────
+  void _onLocationChanged() => _ctrl.onLocationChanged(_mapVmRef!);
 
   @override
   Widget build(BuildContext context) {
-    final mapVM = context.watch<MapViewModel>();
-    final navVM = context.watch<NavigationViewModel>();
-    final savedVM = context.watch<SavedPlacesViewModel>();
+    final mapVM          = context.watch<MapViewModel>();
+    final navVM          = context.watch<NavigationViewModel>();
+    final savedVM        = context.watch<SavedPlacesViewModel>();
     final savedLocationsVM = context.watch<SavedLocationsViewModel>();
 
-    final loc = mapVM.currentLocation;
+    final loc        = mapVM.currentLocation;
     final userLatLng = loc != null ? LatLng(loc.latitude, loc.longitude) : null;
+    final topPadding = MediaQuery.of(context).padding.top;
 
-    _handleInitialCentering(userLatLng);
-    _handleDestinationChange(mapVM);
-    _handleRouteFitting(mapVM);
+    _ctrl.handleInitialCentering(userLatLng);
+    _ctrl.handleDestinationChange(mapVM, _sheetController);
+    _ctrl.handleRouteFitting(mapVM, context, _sheetController);
 
     return Scaffold(
       key: _scaffoldKey,
       drawer: const WazeDrawer(),
       body: Stack(
         children: [
+          // Full-screen map
           Positioned.fill(
-            child: HomeMapLayer(
-              mapController: _mapController,
-              smoothedLoc: _smoothedLoc,
-              smoothedHeading: _smoothedHeading,
-              currentAccuracy: mapVM.currentAccuracy,
-              mapVM: mapVM,
-              onTap: (_, point) => _handleMapTap(point, mapVM),
-              onMapEvent: (_) {
-                final rotation = _mapController.camera.rotation;
-                if (rotation != _mapRotation) {
-                  setState(() => _mapRotation = rotation);
-                }
-              },
+            child: ListenableBuilder(
+              listenable: _ctrl,
+              builder: (_, _) => HomeMapLayer(
+                mapController: _mapController,
+                smoothedLoc: _ctrl.smoothedLoc,
+                smoothedHeading: _ctrl.smoothedHeading,
+                currentAccuracy: mapVM.currentAccuracy,
+                mapVM: mapVM,
+                onTap: (_, point) => handleRouteTap(point, mapVM),
+                onMapEvent: _ctrl.onMapEvent,
+              ),
             ),
           ),
-          HomeControls(
-            onMenuTap: () => _scaffoldKey.currentState?.openDrawer(),
-            onMyLocationTap: () {
-              if (userLatLng != null) _animatedMove(userLatLng, 16);
-            },
-            onCompassTap: () => _animateRotation(0),
-            mapRotation: _mapRotation,
+          // Hamburger menu — top left
+          Positioned(
+            top: topPadding + 12,
+            left: 12,
+            child: FloatingIconButton(
+              icon: Icons.menu,
+              tooltip: 'Menu',
+              onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+            ),
           ),
+          // GPS + Compass — top right
+          Positioned(
+            top: topPadding + 12,
+            right: 12,
+            child: ListenableBuilder(
+              listenable: _ctrl,
+              builder: (_, _) => Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  FloatingIconButton(
+                    icon: Icons.my_location,
+                    tooltip: 'My Location',
+                    onPressed: () {
+                      if (userLatLng != null) _ctrl.animatedMove(userLatLng, 16);
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  CompassButton(
+                    rotation: _ctrl.mapRotation,
+                    onPressed: () => _ctrl.animateRotation(0),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Draggable bottom sheet floating over map
           Positioned.fill(
             child: HomeBottomSheet(
               sheetController: _sheetController,
@@ -335,8 +150,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 curve: Curves.easeOut,
               ),
               onStartNavigation: () async {
-                final navigator = Navigator.of(context);
-                final messenger = ScaffoldMessenger.of(context);
+                final navigator  = Navigator.of(context);
+                final messenger  = ScaffoldMessenger.of(context);
                 await navVM.startNavigation(
                   mapVM.selectedDestination!,
                   route: mapVM.selectedRoute,
@@ -355,8 +170,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             animation: _sheetController,
             builder: (_, _) {
               final screenH = MediaQuery.of(context).size.height;
-              final extent =
-                  _sheetController.isAttached ? _sheetController.size : 0.22;
+              final extent  = _sheetController.isAttached ? _sheetController.size : 0.22;
               return Positioned(
                 right: 16,
                 bottom: screenH * extent + 8,

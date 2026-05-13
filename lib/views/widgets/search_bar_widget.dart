@@ -18,14 +18,6 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
   final FocusNode _focusNode = FocusNode();
 
   @override
-  void initState() {
-    super.initState();
-    _focusNode.addListener(() {
-      if (_focusNode.hasFocus) widget.onFocused?.call();
-    });
-  }
-
-  @override
   void dispose() {
     _controller.dispose();
     _focusNode.dispose();
@@ -35,8 +27,10 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
   @override
   Widget build(BuildContext context) {
     return TextField(
+      autofocus: false,
       controller: _controller,
       focusNode: _focusNode,
+      onTap: () => widget.onFocused?.call(),
       decoration: InputDecoration(
         hintText: searchHint,
         prefixIcon: const Icon(Icons.search),
