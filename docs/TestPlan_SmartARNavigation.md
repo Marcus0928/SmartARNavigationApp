@@ -13,8 +13,8 @@
 | **Programme** | Bachelor of Software Engineering (Hons) |
 | **Testing Type** | Manual Black-Box Testing |
 | **Test Device** | OPPO Reno 7 5G (CPH2371) |
-| **Version** | 1.0 |
-| **Last Updated** | October 2025 |
+| **Version** | 1.1 |
+| **Last Updated** | May 2026 |
 
 ---
 
@@ -28,6 +28,10 @@
 6. [Test Cases — AR Navigation](#6-test-cases--ar-navigation)
 7. [Test Cases — Direction Accuracy](#7-test-cases--direction-accuracy)
 8. [Test Cases — Distance Accuracy](#8-test-cases--distance-accuracy)
+9. [Test Cases — Edge Cases & Error Handling](#9-test-cases--edge-cases--error-handling)
+10. [Test Cases — Route Selection & Toll Indicator](#10-test-cases--route-selection--toll-indicator)
+11. [Test Cases — Recent Search History](#11-test-cases--recent-search-history)
+12. [Test Results Summary Table](#12-test-results-summary-table)
 9. [Test Cases — Edge Cases & Error Handling](#9-test-cases--edge-cases--error-handling)
 10. [Test Results Summary Table](#10-test-results-summary-table)
 
@@ -556,7 +560,227 @@ These tests verify the app handles unexpected situations gracefully.
 
 ---
 
-## 10. Test Results Summary Table
+## 10. Test Cases — Route Selection & Toll Indicator
+
+These tests verify the home screen route preview panel and toll indicators on both the Home Screen and Plan a Drive screen.
+
+---
+
+### TC-029 — Route Preview Panel Appears After Destination Selected
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-029 |
+| **Feature** | Route Selection |
+| **Covers** | FR-69 |
+| **Description** | Verify the route preview panel replaces the search bar when a destination is selected on the Home Screen |
+| **Precondition** | Home Screen is open, no destination set |
+| **Steps** | 1. Type a destination in the search bar 2. Tap a result |
+| **Expected Result** | Search bar disappears; route preview panel shows destination name, a vertical list of route options, and Cancel/Start buttons |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+### TC-030 — Route List Shows Label, Duration, Distance
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-030 |
+| **Feature** | Route Selection |
+| **Covers** | FR-70 |
+| **Description** | Verify each row in the route list shows the correct label, estimated duration, and distance |
+| **Precondition** | Destination selected, routes loaded |
+| **Steps** | 1. Observe each row in the route preview list |
+| **Expected Result** | Each row shows: route label (e.g. "Fastest", "Alt 1"), duration (e.g. "24 min"), and distance (e.g. "18.2 km") |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+### TC-031 — Selected Route Has Blue Accent Bar
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-031 |
+| **Feature** | Route Selection |
+| **Covers** | FR-71 |
+| **Description** | Verify tapping a route row selects it and shows a blue left accent bar |
+| **Precondition** | Route preview panel is showing with multiple routes |
+| **Steps** | 1. Tap "Alt 1" row 2. Observe the visual state of the row |
+| **Expected Result** | "Alt 1" row shows a blue left accent bar; map updates to show that route highlighted |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+### TC-032 — Cancel Button Resets Home Screen
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-032 |
+| **Feature** | Route Selection |
+| **Covers** | FR-73 |
+| **Description** | Verify tapping Cancel clears the destination, re-centres the map, and restores the default bottom sheet |
+| **Precondition** | Route preview panel is showing |
+| **Steps** | 1. Tap the **Cancel** button |
+| **Expected Result** | Destination is cleared; route polylines removed from map; map animates back to user's current location; bottom sheet collapses to default state; search bar reappears |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+### TC-033 — Start Button Launches AR Navigation
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-033 |
+| **Feature** | Route Selection |
+| **Covers** | FR-74 |
+| **Description** | Verify tapping Start launches AR Navigation with the selected route |
+| **Precondition** | Route preview panel is showing, a route is selected |
+| **Steps** | 1. Tap the **Start** button |
+| **Expected Result** | AR Navigation Screen opens and begins navigation using the selected route |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+### TC-034 — Toll Indicator on Home Screen Route (Toll Route)
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-034 |
+| **Feature** | Toll Indicator |
+| **Covers** | FR-68, FR-70 |
+| **Description** | Verify the orange toll indicator appears on a route known to use toll roads |
+| **Precondition** | Home Screen open; device has internet |
+| **Steps** | 1. Search for a destination reachable via a toll highway (e.g. PLUS highway) 2. Wait for routes to load 3. Observe each route row |
+| **Expected Result** | Route rows that use toll roads display an orange 🏧 "Toll" label next to the distance |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+### TC-035 — No Toll Indicator on Toll-Free Route
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-035 |
+| **Feature** | Toll Indicator |
+| **Covers** | FR-68, FR-70 |
+| **Description** | Verify the toll indicator is absent on a route with no toll roads |
+| **Precondition** | Home Screen open |
+| **Steps** | 1. Search for a short local destination reachable without any toll highway 2. Wait for routes to load 3. Observe route rows |
+| **Expected Result** | No toll indicator appears on any route row |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+### TC-036 — Toll Indicator on Plan a Drive Route Card
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-036 |
+| **Feature** | Toll Indicator — Plan a Drive |
+| **Covers** | FR-68 |
+| **Description** | Verify the toll badge appears on route cards in the Plan a Drive alternatives strip |
+| **Precondition** | Plan a Drive screen open with a destination set via a toll highway |
+| **Steps** | 1. Open Plan a Drive from the drawer 2. Enter a destination reachable via a toll road 3. Wait for route cards to load 4. Observe the cards in the horizontal strip |
+| **Expected Result** | Route cards that include toll roads display an orange 🏧 "Toll" pill at the bottom-right of the card |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+## 11. Test Cases — Recent Search History
+
+These tests verify that recently searched and navigated places are recorded and displayed correctly on the Home Screen.
+
+---
+
+### TC-037 — Recent History Appears After First Search
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-037 |
+| **Feature** | Recent History |
+| **Covers** | FR-75, FR-78 |
+| **Description** | Verify that after selecting a destination, it appears in the Recent section on the Home Screen |
+| **Precondition** | Fresh app state with no recent history |
+| **Steps** | 1. Search for and select a destination (e.g. "Sunway Pyramid") 2. Tap **Cancel** to return to idle state 3. Observe the bottom sheet |
+| **Expected Result** | A **RECENT** section appears below the quick-access buttons showing "Sunway Pyramid" with its address |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+### TC-038 — Tapping Recent Item Sets Destination
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-038 |
+| **Feature** | Recent History |
+| **Covers** | FR-77 |
+| **Description** | Verify tapping a recent history entry sets it as the navigation destination |
+| **Precondition** | At least one entry exists in the Recent section |
+| **Steps** | 1. Tap a place in the Recent section |
+| **Expected Result** | That place is set as the destination immediately; route preview panel appears with routes loaded |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+### TC-039 — Recent History Persists After App Restart
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-039 |
+| **Feature** | Recent History |
+| **Covers** | FR-80 |
+| **Description** | Verify the recent search history is retained after the app is fully closed and reopened |
+| **Precondition** | At least two places have been searched |
+| **Steps** | 1. Search for two destinations 2. Force-close the app 3. Reopen the app 4. Observe the bottom sheet |
+| **Expected Result** | Both searched places appear in the Recent section in the same order (newest first) |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+### TC-040 — Recent History Max 8 Items
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-040 |
+| **Feature** | Recent History |
+| **Covers** | FR-76 |
+| **Description** | Verify that the Recent section shows a maximum of 8 entries and drops the oldest when exceeded |
+| **Precondition** | Home Screen open |
+| **Steps** | 1. Search for and select 9 different destinations one by one 2. After each selection, tap Cancel 3. Observe the Recent section after the 9th selection |
+| **Expected Result** | Only 8 entries are shown; the first (oldest) destination is no longer listed |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+### TC-041 — Duplicate Recent Entry Moves to Top
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-041 |
+| **Feature** | Recent History |
+| **Covers** | FR-79 |
+| **Description** | Verify that searching for a place already in the recent list moves it to the top instead of duplicating it |
+| **Precondition** | "Sunway Pyramid" already exists in the Recent section (not at the top) |
+| **Steps** | 1. Search for and select a different destination 2. Cancel 3. Search for "Sunway Pyramid" again and select it 4. Cancel 5. Observe the Recent section |
+| **Expected Result** | "Sunway Pyramid" appears once at the top of the list; no duplicate entry exists |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+## 12. Test Results Summary Table
 
 Fill in this table after completing all tests.
 
@@ -590,6 +814,19 @@ Fill in this table after completing all tests.
 | TC-026 | Error | Internet Lost During Nav | ⏳ | |
 | TC-027 | Rerouting | Off-Route Detection | ⏳ | |
 | TC-028 | Lifecycle | App Backgrounded | ⏳ | |
+| TC-029 | Route Selection | Route Preview Panel Appears | ⏳ | |
+| TC-030 | Route Selection | Route List Shows Label/Duration/Distance | ⏳ | |
+| TC-031 | Route Selection | Selected Route Blue Accent Bar | ⏳ | |
+| TC-032 | Route Selection | Cancel Resets Home Screen | ⏳ | |
+| TC-033 | Route Selection | Start Launches AR Navigation | ⏳ | |
+| TC-034 | Toll Indicator | Toll Badge on Home Screen (Toll Route) | ⏳ | |
+| TC-035 | Toll Indicator | No Badge on Toll-Free Route | ⏳ | |
+| TC-036 | Toll Indicator | Toll Badge on Plan a Drive Card | ⏳ | |
+| TC-037 | Recent History | Appears After First Search | ⏳ | |
+| TC-038 | Recent History | Tap Item Sets Destination | ⏳ | |
+| TC-039 | Recent History | Persists After App Restart | ⏳ | |
+| TC-040 | Recent History | Max 8 Items Enforced | ⏳ | |
+| TC-041 | Recent History | Duplicate Moves to Top | ⏳ | |
 
 ---
 
@@ -601,7 +838,7 @@ Fill in this table after completing all tests.
 | ❌ FAIL | — |
 | ⚠️ PARTIAL | — |
 | ⏭️ SKIP | — |
-| **Total** | **28** |
+| **Total** | **41** |
 
 ---
 
@@ -612,6 +849,6 @@ Fill in this table after completing all tests.
 
 ---
 
-*End of Test Plan Document — Version 1.0*
+*End of Test Plan Document — Version 1.1*
 
 *Prepared by: Liew Sau Yang | Sunway University | Bachelor of Software Engineering (Hons)*

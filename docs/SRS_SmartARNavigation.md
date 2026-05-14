@@ -12,7 +12,7 @@
 | **Institution** | Sunway University — School of Computing and Artificial Intelligence |
 | **Programme** | Bachelor of Software Engineering (Hons) |
 | **Semester** | September 2025 |
-| **Version** | 2.0 |
+| **Version** | 2.1 |
 | **Last Updated** | May 2026 |
 
 ---
@@ -27,6 +27,8 @@
    - [3.9 Bookmarked Locations](#39-bookmarked-locations-saved-places-list)
    - [3.10 Profile Screen](#310-profile-screen)
    - [3.11 Plan a Drive Screen](#311-plan-a-drive-screen)
+   - [3.12 Home Screen Route Selection](#312-home-screen-route-selection)
+   - [3.13 Recent Search History](#313-recent-search-history)
 4. [Non-Functional Requirements](#4-non-functional-requirements)
 5. [External Interface Requirements](#5-external-interface-requirements)
 6. [Technology Stack](#6-technology-stack)
@@ -306,10 +308,41 @@ Primary users are assumed to be comfortable with basic smartphone usage. No tech
 | FR-61 | Both the From and To fields shall show autocomplete search results using the Google Maps Places API as the user types. |
 | FR-62 | The Plan a Drive screen shall provide a **Swap** button to interchange the origin and destination. |
 | FR-63 | The Plan a Drive screen shall provide toggleable **Avoid Tolls** and **Avoid Highways** option chips; selecting either shall trigger a route re-fetch with the corresponding constraint. |
-| FR-64 | When a valid origin and destination are set, the system shall fetch up to three alternative routes from the Google Maps Directions API and display them in a horizontal strip; the fastest route shall be marked with a "Fastest" badge. |
+| FR-64 | When a valid origin and destination are set, the system shall fetch up to three alternative routes from the Google Maps Directions API and display them in a horizontal scrollable strip; the fastest route shall be marked with a "Fastest" badge. |
 | FR-65 | The selected route shall be highlighted on the embedded map; alternative routes shall be shown in a dimmed style. |
 | FR-66 | The map view shall automatically fit to the bounding box of the selected route when routes are loaded. |
 | FR-67 | Tapping **Start AR Navigation** shall hand the selected route to `NavigationViewModel` and launch the AR Navigation Screen. |
+| FR-68 | Each route card in the Plan a Drive alternatives strip shall display an orange toll indicator (toll icon + "Toll" label) when the Google Directions API response indicates the route includes toll roads — detected via the route-level `warnings` array or step-level HTML instruction text containing the word "toll". |
+
+---
+
+### 3.12 Home Screen Route Selection
+
+**Description:** After the user selects a destination from the Home Screen search bar or quick-access buttons, the bottom sheet shall transition from search/idle mode to a route selection panel showing alternative routes and action buttons.
+
+| ID | Requirement |
+|---|---|
+| FR-69 | When a destination is selected on the Home Screen, the search bar shall be hidden and replaced by the route preview panel. |
+| FR-70 | The route preview panel shall display the destination name at the top and list all available alternative routes as a vertical list; each row shall show the route label, estimated duration, distance, and an orange toll indicator when `hasTolls` is true. |
+| FR-71 | The selected route row shall be indicated with a blue left accent bar; tapping any other row shall change the active selection. |
+| FR-72 | The route preview panel shall display a **Cancel** button (outlined) and a **Start** button (filled blue) side-by-side at the bottom of the panel. |
+| FR-73 | Tapping **Cancel** shall clear the selected destination, remove route polylines from the map, animate the map back to the user's current GPS location at the default zoom, and reset the bottom sheet to its default collapsed state. |
+| FR-74 | Tapping **Start** shall start AR navigation using the currently selected route, equivalent to tapping "Start AR Navigation" on the Plan a Drive screen. |
+
+---
+
+### 3.13 Recent Search History
+
+**Description:** The app shall record places the user has navigated to or searched for and display them in the Home Screen bottom sheet for quick re-selection.
+
+| ID | Requirement |
+|---|---|
+| FR-75 | The Home Screen bottom sheet shall display a **Recent** section below the quick-access buttons when at least one place has previously been searched or navigated to. |
+| FR-76 | The Recent section shall display up to **8** most recently used places, ordered newest-first, each showing a history icon, place name, and address. |
+| FR-77 | Tapping a recent entry shall immediately set that place as the selected destination on the map, identical to selecting it from search results. |
+| FR-78 | A place shall be added to the recent history whenever the user selects a destination from: the autocomplete search results, a quick-access button (Home / Work / Favourite), or a recent history entry itself. |
+| FR-79 | If the same place is selected again it shall move to the top of the list rather than creating a duplicate entry. |
+| FR-80 | Recent search history shall be persisted via `shared_preferences` and restored after app restart. |
 
 ---
 
@@ -353,6 +386,13 @@ Primary users are assumed to be comfortable with basic smartphone usage. No tech
 |---|---|
 | NFR-13 | The Google Maps API key shall be stored securely and not hardcoded in the public source code. |
 | NFR-14 | Location data shall not be stored or transmitted beyond what is required for navigation. |
+
+### 4.6 Data Persistence
+
+| ID | Requirement |
+|---|---|
+| NFR-15 | Recent search history shall be loaded and displayed within 500 ms of the Home Screen becoming visible. |
+| NFR-16 | Toll detection shall cover both the Google Directions API route-level `warnings` array and individual step-level HTML instructions to ensure reliable detection on Malaysian highway routes where warnings may not always be populated. |
 
 ---
 
@@ -464,6 +504,6 @@ dependencies:
 
 ---
 
-*End of SRS Document — Version 2.0*
+*End of SRS Document — Version 2.1*
 
 *Prepared by: Liew Sau Yang | Sunway University | Bachelor of Software Engineering (Hons)*

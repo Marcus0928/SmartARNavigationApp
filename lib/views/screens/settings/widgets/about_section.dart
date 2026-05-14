@@ -13,7 +13,7 @@ class AboutSection extends StatelessWidget {
         const SettingsSectionHeader('About'),
         ListTile(
           title: const Text('App Version'),
-          trailing: Text('Beta 0.0.1', style: TextStyle(color: Colors.grey.shade600)),
+          trailing: Text('Beta 0.1.0', style: TextStyle(color: Colors.grey.shade600)),
         ),
         ListTile(
           title: const Text('Developer'),

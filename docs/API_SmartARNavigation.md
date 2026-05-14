@@ -11,8 +11,8 @@
 | **Supervisor** | Dr Javid Iqbal Thirupattur |
 | **Institution** | Sunway University — School of Computing and Artificial Intelligence |
 | **Programme** | Bachelor of Software Engineering (Hons) |
-| **Version** | 1.0 (Basic — Core Functions) |
-| **Last Updated** | October 2025 |
+| **Version** | 1.1 |
+| **Last Updated** | May 2026 |
 
 ---
 
@@ -26,9 +26,11 @@
 6. [NavigationViewModel](#6-navigationviewmodel)
 7. [ARViewModel](#7-arviewmodel)
 8. [MapViewModel](#8-mapviewmodel)
-9. [SettingsViewModel](#9-settingsviewmodel)
-10. [Utility Functions](#10-utility-functions)
-11. [Enums & Constants](#11-enums--constants)
+9. [RecentPlacesRepository](#9-recentplacesrepository)
+10. [RecentPlacesViewModel](#10-recentplacesviewmodel)
+11. [SettingsViewModel](#11-settingsviewmodel)
+12. [Utility Functions](#12-utility-functions)
+13. [Enums & Constants](#13-enums--constants)
 
 ---
 
@@ -142,25 +144,30 @@ void stopLocationStream()
 ### `getRoute()`
 
 ```dart
-Future<RouteModel> getRoute({
+Future<List<RouteModel>> getRoute({
   required LatLng origin,
   required LatLng destination,
+  bool avoidTolls = false,
+  bool avoidHighways = false,
 })
 ```
 
-**Purpose:** Fetches a walking route from origin to destination using Google Maps Directions API.
+**Purpose:** Fetches up to three alternative driving routes from the Google Maps Directions API.
 
 **Parameters:**
 | Parameter | Type | Description |
 |---|---|---|
 | `origin` | `LatLng` | The user's current GPS location |
 | `destination` | `LatLng` | The user's chosen destination |
+| `avoidTolls` | `bool` | If `true`, adds `avoid=tolls` to the request (default `false`) |
+| `avoidHighways` | `bool` | If `true`, adds `avoid=highways` to the request (default `false`) |
 
-**Returns:** `RouteModel` — contains waypoints, turn instructions, distance, and duration
+**Returns:** `List<RouteModel>` — up to 3 alternative routes ordered fastest-first; each entry includes `label`, `waypoints`, `polylinePoints`, `turns`, `totalDistance`, `estimatedDuration`, and `hasTolls`
 
 **Notes:**
-- Makes an HTTP GET request to `maps.googleapis.com/maps/api/directions/json`
-- Uses `mode=walking` by default (suitable for FYP demo)
+- Makes an HTTP GET request to `maps.googleapis.com/maps/api/directions/json` with `alternatives=true` and `departure_time=now`
+- `mode=driving`
+- Duration uses `duration_in_traffic` when available (requires `departure_time=now`)
 - Throws a `RouteNotFoundException` if no route is found
 - Throws a `NetworkException` if the device has no internet
 
@@ -169,21 +176,24 @@ Future<RouteModel> getRoute({
 ### `parseRouteResponse()`
 
 ```dart
-RouteModel parseRouteResponse(Map<String, dynamic> json)
+List<RouteModel> parseRouteResponse(Map<String, dynamic> json)
 ```
 
-**Purpose:** Parses the raw JSON response from Google Maps Directions API into a `RouteModel` object.
+**File:** `lib/core/utils/route_parser.dart`
+
+**Purpose:** Parses the raw JSON response from the Google Maps Directions API into a list of `RouteModel` objects; also detects toll roads.
 
 **Parameters:**
 | Parameter | Type | Description |
 |---|---|---|
 | `json` | `Map<String, dynamic>` | Raw JSON response from the Directions API |
 
-**Returns:** `RouteModel` — clean data object ready for use in the app
+**Returns:** `List<RouteModel>` — one entry per alternative route
 
 **Notes:**
-- This is a private helper function called internally by `getRoute()`
-- Extracts steps, distance, duration, and waypoint coordinates from the JSON
+- Sets `hasTolls = true` when the route-level `warnings` array contains the word "toll", **or** when any step's `html_instructions` contains the word "toll" (covers Malaysian routes where warnings may be absent)
+- Extracts the road name from the first non-compass, non-ordinal `<b>` tag in `html_instructions`
+- Extracts roundabout exit numbers (e.g. "2nd exit") via regex from `html_instructions`
 
 ---
 
@@ -600,7 +610,7 @@ Future<void> searchDestination(String query)
 Future<void> selectDestination(PlaceModel place)
 ```
 
-**Purpose:** Handles the user tapping on a search result.
+**Purpose:** Handles the user tapping on a search result — fetches full place details then loads preview routes.
 
 **Parameters:**
 | Parameter | Type | Description |
@@ -610,13 +620,191 @@ Future<void> selectDestination(PlaceModel place)
 **Returns:** Nothing
 
 **Notes:**
-- Calls `PlacesRepository.getPlaceDetails()` to get the full coordinates
-- Sets `selectedDestination` and notifies listeners
-- The Home Screen will show the "Start AR Navigation" button once this is set
+- Calls `PlacesRepository.getPlaceDetails()` to resolve full coordinates
+- Sets `selectedDestination`, clears `searchResults`, sets `isFetchingRoute = true`, then calls the internal `_fetchPreviewRoute()`
+- The Home Screen bottom sheet switches to route preview mode once `selectedDestination` is non-null
 
 ---
 
-## 9. SettingsViewModel
+### `setSelectedDestination()`
+
+```dart
+void setSelectedDestination(PlaceModel place)
+```
+
+**Purpose:** Sets a fully-resolved place (coordinates already present) as the destination and fetches preview routes — used by quick-access buttons (Home/Work/Favourite) and recent history entries.
+
+**Parameters:**
+| Parameter | Type | Description |
+|---|---|---|
+| `place` | `PlaceModel` | A `PlaceModel` that already has valid `coordinates` |
+
+**Returns:** Nothing
+
+**Notes:**
+- Skips the `getPlaceDetails()` call since coordinates are already known
+- Immediately calls `_fetchPreviewRoute()` after setting the destination
+
+---
+
+### `clearDestination()`
+
+```dart
+void clearDestination()
+```
+
+**Purpose:** Clears the selected destination, all preview routes, and resets route-selection state.
+
+**Parameters:** None
+
+**Returns:** Nothing
+
+**Notes:**
+- Called when the user taps **Cancel** on the route preview panel
+- Resets `selectedDestination`, `previewRoutes`, `selectedRouteIndex`, `isFetchingRoute`, and `searchResults`
+
+---
+
+### `selectRoute()`
+
+```dart
+void selectRoute(int index)
+```
+
+**Purpose:** Changes the active route selection in the preview panel.
+
+**Parameters:**
+| Parameter | Type | Description |
+|---|---|---|
+| `index` | `int` | Zero-based index into `previewRoutes` |
+
+**Returns:** Nothing
+
+**Notes:**
+- Guards against out-of-range indices
+- Notifies listeners so the map and route list rebuild with the newly selected route highlighted
+
+---
+
+### Key properties
+
+| Property | Type | Description |
+|---|---|---|
+| `previewRoutes` | `List<RouteModel>` | Up to 3 alternative routes fetched after a destination is set |
+| `selectedRouteIndex` | `int` | Index of the currently highlighted route (default `0`) |
+| `selectedRoute` | `RouteModel?` | Convenience getter: `previewRoutes[selectedRouteIndex]`, or `null` if empty |
+| `isFetchingRoute` | `bool` | `true` while a route request is in flight |
+
+---
+
+## 9. RecentPlacesRepository
+
+**File:** `lib/repositories/recent_places_repository.dart`
+**Purpose:** Persists up to 8 recently navigated places in `shared_preferences` as a JSON-encoded string list.
+
+---
+
+### `getAll()`
+
+```dart
+Future<List<PlaceModel>> getAll()
+```
+
+**Purpose:** Reads and returns all stored recent places, ordered newest-first.
+
+**Parameters:** None
+
+**Returns:** `List<PlaceModel>` — decoded recent places; malformed entries are silently skipped
+
+---
+
+### `add()`
+
+```dart
+Future<void> add(PlaceModel place)
+```
+
+**Purpose:** Prepends a place to the recent list, removes any existing duplicate, and trims to 8 entries.
+
+**Parameters:**
+| Parameter | Type | Description |
+|---|---|---|
+| `place` | `PlaceModel` | The place to record |
+
+**Returns:** Nothing
+
+**Notes:**
+- Deduplication is by `placeId` — same place selected twice moves it to position 0 rather than creating a duplicate
+
+---
+
+### `clear()`
+
+```dart
+Future<void> clear()
+```
+
+**Purpose:** Removes the entire recent history from `shared_preferences`.
+
+**Parameters:** None
+
+**Returns:** Nothing
+
+---
+
+## 10. RecentPlacesViewModel
+
+**File:** `lib/viewmodels/recent_places_viewmodel.dart`
+**Purpose:** Exposes the recent search history list to the Home Screen. Extends `ChangeNotifier`.
+
+---
+
+### `load()`
+
+```dart
+Future<void> load()
+```
+
+**Purpose:** Reads persisted recent places from `RecentPlacesRepository` and notifies listeners.
+
+**Notes:** Called automatically on app start via `..load()` in `app.dart`'s provider initialiser.
+
+---
+
+### `add()`
+
+```dart
+Future<void> add(PlaceModel place)
+```
+
+**Purpose:** Records a place as recently used, persists it, reloads the list, and notifies listeners.
+
+**Parameters:**
+| Parameter | Type | Description |
+|---|---|---|
+| `place` | `PlaceModel` | The destination the user just selected |
+
+---
+
+### `clear()`
+
+```dart
+Future<void> clear()
+```
+
+**Purpose:** Wipes the full recent history and notifies listeners.
+
+---
+
+### Key properties
+
+| Property | Type | Description |
+|---|---|---|
+| `places` | `List<PlaceModel>` | Ordered recent places list (newest first, max 8) |
+
+---
+
+## 11. SettingsViewModel
 
 **File:** `lib/viewmodels/settings_viewmodel.dart`  
 **Purpose:** Manages user preferences, persisted via `shared_preferences`. Extends `ChangeNotifier`.
@@ -854,7 +1042,7 @@ Future<void> setOverlayOpacity(double opacity)
 
 ---
 
-## 10. Utility Functions
+## 12. Utility Functions
 
 **File:** `lib/core/utils/location_utils.dart`  
 **Purpose:** Helper functions for location calculations.
@@ -905,16 +1093,19 @@ TurnInstruction? findNextTurn(LatLng currentLocation, List<TurnInstruction> turn
 
 ---
 
-## 11. Enums & Constants
+## 13. Enums & Constants
 
 **File:** `lib/core/enums/turn_direction.dart`
 
 ```dart
 enum TurnDirection {
-  forward,   // Go straight
-  left,      // Turn left
-  right,     // Turn right
-  uTurn,     // Make a U-turn
+  forward,     // Go straight
+  left,        // Turn left (sharp or normal)
+  right,       // Turn right (sharp or normal)
+  keepLeft,    // Slight left / keep left / ramp left / fork left
+  keepRight,   // Slight right / keep right / ramp right / fork right
+  uTurn,       // Make a U-turn (left or right)
+  roundabout,  // Enter roundabout — exit number shown in centre of diagram
 }
 ```
 
@@ -965,12 +1156,8 @@ const Color textPrimary        = Color(0xFF212121);  // Dark Grey
 
 ---
 
-> 📝 **Note:** This is Version 1.0 — Basic Core Functions.
-> A more detailed version with full code examples, error handling patterns,
-> and edge case documentation will be added in a future revision.
-
 ---
 
-*End of API & Function Documentation — Version 1.0*
+*End of API & Function Documentation — Version 1.1*
 
 *Prepared by: Liew Sau Yang | Sunway University | Bachelor of Software Engineering (Hons)*

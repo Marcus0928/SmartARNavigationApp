@@ -11,8 +11,8 @@
 | **Supervisor** | Dr Javid Iqbal Thirupattur |
 | **Institution** | Sunway University — School of Computing and Artificial Intelligence |
 | **Programme** | Bachelor of Software Engineering (Hons) |
-| **App Version** | 1.0 |
-| **Last Updated** | October 2025 |
+| **App Version** | 1.1 |
+| **Last Updated** | May 2026 |
 
 ---
 
@@ -131,16 +131,29 @@ This is needed for GPS tracking and route calculation.
 After permissions are granted, you will see the **Home Screen**:
 
 ```
-┌─────────────────────────┐
-│   Smart AR Navigate     │  ← App name
-├─────────────────────────┤
-│  🔍  Where to?          │  ← Search bar — tap here to start
-├─────────────────────────┤
-│                         │
-│    [ Map Preview ]      │  ← Shows your current location
-│                         │
-└─────────────────────────┘
+┌──────────────────────────────┐
+│ ≡                     📍  ↑  │  ← Menu (left) + My Location / Compass (right)
+│                              │
+│   [Full-Screen Map]          │  ← Interactive map centred on your location
+│                              │
+├──────────────────────────────┤  ← Drag handle — pull up to expand sheet
+│  🔍  Where to?               │  ← Search bar (tap to search)
+│  [🏠 Home][💼 Work][⭐ Fav][🔖]│  ← Quick-access buttons
+│                              │
+│  RECENT                      │  ← Recent search history (appears after first use)
+│  🕐 Sunway Pyramid        ↗  │
+│  🕐 KLCC Twin Towers      ↗  │
+└──────────────────────────────┘
 ```
+
+| Element | What it does |
+|---|---|
+| **≡ Menu** | Opens the side drawer (Plan a Drive, Settings, Profile…) |
+| **📍 My Location** | Animates the map back to your current position |
+| **↑ Compass** | Resets map rotation to north |
+| **Search bar** | Type any destination to search |
+| **Quick buttons** | Tap Home/Work/Favourite to navigate there instantly; tap to set if empty |
+| **Recent** | Your last 8 destinations — tap any to navigate again |
 
 ---
 
@@ -148,7 +161,7 @@ After permissions are granted, you will see the **Home Screen**:
 
 ### 5.1 Setting a Destination
 
-**Step 1** — Tap the **"Where to?"** search bar at the top of the Home Screen
+**Step 1** — Tap the **"Where to?"** search bar
 
 **Step 2** — Type your destination
 - Example: `"Sunway Pyramid"`, `"Sunway University Library"`, `"Petaling Jaya City Council"`
@@ -156,25 +169,95 @@ After permissions are granted, you will see the **Home Screen**:
 
 **Step 3** — Tap on your destination from the suggestions list
 
-**Step 4** — A **"Start AR Navigation"** button will appear at the bottom of the screen
+**Step 4** — The search bar disappears and a **route selection panel** appears showing up to three route options
 
 ```
-┌─────────────────────────┐
-│  Sunway University  ×   │  ← Selected destination
-├─────────────────────────┤
-│                         │
-│    [ Map Preview ]      │  ← Route preview shown
-│                         │
-├─────────────────────────┤
-│   [ Start AR Nav ▶ ]    │  ← Tap this to begin!
-└─────────────────────────┘
+┌──────────────────────────────┐
+│  📍  Sunway Pyramid          │  ← Destination name
+│  ─────────────────────────── │
+│ ▌Fastest    24 min  18.2 km  │  ← Selected route (blue left bar)
+│  Alt 1      31 min  22.4 km 🏧│  ← 🏧 = route includes toll roads
+│  Alt 2      35 min  25.1 km  │
+│  ─────────────────────────── │
+│  [  Cancel  ] [ ▶  Start  ] │  ← Cancel to go back, Start to navigate
+└──────────────────────────────┘
 ```
+
+**Step 5** — Tap a route row to select it; the map updates to show the highlighted route
+
+**Step 6** — Tap **Start** to begin AR navigation, or **Cancel** to go back to the search bar
+
+> 💡 **Tip:** Look for the 🏧 **Toll** label on any route row — it means that route passes through a toll road. Choose a toll-free route if you want to avoid paying tolls.
 
 ---
 
-### 5.2 Starting AR Navigation
+### 5.2 Using Quick-Access Buttons
 
-**Step 1** — Tap **"Start AR Navigation"**
+The four quick-access buttons below the search bar let you navigate to saved locations instantly.
+
+| Button | What it does |
+|---|---|
+| **🏠 Home** | Navigate to your saved Home address |
+| **💼 Work** | Navigate to your saved Work address |
+| **⭐ Favourite** | Navigate to your saved Favourite location |
+| **🔖 Saved** | Browse your saved places |
+
+**If a button is empty (not yet set):**
+1. Tap the button to open the **Save Place** screen
+2. Search for a location and tap **Save**
+3. The button will now show the saved address and navigate to it on next tap
+
+**If a button already has a saved location:**
+1. Tap the button — the route selection panel appears immediately for that destination
+2. Select a route and tap **Start** to begin navigation
+
+---
+
+### 5.3 Using Recent Search History
+
+After you navigate to any destination, it is automatically saved in your recent search history.
+
+- Your last **8 destinations** are displayed below the quick-access buttons
+- Each entry shows a clock icon (🕐) on the left and an arrow (↗) on the right
+- Tap any entry to immediately open the route selection panel for that place
+- Recent history is preserved after closing and reopening the app
+
+```
+│  RECENT                      │
+│  🕐 Sunway Pyramid        ↗  │  ← Tap row to select as destination
+│  🕐 KLCC Twin Towers      ↗  │
+│  🕐 Sunway University     ↗  │
+```
+
+> 💡 **Tip:** The most recently visited place always appears at the top of the list.
+
+---
+
+### 5.4 Plan a Drive
+
+**Plan a Drive** lets you compare routes and check toll information before you start driving.
+
+**Step 1** — Tap the **≡ Menu** button (top-left of the home screen)
+
+**Step 2** — Tap **"Plan a Drive"**
+
+**Step 3** — Enter your **starting point** (defaults to current location) and **destination**
+
+**Step 4** — Toggle **"Avoid Tolls"** if you want toll-free routes only
+
+**Step 5** — Tap **"Get Directions"** to fetch available routes
+
+**Step 6** — Browse the route cards at the bottom of the screen:
+- Each card shows **duration**, **distance**, and a 🏧 **Toll** badge if the route passes through a toll road
+- Tap a card to highlight that route on the map
+
+> 💡 **Tip:** Use Plan a Drive when you want to compare route options or verify toll costs before setting off.
+
+---
+
+### 5.5 Starting AR Navigation
+
+**Step 1** — Tap **"Start"**
 
 **Step 2** — The AR Navigation Screen will open, showing your live camera feed
 
@@ -188,7 +271,7 @@ After permissions are granted, you will see the **Home Screen**:
 
 ---
 
-### 5.3 During Navigation
+### 5.6 During Navigation
 
 While navigating, you will see the following on screen:
 
@@ -218,11 +301,15 @@ While navigating, you will see the following on screen:
 
 ---
 
-### 5.4 Stopping Navigation
+### 5.7 Stopping Navigation / Cancelling a Route
 
-To stop navigation at any time:
-1. Tap the **"Stop"** button at the bottom right of the AR Navigation Screen
-2. The app will return to the Home Screen
+**Before navigation starts (route selection panel):**
+- Tap **"Cancel"** to dismiss the route selection panel
+- The drawer returns to its default position and the map re-centres on your current location
+
+**During active AR navigation:**
+- Tap the **"Stop"** button at the bottom right of the AR Navigation Screen
+- The app returns to the Home Screen
 
 Navigation also stops automatically when you **arrive at your destination**, and the app will show:
 ```
@@ -231,7 +318,7 @@ Navigation also stops automatically when you **arrive at your destination**, and
 
 ---
 
-### 5.5 If the Route Changes (Rerouting)
+### 5.8 If the Route Changes (Rerouting)
 
 If you drive off the planned route, the app will automatically recalculate:
 
@@ -430,6 +517,6 @@ build/app/outputs/flutter-apk/app-release.apk
 
 ---
 
-*End of User Manual — Version 1.0*
+*End of User Manual — Version 1.1*
 
 *Prepared by: Liew Sau Yang | Sunway University | Bachelor of Software Engineering (Hons)*

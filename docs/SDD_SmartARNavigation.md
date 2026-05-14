@@ -417,6 +417,16 @@ Check Location Permission
 | `incrementDriveCount()` | `Future<void>` | Increments `totalDrives` and persists (called by `NavigationViewModel` on arrival) |
 | `addDistance(km)` | `Future<void>` | Adds to `totalDistanceKm` and persists (called by `NavigationViewModel` on arrival) |
 
+#### `RecentPlacesViewModel`
+**Responsibility:** Exposes the recent search history list to the Home Screen bottom sheet.
+
+| Property / Method | Type | Description |
+|---|---|---|
+| `places` | `List<PlaceModel>` | Ordered list of recently navigated places (newest first, max 8) |
+| `load()` | `Future<void>` | Reads persisted list from `RecentPlacesRepository` on app start |
+| `add(place)` | `Future<void>` | Prepends a place (deduplicating by `placeId`), persists, reloads list |
+| `clear()` | `Future<void>` | Wipes the entire history |
+
 #### `PlanDriveViewModel`
 **Responsibility:** Manages the Plan a Drive screen state — origin/destination search, route fetching, route selection, and routing options.
 
@@ -453,10 +463,13 @@ Check Location Permission
 #### `RouteModel`
 ```dart
 class RouteModel {
+  final String label;                 // "Fastest", "Alt 1", "Alt 2"
   final List<LatLng> waypoints;       // List of GPS coordinates along the route
+  final List<LatLng> polylinePoints;  // Decoded overview polyline for map rendering
   final List<TurnInstruction> turns;  // Turn-by-turn instructions
   final double totalDistance;         // Total route distance in metres
-  final int estimatedDuration;        // Estimated time in seconds
+  final int estimatedDuration;        // Estimated time in seconds (traffic-aware when available)
+  final bool hasTolls;                // True when route['warnings'] contains "toll"
 }
 ```
 
@@ -524,6 +537,13 @@ class PlaceModel {
 - `remove(placeId)` — deletes by Google Places ID
 - `getAll()` — returns all bookmarks as `List<PlaceModel>`
 - `isSaved(placeId)` — checks existence without loading all rows
+
+#### `RecentPlacesRepository`
+- Persists up to **8** recently searched/navigated places via `shared_preferences` as a JSON list
+- Most recent entry is always at index 0; duplicates are deduplicated by `placeId` before re-inserting
+- `getAll()` — returns the ordered recent list as `List<PlaceModel>`
+- `add(place)` — deduplicates, prepends, trims to 8, persists
+- `clear()` — removes the key entirely
 
 #### `ARService`
 - Wraps `ar_flutter_plugin`
@@ -631,7 +651,8 @@ smart_ar_navigation/
 │   ├── repositories/                # API & DB communication (Model layer)
 │   │   ├── route_repository.dart         # Google Maps Directions API (supports avoidTolls / avoidHighways)
 │   │   ├── places_repository.dart        # Google Maps Places API
-│   │   └── saved_locations_repository.dart # CRUD over SavedLocationsDatabase
+│   │   ├── saved_locations_repository.dart # CRUD over SavedLocationsDatabase
+│   │   └── recent_places_repository.dart # Recent search history via SharedPreferences (max 8)
 │   │
 │   ├── viewmodels/                  # Business logic (ViewModel layer)
 │   │   ├── navigation_viewmodel.dart     # Session state; updates ProfileViewModel on arrival
@@ -641,7 +662,8 @@ smart_ar_navigation/
 │   │   ├── profile_viewmodel.dart        # Name, email, drive stats (SharedPreferences)
 │   │   ├── plan_drive_viewmodel.dart     # Plan Drive screen: search, routes, options
 │   │   ├── saved_places_viewmodel.dart   # Home / Work / Favourite slots (SharedPreferences)
-│   │   └── saved_locations_viewmodel.dart # Bookmarked places list (SQLite)
+│   │   ├── saved_locations_viewmodel.dart # Bookmarked places list (SQLite)
+│   │   └── recent_places_viewmodel.dart  # Recent search history (max 8, SharedPreferences)
 │   │
 │   ├── views/                       # Screens & Widgets (View layer)
 │   │   ├── screens/
@@ -655,10 +677,10 @@ smart_ar_navigation/
 │   │   │   ├── home/widgets/              # Extracted widgets for HomeScreen
 │   │   │   │   ├── home_map_layer.dart        # FlutterMap tile + polyline + marker stack
 │   │   │   │   ├── home_controls.dart         # Menu button (left) + my-location / compass (right)
-│   │   │   │   ├── home_bottom_sheet.dart     # DraggableScrollableSheet: search / route preview / idle
+│   │   │   │   ├── home_bottom_sheet.dart     # DraggableScrollableSheet: idle / search results / route preview
 │   │   │   │   ├── quick_actions_section.dart # Home/Work/Favourite quick buttons + Saved Places tile
 │   │   │   │   ├── search_result_item.dart    # Search result row with bookmark toggle
-│   │   │   │   ├── route_preview_card.dart    # Route summary card shown after destination selected
+│   │   │   │   ├── route_preview_card.dart    # Vertical route list + Cancel/Start buttons (shown after destination set)
 │   │   │   │   ├── compass_button.dart        # Rotating compass FAB
 │   │   │   │   ├── floating_icon_button.dart  # Reusable floating circular button
 │   │   │   │   ├── location_indicator.dart    # Animated GPS location dot
@@ -807,43 +829,123 @@ GET https://maps.googleapis.com/maps/api/directions/json
 └─────────────────────┘
 ```
 
-#### Home Screen
+#### Home Screen — Idle State
 ```
-┌─────────────────────┐
-│ ≡              📍 ↑ │  ← Hamburger (left) + my-location / compass (right)
-│                     │
-│   [Full-Screen      │
-│    CartoDB Map]     │  ← Interactive 2D map, user location centred
-│                     │
-│  ┌───────────────┐  │
-│  │ 🔍 Where to? │  │  ← DraggableScrollableSheet (bottom)
-│  │               │  │    idle: quick actions + saved places
-│  │ [Home][Work]  │  │    searching: autocomplete results
-│  │ [Favourite]   │  │    destination set: route preview card
-│  └───────────────┘  │
-└─────────────────────┘
+┌──────────────────────────────┐
+│ ≡                     📍  ↑  │  ← Hamburger (left) + my-location / compass (right)
+│                              │
+│                              │
+│   [Full-Screen CartoDB Map]  │  ← Interactive 2D map, user location centred
+│      (user dot centred)      │
+│                              │
+│                              │
+├──────────────────────────────┤  ← DraggableScrollableSheet (snap: 0.22 / 0.40 / 0.95)
+│          ▬▬▬                 │  ← drag handle
+│  ┌────────────────────────┐  │
+│  │ 🔍  Where to?          │  │  ← SearchBarWidget (hidden when destination is set)
+│  └────────────────────────┘  │
+│  [🏠 Home][💼 Work][⭐ Fav][🔖]│  ← QuickActionsSection (horizontal scroll)
+│                              │
+│  RECENT                      │  ← Section label (hidden when history is empty)
+│  🕐 Sunway Pyramid           │
+│     Subang Jaya, Selangor  ↗ │  ← RecentPlacesViewModel.places (tap → set destination)
+│  🕐 KLCC Twin Towers         │
+│     Kuala Lumpur           ↗ │
+└──────────────────────────────┘
+```
+
+#### Home Screen — Route Selection State
+```
+┌──────────────────────────────┐
+│ ≡                     📍  ↑  │
+│                              │
+│   [Full-Screen CartoDB Map]  │  ← Route polyline fitted to viewport,
+│   📍──────────────────📍    │    origin pin + destination pin visible
+│   (route polyline fitted)    │
+│                              │
+├──────────────────────────────┤  ← Sheet snapped to 0.40
+│          ▬▬▬                 │
+│  📍  Sunway Pyramid          │  ← Destination name (no close button)
+│  ─────────────────────────── │
+│ ▌Fastest    24 min  18.2 km  │  ← Selected row: blue left accent bar
+│  Alt 1      31 min  22.4 km 🏧│  ← 🏧 Toll pill shown when hasTolls = true
+│  Alt 2      35 min  25.1 km  │  ← Divider between rows
+│  ─────────────────────────── │
+│  [  Cancel  ] [ ▶  Start  ]  │  ← Cancel → clears destination + re-centres map
+└──────────────────────────────┘    Start → launches AR Navigation Screen
+```
+
+#### Home Screen — Search State
+```
+┌──────────────────────────────┐
+│ ≡                     📍  ↑  │
+│   [Full-Screen CartoDB Map]  │
+│                              │
+├──────────────────────────────┤  ← Sheet expanded to 0.95
+│          ▬▬▬                 │
+│  ┌────────────────────────┐  │
+│  │ 🔍  Sunway University  │  │  ← Active search field
+│  └────────────────────────┘  │
+│  📍 Sunway University        │
+│     No.5, Jalan Universiti ↗ │  ← Autocomplete result rows
+│  ─────────────────────────── │  ← SearchResultItem (bookmark toggle on right)
+│  📍 Sunway Pyramid Mall      │
+│     Subang Jaya, Selangor  ↗ │
+└──────────────────────────────┘
 ```
 
 #### Plan Drive Screen
 ```
-┌─────────────────────┐
-│ ← Plan a Drive      │  ← AppBar with back button
-│ ┌─────────────────┐ │
-│ │ From: Your loc  │ │  ← From text field
-│ │ ⇅               │ │  ← Swap button
-│ │ To:  search...  │ │  ← To text field
-│ └─────────────────┘ │
-│ [Avoid Tolls][Avoid Highways] │  ← Toggle option chips
-│                     │
-│   [Map with route   │  ← FlutterMap: selected route highlighted,
-│    preview]         │    alternatives dimmed
-│                     │
-│ ─────────────────── │
-│ [Alt 1][Alt 2][Alt3]│  ← Route alternatives horizontal strip
-│ ─────────────────── │
-│ 25 min · 18.2 km    │  ← Route summary card
-│ [Start AR Navigation]│
-└─────────────────────┘
+┌──────────────────────────────┐
+│ ←  Plan a Drive              │  ← AppBar with back button
+├──────────────────────────────┤
+│  ┌────────────────────────┐  │
+│  │ 📍 From: Your location │  │  ← From text field
+│  │          ⇅             │  │  ← Swap origin ↔ destination
+│  │ 🔍 To:   search...  ✕  │  │  ← To text field (✕ clears destination)
+│  └────────────────────────┘  │
+├──────────────────────────────┤
+│  [Avoid Tolls] [Avoid Hwys]  │  ← Animated toggle chips (blue when active)
+├──────────────────────────────┤
+│                              │
+│   ┌──────────────────────┐   │
+│   │                      │   │  ← FlutterMap (CartoDB Voyager tiles)
+│   │   [Route polylines]  │   │    Selected route: blue, solid
+│   │   📍Origin  📍Dest   │   │    Alt routes: grey, dimmed
+│   │                      │   │
+│   └──────────────────────┘   │
+│                              │
+├──────────────────────────────┤
+│  Route alternatives strip    │  ← Horizontally scrollable (one card = 200 × 94 dp)
+│ ┌──────────────┐ ┌─────────┐ │
+│ │ Fastest  ★  │ │ Alt 1   │ │  ← Selected card: filled blue
+│ │             │ │         │ │    Unselected: white with grey border
+│ │  24 min     │ │  31 min │ │  ← Duration (large, bold)
+│ │  18.2 km 🏧Toll│ │ 22.4km │ │  ← Distance + orange 🏧 Toll pill (if hasTolls)
+│ └──────────────┘ └─────────┘ │
+├──────────────────────────────┤
+│  Fastest                     │  ← Route summary card (bottom sheet)
+│  🛣 18.2 km  ⏱ 24 min        │
+│  🚩 Arrive 2:45 PM  🏧 Tolls │  ← 🏧 Tolls chip shown only when hasTolls = true
+│                              │
+│  ┌──────────────────────┐    │
+│  │ ▶  Start AR Navigation│   │  ← Primary CTA button (blue)
+│  └──────────────────────┘    │
+└──────────────────────────────┘
+
+Search overlay (shown when a field is focused):
+┌──────────────────────────────┐
+│  ┌────────────────────────┐  │
+│  │ 🔍 Sunway University   │  │  ← Active text field
+│  └────────────────────────┘  │
+│  ┌────────────────────────┐  │
+│  │ 📍 Sunway University   │  │
+│  │    Subang Jaya, MY     │  │  ← Autocomplete result rows
+│  │ ─────────────────────  │  │    (overlays the map entirely)
+│  │ 📍 Sunway Pyramid Mall │  │
+│  │    Subang Jaya, MY     │  │
+│  └────────────────────────┘  │
+└──────────────────────────────┘
 ```
 
 #### Profile Screen
