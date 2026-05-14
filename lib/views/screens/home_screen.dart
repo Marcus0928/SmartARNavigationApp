@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:smart_ar_navigation/core/utils/map_utils.dart';
 import 'package:smart_ar_navigation/viewmodels/map_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/navigation_viewmodel.dart';
+import 'package:smart_ar_navigation/viewmodels/recent_places_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/saved_locations_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/saved_places_viewmodel.dart';
 import 'package:smart_ar_navigation/views/screens/home/home_map_controller.dart';
@@ -73,6 +74,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final navVM          = context.watch<NavigationViewModel>();
     final savedVM        = context.watch<SavedPlacesViewModel>();
     final savedLocationsVM = context.watch<SavedLocationsViewModel>();
+    final recentVM       = context.watch<RecentPlacesViewModel>();
 
     final loc        = mapVM.currentLocation;
     final userLatLng = loc != null ? LatLng(loc.latitude, loc.longitude) : null;
@@ -144,11 +146,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               mapVM: mapVM,
               savedVM: savedVM,
               savedLocationsVM: savedLocationsVM,
+              recentVM: recentVM,
               onSearchFocused: () => _sheetController.animateTo(
                 0.95,
                 duration: const Duration(milliseconds: 350),
                 curve: Curves.easeOut,
               ),
+              onCancelRoute: () {
+                final loc = mapVM.currentLocation;
+                if (loc != null) {
+                  _ctrl.animatedMove(LatLng(loc.latitude, loc.longitude), 16);
+                }
+              },
               onStartNavigation: () async {
                 final navigator  = Navigator.of(context);
                 final messenger  = ScaffoldMessenger.of(context);

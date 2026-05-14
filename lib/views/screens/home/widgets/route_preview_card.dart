@@ -27,15 +27,7 @@ class RoutePreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
+    return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -54,10 +46,6 @@ class RoutePreviewCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              GestureDetector(
-                onTap: onClear,
-                child: Icon(Icons.close, size: 18, color: Colors.grey.shade500),
               ),
             ],
           ),
@@ -85,100 +73,141 @@ class RoutePreviewCard extends StatelessWidget {
               'Route unavailable',
               style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
             )
-          else ...[
-            // Route selector tabs
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: routes.asMap().entries.map((entry) {
-                  final i = entry.key;
-                  final r = entry.value;
-                  final isSelected = i == selectedIndex;
-                  return Padding(
-                    padding: EdgeInsets.only(right: i < routes.length - 1 ? 8 : 0),
-                    child: GestureDetector(
-                      onTap: () => onSelectRoute(i),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: isSelected ? primaryColor : Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: isSelected
-                                ? primaryColor
-                                : Colors.grey.shade300,
-                          ),
+          else
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: routes.asMap().entries.map((entry) {
+                final i = entry.key;
+                final r = entry.value;
+                final isSelected = i == selectedIndex;
+                final isLast = i == routes.length - 1;
+
+                return GestureDetector(
+                  onTap: () => onSelectRoute(i),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? primaryColor.withValues(alpha: 0.07)
+                          : Colors.transparent,
+                      border: Border(
+                        left: BorderSide(
+                          color: isSelected ? primaryColor : Colors.transparent,
+                          width: 3,
                         ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              r.label,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: isSelected
-                                    ? Colors.white
-                                    : Colors.grey.shade700,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${(r.estimatedDuration / 60).ceil()} min',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                                color: isSelected
-                                    ? Colors.white
-                                    : Colors.grey.shade800,
-                              ),
-                            ),
-                            Text(
-                              _formatDistance(r.totalDistance),
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: isSelected
-                                    ? Colors.white70
-                                    : Colors.grey.shade500,
-                              ),
-                            ),
-                          ],
+                        bottom: BorderSide(
+                          color: isLast
+                              ? Colors.transparent
+                              : Colors.grey.shade200,
+                          width: 1,
                         ),
                       ),
                     ),
-                  );
-                }).toList(),
-              ),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    child: Row(
+                      children: [
+                        // Label
+                        SizedBox(
+                          width: 64,
+                          child: Text(
+                            r.label,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: isSelected
+                                  ? primaryColor
+                                  : Colors.grey.shade700,
+                            ),
+                          ),
+                        ),
+                        // Duration
+                        Text(
+                          '${(r.estimatedDuration / 60).ceil()} min',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: isSelected
+                                ? primaryColor
+                                : Colors.grey.shade900,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Distance
+                        Text(
+                          _formatDistance(r.totalDistance),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                        // Toll badge
+                        if (r.hasTolls) ...[
+                          const SizedBox(width: 6),
+                          Icon(Icons.toll_rounded,
+                              size: 12, color: Colors.orange.shade700),
+                          const SizedBox(width: 2),
+                          Text(
+                            'Toll',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.orange.shade700,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
             ),
-
-          ],
 
           const SizedBox(height: 12),
 
-          // ── Start button ────────────────────────────────────────────
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryColor,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+          // ── Action buttons ───────────────────────────────────────────
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.grey.shade700,
+                    side: BorderSide(color: Colors.grey.shade300),
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: onClear,
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
                 ),
               ),
-              icon: const Icon(Icons.navigation_rounded, size: 20),
-              label: const Text(
-                startNavigation,
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(Icons.navigation_rounded, size: 18),
+                  label: const Text(
+                    'Start',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
+                  onPressed: routes.isEmpty ? null : onStart,
+                ),
               ),
-              onPressed: routes.isEmpty ? null : onStart,
-            ),
+            ],
           ),
         ],
-      ),
     );
   }
 

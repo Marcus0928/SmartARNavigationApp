@@ -8,6 +8,7 @@ class RouteModel {
   final List<TurnInstruction> turns;
   final double totalDistance;
   final int estimatedDuration;
+  final bool hasTolls;
 
   const RouteModel({
     required this.label,
@@ -16,5 +17,6 @@ class RouteModel {
     required this.turns,
     required this.totalDistance,
     required this.estimatedDuration,
+    this.hasTolls = false,
   });
 }

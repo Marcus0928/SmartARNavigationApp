@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
 import 'package:smart_ar_navigation/core/utils/location_utils.dart';
+import 'package:smart_ar_navigation/core/constants/app_colors.dart';
 import 'package:smart_ar_navigation/viewmodels/map_viewmodel.dart';
+import 'package:smart_ar_navigation/viewmodels/recent_places_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/saved_locations_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/saved_places_viewmodel.dart';
+import 'package:smart_ar_navigation/views/screens/home/save_place_page.dart';
 import 'package:smart_ar_navigation/views/screens/home/widgets/place_options_sheet.dart';
-import 'package:smart_ar_navigation/views/screens/home/widgets/place_search_sheet.dart';
 import 'package:smart_ar_navigation/views/screens/home/widgets/quick_actions_section.dart';
 import 'package:smart_ar_navigation/views/screens/home/widgets/route_preview_card.dart';
 import 'package:smart_ar_navigation/views/screens/home/widgets/saved_locations_sheet.dart';
@@ -21,14 +23,18 @@ class HomeBottomSheet extends StatelessWidget {
     required this.savedLocationsVM,
     required this.onSearchFocused,
     required this.onStartNavigation,
+    required this.onCancelRoute,
+    required this.recentVM,
   });
 
   final DraggableScrollableController sheetController;
   final MapViewModel mapVM;
   final SavedPlacesViewModel savedVM;
   final SavedLocationsViewModel savedLocationsVM;
+  final RecentPlacesViewModel recentVM;
   final VoidCallback onSearchFocused;
   final VoidCallback onStartNavigation;
+  final VoidCallback onCancelRoute;
 
   // ── Utilities ─────────────────────────────────────────────────────────────
 
@@ -41,13 +47,11 @@ class HomeBottomSheet extends StatelessWidget {
 
   void _showPlaceSearch(BuildContext context, SavedPlaceType type, String label) {
     savedVM.clearSearch();
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SavePlacePage(type: type, label: label, vm: savedVM),
       ),
-      builder: (_) => PlaceSearchSheet(type: type, label: label, vm: savedVM),
     ).whenComplete(savedVM.clearSearch);
   }
 
@@ -69,6 +73,7 @@ class HomeBottomSheet extends StatelessWidget {
     if (place == null) {
       _showPlaceSearch(context, type, label);
     } else {
+      recentVM.add(place);
       mapVM.setSelectedDestination(place);
     }
   }
@@ -142,7 +147,8 @@ class HomeBottomSheet extends StatelessWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        SearchBarWidget(onFocused: onSearchFocused),
+                        if (mapVM.selectedDestination == null)
+                          SearchBarWidget(onFocused: onSearchFocused),
                         _buildBody(context),
                       ],
                     ),
@@ -176,7 +182,10 @@ class HomeBottomSheet extends StatelessWidget {
             place: place,
             distance: distStr,
             isSaved: savedLocationsVM.isSaved(place.placeId),
-            onTap: () => mapVM.selectDestination(place),
+            onTap: () {
+              recentVM.add(place);
+              mapVM.selectDestination(place);
+            },
             onBookmarkTap: () => savedLocationsVM.toggle(place),
           );
         }),
@@ -195,7 +204,15 @@ class HomeBottomSheet extends StatelessWidget {
           selectedIndex: mapVM.selectedRouteIndex,
           isFetching: mapVM.isFetchingRoute,
           onSelectRoute: mapVM.selectRoute,
-          onClear: mapVM.clearDestination,
+          onClear: () {
+            mapVM.clearDestination();
+            sheetController.animateTo(
+              0.22,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOut,
+            );
+            onCancelRoute();
+          },
           onStart: onStartNavigation,
         ),
       ],
@@ -222,6 +239,84 @@ class HomeBottomSheet extends StatelessWidget {
               _handleQuickLongPress(context, SavedPlaceType.favourite, 'Favourite'),
           onSavedPlacesTap: () => _showSavedLocations(context),
         ),
+        if (recentVM.places.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Text(
+                'RECENT',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.grey.shade500,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          ...recentVM.places.map(
+            (place) => InkWell(
+              onTap: () {
+                recentVM.add(place);
+                mapVM.setSelectedDestination(place);
+              },
+              borderRadius: BorderRadius.circular(10),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.history_rounded,
+                        size: 17,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            place.name,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            place.address,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      Icons.north_west_rounded,
+                      size: 16,
+                      color: Colors.grey.shade400,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }

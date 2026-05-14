@@ -32,11 +32,16 @@ class QuickActionsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final count = savedLocationsVM.count;
+    // Match the width each button had with Expanded in the original 3-button row:
+    // screen minus 32dp container padding minus 2×8dp gaps, divided by 3.
+    final buttonWidth =
+        (MediaQuery.of(context).size.width - 32 - 16) / 3;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
+    return ScrollConfiguration(
+      behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
           children: [
             QuickPlaceButton(
               icon: Icons.home_outlined,
@@ -44,6 +49,7 @@ class QuickActionsSection extends StatelessWidget {
               place: savedVM.home,
               onTap: onHomeTap,
               onLongPress: onHomeLongPress,
+              width: buttonWidth,
             ),
             const SizedBox(width: 8),
             QuickPlaceButton(
@@ -52,6 +58,7 @@ class QuickActionsSection extends StatelessWidget {
               place: savedVM.work,
               onTap: onWorkTap,
               onLongPress: onWorkLongPress,
+              width: buttonWidth,
             ),
             const SizedBox(width: 8),
             QuickPlaceButton(
@@ -60,51 +67,63 @@ class QuickActionsSection extends StatelessWidget {
               place: savedVM.favourite,
               onTap: onFavouriteTap,
               onLongPress: onFavouriteLongPress,
+              width: buttonWidth,
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: onSavedPlacesTap,
+              child: Container(
+                width: buttonWidth,
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      count > 0
+                          ? Icons.bookmark_rounded
+                          : Icons.bookmark_border_rounded,
+                      size: 20,
+                      color: count > 0 ? primaryColor : Colors.grey.shade500,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'Saved',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            count > 0
+                                ? '$count place${count == 1 ? '' : 's'}'
+                                : 'None',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
-        const SizedBox(height: 8),
-        InkWell(
-          onTap: onSavedPlacesTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  count > 0
-                      ? Icons.bookmark_rounded
-                      : Icons.bookmark_border_rounded,
-                  size: 20,
-                  color: count > 0 ? primaryColor : Colors.grey.shade500,
-                ),
-                const SizedBox(width: 10),
-                const Text(
-                  'Saved Places',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                ),
-                const Spacer(),
-                Text(
-                  count > 0
-                      ? '$count place${count == 1 ? '' : 's'}'
-                      : 'None saved',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                ),
-                const SizedBox(width: 4),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  size: 18,
-                  color: Colors.grey.shade400,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }

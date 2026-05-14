@@ -11,6 +11,7 @@ class QuickPlaceButton extends StatelessWidget {
     required this.place,
     required this.onTap,
     required this.onLongPress,
+    required this.width,
   });
 
   final IconData icon;
@@ -18,12 +19,14 @@ class QuickPlaceButton extends StatelessWidget {
   final PlaceModel? place;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
+  final double width;
 
   @override
   Widget build(BuildContext context) {
     final isSet = place != null;
 
-    return Expanded(
+    return SizedBox(
+      width: width,
       child: GestureDetector(
         onTap: onTap,
         onLongPress: isSet ? onLongPress : null,

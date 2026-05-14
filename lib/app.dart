@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:smart_ar_navigation/core/constants/app_colors.dart';
 import 'package:smart_ar_navigation/core/constants/app_strings.dart';
 import 'package:smart_ar_navigation/repositories/places_repository.dart';
+import 'package:smart_ar_navigation/repositories/recent_places_repository.dart';
 import 'package:smart_ar_navigation/repositories/route_repository.dart';
 import 'package:smart_ar_navigation/repositories/saved_locations_repository.dart';
 import 'package:smart_ar_navigation/services/ar_service.dart';
@@ -12,6 +13,7 @@ import 'package:smart_ar_navigation/services/saved_locations_database.dart';
 import 'package:smart_ar_navigation/viewmodels/ar_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/map_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/navigation_viewmodel.dart';
+import 'package:smart_ar_navigation/viewmodels/recent_places_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/saved_locations_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/saved_places_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/settings_viewmodel.dart';
@@ -51,6 +53,9 @@ class SmartARNavigationApp extends StatelessWidget {
           create: (ctx) => SavedLocationsRepository(
             db: ctx.read<SavedLocationsDatabase>(),
           ),
+        ),
+        Provider<RecentPlacesRepository>(
+          create: (_) => RecentPlacesRepository(),
         ),
 
         // ── ViewModels (ChangeNotifier, created in dependency order) ──
@@ -106,6 +111,12 @@ class SmartARNavigationApp extends StatelessWidget {
           create: (ctx) => SavedLocationsViewModel(
             repo: ctx.read<SavedLocationsRepository>(),
           ),
+        ),
+
+        // RecentPlacesViewModel — persists recent search history via shared_preferences
+        ChangeNotifierProvider<RecentPlacesViewModel>(
+          create: (ctx) => RecentPlacesViewModel(ctx.read<RecentPlacesRepository>())
+            ..load(),
         ),
 
       ],

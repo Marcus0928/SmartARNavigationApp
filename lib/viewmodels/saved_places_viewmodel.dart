@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -20,11 +21,14 @@ class SavedPlacesViewModel extends ChangeNotifier {
   PlaceModel? _work;
   PlaceModel? _favourite;
   List<PlaceModel> _searchResults = [];
+  bool _isSearching = false;
+  Timer? _searchDebounce;
 
   PlaceModel? get home => _home;
   PlaceModel? get work => _work;
   PlaceModel? get favourite => _favourite;
   List<PlaceModel> get searchResults => _searchResults;
+  bool get isSearching => _isSearching;
 
   PlaceModel? getPlace(SavedPlaceType type) => switch (type) {
         SavedPlaceType.home => _home,
@@ -45,25 +49,41 @@ class SavedPlacesViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> searchPlace(String query) async {
+  void searchPlace(String query) {
+    _searchDebounce?.cancel();
     if (query.trim().isEmpty) {
       _searchResults = [];
+      _isSearching = false;
       notifyListeners();
       return;
     }
-    _searchResults = await _placesRepository.searchPlaces(query);
+    _isSearching = true;
     notifyListeners();
+    _searchDebounce = Timer(const Duration(milliseconds: 400), () async {
+      try {
+        _searchResults = await _placesRepository.searchPlaces(query);
+      } finally {
+        _isSearching = false;
+        notifyListeners();
+      }
+    });
   }
 
   void clearSearch() {
+    _searchDebounce?.cancel();
     _searchResults = [];
+    _isSearching = false;
     notifyListeners();
   }
 
-  // Fetches full place details (coordinates) then persists.
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    super.dispose();
+  }
+
   Future<void> selectAndSavePlace(SavedPlaceType type, PlaceModel place) async {
-    final detailed = await _placesRepository.getPlaceDetails(place.placeId);
-    await _savePlace(type, detailed);
+    await _savePlace(type, place);
   }
 
   Future<void> _savePlace(SavedPlaceType type, PlaceModel place) async {
@@ -108,7 +128,10 @@ class SavedPlacesViewModel extends ChangeNotifier {
         placeId: m['placeId'] as String,
         name: m['name'] as String,
         address: m['address'] as String,
-        coordinates: LatLng(m['lat'] as double, m['lng'] as double),
+        coordinates: LatLng(
+          (m['lat'] as num).toDouble(),
+          (m['lng'] as num).toDouble(),
+        ),
       );
     } catch (_) {
       return null;

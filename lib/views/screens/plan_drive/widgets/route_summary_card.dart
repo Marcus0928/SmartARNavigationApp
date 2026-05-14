@@ -105,6 +105,16 @@ class RouteSummaryCard extends StatelessWidget {
               icon: Icons.flag_rounded,
               label: 'Arrive ${_formatETA(route.estimatedDuration)}',
             ),
+            if (route.hasTolls) ...[
+              const SizedBox(width: 4),
+              _Dot(),
+              const SizedBox(width: 4),
+              StatChip(
+                icon: Icons.toll_rounded,
+                label: 'Tolls',
+                color: Colors.orange.shade700,
+              ),
+            ],
           ],
         ),
         const SizedBox(height: 14),

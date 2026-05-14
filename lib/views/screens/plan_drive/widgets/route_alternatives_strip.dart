@@ -31,7 +31,7 @@ class RouteAlternativesStrip extends StatelessWidget {
         .key;
 
     return Container(
-      height: 90,
+      height: 110,
       color: Colors.white,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
@@ -47,9 +47,9 @@ class RouteAlternativesStrip extends StatelessWidget {
             onTap: () => onSelectRoute(i),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              width: 155,
+              width: 200,
               margin: const EdgeInsets.only(right: 8),
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
               decoration: BoxDecoration(
                 color: selected ? primaryColor : Colors.white,
                 borderRadius: BorderRadius.circular(12),
@@ -70,6 +70,7 @@ class RouteAlternativesStrip extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  // Row 1: label + Fastest badge
                   Row(
                     children: [
                       Expanded(
@@ -109,6 +110,7 @@ class RouteAlternativesStrip extends StatelessWidget {
                         ),
                     ],
                   ),
+                  // Row 2: duration
                   Text(
                     '$durationMin min',
                     style: TextStyle(
@@ -117,13 +119,58 @@ class RouteAlternativesStrip extends StatelessWidget {
                       color: selected ? Colors.white : textPrimary,
                     ),
                   ),
-                  Text(
-                    _formatDistance(route.totalDistance),
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                      color: selected ? Colors.white70 : Colors.grey.shade500,
-                    ),
+                  // Row 3: distance + toll indicator
+                  Row(
+                    children: [
+                      Text(
+                        _formatDistance(route.totalDistance),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: selected
+                              ? Colors.white70
+                              : Colors.grey.shade500,
+                        ),
+                      ),
+                      if (route.hasTolls) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: selected
+                                ? Colors.white.withValues(alpha: 0.2)
+                                : Colors.orange.shade50,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.toll_rounded,
+                                size: 10,
+                                color: selected
+                                    ? Colors.white
+                                    : Colors.orange.shade700,
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                'Toll',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  color: selected
+                                      ? Colors.white
+                                      : Colors.orange.shade700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),

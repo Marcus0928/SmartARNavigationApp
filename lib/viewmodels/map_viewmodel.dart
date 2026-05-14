@@ -42,6 +42,7 @@ class MapViewModel extends ChangeNotifier {
   int _selectedRouteIndex = 0;
   bool _isFetchingRoute = false;
   StreamSubscription<LatLng>? _locationSubscription;
+  Timer? _searchDebounce;
 
   LatLng? get currentLocation => _currentLocation;
   double? get currentHeading => _currentHeading;
@@ -93,12 +94,28 @@ class MapViewModel extends ChangeNotifier {
     _locationService.stopLocationStream();
   }
 
-  Future<void> searchDestination(String query) async {
-    _searchResults = await _placesRepository.searchPlaces(
-      query,
-      location: _currentLocation,
-    );
-    notifyListeners();
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    stopLocationTracking();
+    super.dispose();
+  }
+
+  void searchDestination(String query) {
+    _searchDebounce?.cancel();
+    if (query.trim().isEmpty) {
+      _searchResults = [];
+      notifyListeners();
+      return;
+    }
+    _searchDebounce = Timer(const Duration(milliseconds: 400), () async {
+      final results = await _placesRepository.searchPlaces(
+        query,
+        location: _currentLocation,
+      );
+      _searchResults = results;
+      notifyListeners();
+    });
   }
 
   Future<void> selectDestination(PlaceModel place) async {

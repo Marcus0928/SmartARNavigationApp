@@ -1,3 +1,5 @@
+import 'dart:developer' as dev;
+
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:smart_ar_navigation/core/enums/turn_direction.dart';
@@ -47,6 +49,22 @@ List<RouteModel> parseRouteResponse(Map<String, dynamic> json) {
       ));
     }
 
+    final warnings = (route['warnings'] as List<dynamic>?)
+            ?.map((w) => w.toString().toLowerCase())
+            .toList() ??
+        [];
+    dev.log('Route $index warnings: $warnings', name: 'RouteParser');
+
+    // Check warnings array first, then fall back to scanning step instructions
+    // (Malaysian highway steps often include "Toll" in html_instructions)
+    final stepInstructions = (leg['steps'] as List<dynamic>)
+        .map((s) => (s['html_instructions'] as String).toLowerCase())
+        .toList();
+    dev.log('Route $index step instructions: $stepInstructions', name: 'RouteParser');
+
+    final hasTolls = warnings.any((w) => w.contains('toll')) ||
+        stepInstructions.any((s) => s.contains('toll'));
+
     return RouteModel(
       label: index == 0 ? 'Fastest' : 'Alt $index',
       waypoints: waypoints,
@@ -54,6 +72,7 @@ List<RouteModel> parseRouteResponse(Map<String, dynamic> json) {
       turns: turns,
       totalDistance: totalDistance,
       estimatedDuration: estimatedDuration,
+      hasTolls: hasTolls,
     );
   }).toList();
 }

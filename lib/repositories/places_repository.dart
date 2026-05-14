@@ -15,7 +15,7 @@ class PlacesRepository {
     String query, {
     LatLng? location,
   }) async {
-    if (query.length < 3) return [];
+    if (query.trim().isEmpty) return [];
 
     final params = <String, String>{
       'query': query,
