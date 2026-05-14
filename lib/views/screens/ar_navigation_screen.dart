@@ -11,6 +11,7 @@ import 'package:smart_ar_navigation/core/enums/navigation_status.dart';
 import 'package:smart_ar_navigation/viewmodels/ar_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/navigation_viewmodel.dart';
 import 'package:smart_ar_navigation/views/widgets/ar_overlay_widget.dart';
+import 'package:smart_ar_navigation/views/widgets/dynamic_arrow_widget.dart';
 import 'package:smart_ar_navigation/views/widgets/navigation_bottom_bar.dart';
 
 class ARNavigationScreen extends StatefulWidget {
@@ -58,21 +59,24 @@ class _ARNavigationScreenState extends State<ARNavigationScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // ── Full-screen AR camera feed ────────────────────────────
+          // ── Layer 1: Full-screen AR camera feed ───────────────────
           ARView(onARViewCreated: _onARViewCreated),
 
-          // ── Top HUD: turn instruction card only ──────────────────
-          const SafeArea(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(12, 8, 12, 0),
-              child: Align(
-                alignment: Alignment.topLeft,
-                child: AROverlayWidget(),
-              ),
+          // ── Layer 2: Chevron arrows centred at 45% screen height ──
+          const Positioned.fill(child: _CenteredArrowOverlay()),
+
+          // ── Layer 3: Slim top info bar — distance + street name ───
+          const Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              bottom: false,
+              child: AROverlayWidget(),
             ),
           ),
 
-          // ── Bottom navigation bar ─────────────────────────────────
+          // ── Layer 4: Bottom navigation bar ───────────────────────
           const Positioned(
             bottom: 0,
             left: 0,
@@ -80,6 +84,30 @@ class _ARNavigationScreenState extends State<ARNavigationScreen> {
             child: NavigationBottomBar(),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Centred chevron overlay ───────────────────────────────────────────────────
+
+class _CenteredArrowOverlay extends StatelessWidget {
+  const _CenteredArrowOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    final arVM = context.watch<ARViewModel>();
+    if (arVM.nextTurnDirection == null) return const SizedBox.shrink();
+
+    // Alignment(0, 0.2) places the widget centre at 60% of screen height:
+    //   centre_y = screenH/2 + (0.2 * screenH/2) = screenH * 0.60
+    return Align(
+      alignment: const Alignment(0.0, 0.2),
+      child: DynamicArrowWidget(
+        direction: arVM.nextTurnDirection!,
+        distance: arVM.distanceToNextTurn ?? double.infinity,
+        size: 180,
+        showLabel: false,
       ),
     );
   }
