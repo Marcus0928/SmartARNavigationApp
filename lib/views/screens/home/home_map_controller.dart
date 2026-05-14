@@ -147,8 +147,10 @@ class HomeMapController extends ChangeNotifier {
   void handleInitialCentering(LatLng? userLatLng) {
     if (userLatLng != null && !_centeredOnUser) {
       _centeredOnUser = true;
+      // Instant move — the map already starts at the user's location from
+      // initialCenter, so no visible fly animation is needed here.
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        animatedMove(userLatLng, 16);
+        _mapController.move(userLatLng, 16);
       });
     }
   }

@@ -26,8 +26,23 @@ class LocationService {
         permission == LocationPermission.always;
   }
 
+  /// Returns the OS-cached last-known position instantly (< 100 ms).
+  /// Returns null on first-ever launch when no cache exists.
+  Future<LatLng?> getLastKnownLocation() async {
+    final position = await Geolocator.getLastKnownPosition();
+    if (position == null) return null;
+    currentHeading = position.heading >= 0 ? position.heading : null;
+    currentAccuracy = position.accuracy;
+    currentSpeed = position.speed >= 0 ? position.speed : null;
+    return LatLng(position.latitude, position.longitude);
+  }
+
+  /// Forces a fresh GPS fix. Use only when a current position is strictly
+  /// required and the stream has not yet delivered one (e.g. route fetch
+  /// fallback). Times out after 10 s to avoid indefinite blocking.
   Future<LatLng> getCurrentLocation() async {
-    final position = await Geolocator.getCurrentPosition();
+    final position = await Geolocator.getCurrentPosition()
+        .timeout(const Duration(seconds: 10));
     currentHeading = position.heading >= 0 ? position.heading : null;
     currentAccuracy = position.accuracy;
     currentSpeed = position.speed >= 0 ? position.speed : null;
