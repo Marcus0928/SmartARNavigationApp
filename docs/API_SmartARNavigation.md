@@ -1125,6 +1125,20 @@ enum NavigationStatus {
 
 ---
 
+**File:** `lib/core/enums/navigation_approach_stage.dart`
+
+```dart
+enum NavigationApproachStage {
+  far,         // > 100 m to next turn — arrow is cyan, slow pulse
+  approaching, // 50–100 m to next turn — arrow turns amber, medium pulse
+  imminent,    // < 50 m to next turn — arrow turns red, fast pulse
+}
+```
+
+Used by `DynamicArrowWidget` to drive arrow colour and pulse animation speed. `ARViewModel` computes the stage from `distanceToNextTurn` and exposes it as `approachStage`.
+
+---
+
 **File:** `lib/core/constants/app_strings.dart`
 
 ```dart
@@ -1155,6 +1169,47 @@ const Color textPrimary        = Color(0xFF212121);  // Dark Grey
 ```
 
 ---
+
+## 14. DynamicArrowWidget
+
+**File:** `lib/views/widgets/dynamic_arrow_widget.dart`  
+**Purpose:** A `StatefulWidget` that renders all 7 turn-direction AR arrows using `CustomPainter`. Replaces the older `TurnArrowWidget`, `AROverlayWidget`, and `RoundaboutWidget`.
+
+### Constructor
+
+```dart
+DynamicArrowWidget({
+  required TurnDirection direction,
+  required double distance,
+  required NavigationApproachStage approachStage,
+  double? size,          // canvas side length in logical pixels (default: fills parent)
+  bool showLabel = true, // whether to draw the direction label below the arrow
+  int? exitNumber,       // roundabout exit number (1–4); only shown when direction == roundabout
+})
+```
+
+### Behaviour
+
+| Parameter | Effect |
+|---|---|
+| `direction` | Selects which arrow shape is drawn (chevrons, U-arc, or roundabout arc) |
+| `distance` | Passed to `approachStage` for colour; also drives pulse speed |
+| `approachStage` | `far` → cyan / slow pulse; `approaching` → amber / medium pulse; `imminent` → red / fast pulse |
+| `exitNumber` | When non-null and `direction == roundabout`, the number is rendered in bold white at the arc centre |
+
+### Arrow shapes
+
+| `direction` | Shape |
+|---|---|
+| `forward` | 3 upward chevrons with 12 px stroke and flow-wave opacity animation |
+| `right` | Same chevrons rotated 90° CW |
+| `left` | Mirror of right (x-flip + 90° CW) |
+| `keepRight` | 2 chevrons at 80 % scale, −15° tilt, 90° CW |
+| `keepLeft` | Mirror of keepRight |
+| `uTurn` | U-shaped arc (clockwise 180°) with downward arrowhead, 12 px stroke |
+| `roundabout` | 270° CCW arc, exit arrowhead at 9-o'clock, entry indicator at 135°, exit number centred |
+
+All shapes use a 24 px glow layer (alpha 0.3) beneath the 12 px main stroke and rounded `StrokeCap`.
 
 ---
 

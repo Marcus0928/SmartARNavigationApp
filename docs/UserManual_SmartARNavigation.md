@@ -334,12 +334,17 @@ If you drive off the planned route, the app will automatically recalculate:
 
 ### 6.1 Arrow Types
 
-| Arrow | Meaning |
-|---|---|
-| ↑ | Go straight ahead |
-| ← | Turn left |
-| → | Turn right |
-| ↓ | Make a U-turn |
+All arrows are drawn as animated glowing shapes directly on the camera feed. The arrow colour changes as you approach a turn (see Section 6.3).
+
+| Arrow shape | Direction | Meaning |
+|---|---|---|
+| ^^^ (3 upward chevrons) | Forward | Go straight ahead |
+| >>> (3 right chevrons) | Turn right | Turn right at the next junction |
+| <<< (3 left chevrons) | Turn left | Turn left at the next junction |
+| >> (2 right chevrons, angled up) | Keep right | Bear right / stay on the right lane |
+| << (2 left chevrons, angled up) | Keep left | Bear left / stay on the left lane |
+| U-arc with downward arrowhead | U-turn | Make a U-turn and go back the way you came |
+| 3/4-circle arc with exit arrowhead | Roundabout | Enter the roundabout; take the exit shown by the number inside the arc |
 
 ### 6.2 Distance Display
 
@@ -353,10 +358,13 @@ The distance shown next to the arrow is the distance to your **next turn**, not 
 
 ### 6.3 Arrow Colour Meaning
 
-| Colour | Meaning |
-|---|---|
-| 🟢 Green | Normal navigation — follow the arrow |
-| 🟡 Amber | Rerouting in progress |
+The arrow colour changes automatically as you get closer to the next turn. No action is needed — it is a visual cue to help you prepare in time.
+
+| Colour | Distance to next turn | Meaning |
+|---|---|---|
+| 🟢 Cyan / Green | More than 100 m | Normal navigation — follow the arrow, plenty of time |
+| 🟡 Amber / Yellow | 50 – 100 m | Approaching the turn — start preparing to turn |
+| 🔴 Red | Less than 50 m | Turn now — the turn is immediately ahead |
 
 ---
 

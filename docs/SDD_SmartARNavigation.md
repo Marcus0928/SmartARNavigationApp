@@ -477,13 +477,13 @@ class RouteModel {
 
 | Value | Icon rendered | Google Maps maneuver strings |
 |---|---|---|
-| `forward` | Arrow up | *(default / straight)* |
-| `left` | Turn left | `turn-left`, `turn-sharp-left` |
-| `right` | Turn right | `turn-right`, `turn-sharp-right` |
-| `keepLeft` | Slight left | `turn-slight-left`, `keep-left`, `ramp-left`, `fork-left` |
-| `keepRight` | Slight right | `turn-slight-right`, `keep-right`, `ramp-right`, `fork-right` |
-| `uTurn` | U-turn | `uturn-left`, `uturn-right` |
-| `roundabout` | Custom diagram | `roundabout-left`, `roundabout-right` |
+| `forward` | 3 upward chevrons (^^^), 12 px stroke | *(default / straight)* |
+| `left` | 3 left-pointing chevrons (mirrored from right), 12 px stroke | `turn-left`, `turn-sharp-left` |
+| `right` | 3 right-pointing chevrons (>>>), 12 px stroke | `turn-right`, `turn-sharp-right` |
+| `keepLeft` | 2 left-pointing chevrons, 80 % scale, angled upward, 12 px stroke | `turn-slight-left`, `keep-left`, `ramp-left`, `fork-left` |
+| `keepRight` | 2 right-pointing chevrons, 80 % scale, angled upward, 12 px stroke | `turn-slight-right`, `keep-right`, `ramp-right`, `fork-right` |
+| `uTurn` | U-shaped arc with downward arrowhead, 12 px stroke | `uturn-left`, `uturn-right` |
+| `roundabout` | 3/4-circle arc (CCW), exit arrowhead at left, entry indicator at 135°; exit number centred inside arc | `roundabout-left`, `roundabout-right` |
 
 #### `TurnInstruction`
 ```dart
@@ -632,11 +632,13 @@ smart_ar_navigation/
 │   │   │   ├── app_strings.dart     # All text strings
 │   │   │   └── api_keys.dart        # API key references (loaded from .env)
 │   │   ├── enums/
-│   │   │   ├── turn_direction.dart  # forward, left, right, keepLeft, keepRight, uTurn, roundabout
-│   │   │   └── navigation_status.dart # idle, loading, navigating, rerouting, arrived
+│   │   │   ├── turn_direction.dart            # forward, left, right, keepLeft, keepRight, uTurn, roundabout
+│   │   │   ├── navigation_status.dart         # idle, loading, navigating, rerouting, arrived
+│   │   │   └── navigation_approach_stage.dart # far, approaching, imminent — drives arrow colour & pulse speed
 │   │   └── utils/
-│   │       ├── location_utils.dart  # Distance / findNextTurn helpers
-│   │       └── route_parser.dart    # Parses Google Maps JSON; extracts street name & roundabout exit number
+│   │       ├── location_utils.dart    # Distance / findNextTurn helpers
+│   │       ├── route_parser.dart      # Parses Google Maps JSON; extracts street name & roundabout exit number
+│   │       └── instruction_builder.dart # Builds human-readable instruction text from TurnInstruction
 │   │
 │   ├── models/                      # Data classes (Model layer)
 │   │   ├── route_model.dart
@@ -711,11 +713,9 @@ smart_ar_navigation/
 │   │   │       └── saved_places_section.dart  # Home / Work / Favourite place rows
 │   │   │
 │   │   └── widgets/                 # Reusable UI components (shared across screens)
-│   │       ├── ar_overlay_widget.dart      # Turn card HUD (switches between TurnArrowWidget / RoundaboutWidget)
-│   │       ├── roundabout_widget.dart      # CustomPainter: ring + entry/exit arrows + exit number
+│   │       ├── dynamic_arrow_widget.dart   # CustomPainter: chevron arrows for all 7 TurnDirection values with animated glow, colour pulse, and flow wave
 │   │       ├── search_bar_widget.dart      # Destination search input
-│   │       ├── navigation_bottom_bar.dart  # ETA / distance bottom panel
-│   │       └── turn_arrow_widget.dart      # Material icon arrows for all 7 TurnDirection values
+│   │       └── navigation_bottom_bar.dart  # ETA / distance bottom panel
 │   │
 │   └── app.dart                     # MaterialApp setup, routing & MultiProvider tree
 │
