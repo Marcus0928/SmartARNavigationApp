@@ -4,15 +4,17 @@ import 'package:smart_ar_navigation/core/enums/turn_direction.dart';
 class TurnInstruction {
   final TurnDirection direction;
   final double distanceFromPrev;
-  final String streetName;
+  final String? streetName;
   final LatLng position;
+  final String maneuver;
   final int? exitNumber;
 
   const TurnInstruction({
     required this.direction,
     required this.distanceFromPrev,
-    required this.streetName,
+    this.streetName,
     required this.position,
+    required this.maneuver,
     this.exitNumber,
   });
 }

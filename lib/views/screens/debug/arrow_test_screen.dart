@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:smart_ar_navigation/core/enums/navigation_approach_stage.dart';
 import 'package:smart_ar_navigation/core/enums/turn_direction.dart';
 import 'package:smart_ar_navigation/views/widgets/dynamic_arrow_widget.dart';
 
@@ -39,12 +40,18 @@ class ArrowTestScreen extends StatelessWidget {
         itemCount: _cases.length,
         itemBuilder: (context, i) {
           final (direction, label, distance) = _cases[i];
+          final stage = distance > 200
+              ? NavigationApproachStage.far
+              : distance > 50
+                  ? NavigationApproachStage.approaching
+                  : NavigationApproachStage.imminent;
           return Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               DynamicArrowWidget(
                 direction: direction,
                 distance: distance,
+                approachStage: stage,
                 size: 100,
               ),
               const SizedBox(height: 8),

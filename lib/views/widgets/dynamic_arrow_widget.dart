@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'package:smart_ar_navigation/core/constants/app_colors.dart';
+import 'package:smart_ar_navigation/core/enums/navigation_approach_stage.dart';
 import 'package:smart_ar_navigation/core/enums/turn_direction.dart';
 
 class DynamicArrowWidget extends StatefulWidget {
@@ -10,14 +11,18 @@ class DynamicArrowWidget extends StatefulWidget {
     super.key,
     required this.direction,
     required this.distance,
+    required this.approachStage,
     this.size = 180,
     this.showLabel = true,
+    this.exitNumber,
   });
 
   final TurnDirection direction;
   final double distance;
+  final NavigationApproachStage approachStage;
   final double size;
   final bool showLabel;
+  final int? exitNumber;
 
   @override
   State<DynamicArrowWidget> createState() => _DynamicArrowWidgetState();
@@ -38,7 +43,7 @@ class _DynamicArrowWidgetState extends State<DynamicArrowWidget>
   void initState() {
     super.initState();
 
-    final initialColor = _colorForDistance(widget.distance);
+    final initialColor = _colorForStage(widget.approachStage);
     _colorFrom = initialColor;
     _colorTo   = initialColor;
     _colorController = AnimationController(
@@ -50,7 +55,7 @@ class _DynamicArrowWidgetState extends State<DynamicArrowWidget>
     _pulseAnimation = Tween<double>(begin: 0.9, end: 1.1).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
-    _updatePulse(widget.distance);
+    _updatePulse(widget.approachStage);
 
     _directionController = AnimationController(
       vsync: this,
@@ -78,13 +83,13 @@ class _DynamicArrowWidgetState extends State<DynamicArrowWidget>
   @override
   void didUpdateWidget(DynamicArrowWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (_pulseCategory(widget.distance) != _pulseCategory(oldWidget.distance)) {
-      _updatePulse(widget.distance);
+    if (widget.approachStage != oldWidget.approachStage) {
+      _updatePulse(widget.approachStage);
     }
     if (widget.direction != oldWidget.direction) {
       _directionController.forward(from: 0.0);
     }
-    final newColor = _colorForDistance(widget.distance);
+    final newColor = _colorForStage(widget.approachStage);
     if (newColor != _colorTo) {
       _colorFrom = Color.lerp(_colorFrom, _colorTo, _colorController.value)
           ?? _colorTo;
@@ -102,23 +107,22 @@ class _DynamicArrowWidgetState extends State<DynamicArrowWidget>
     super.dispose();
   }
 
-  int _pulseCategory(double d) {
-    if (d > 100) return 0;
-    if (d >= 50) return 1;
-    return 2;
-  }
+  Color _colorForStage(NavigationApproachStage stage) => switch (stage) {
+        NavigationApproachStage.far         => arArrowColor,
+        NavigationApproachStage.approaching => const Color(0xFFFFC107),
+        NavigationApproachStage.imminent    => const Color(0xFFFF5252),
+      };
 
-  void _updatePulse(double distance) {
-    if (distance > 100) {
-      _pulseController.stop();
-      // value 0.5 maps to scale 1.0 in the 0.9–1.1 tween — no visible pulse.
-      _pulseController.value = 0.5;
-    } else {
-      _pulseController.duration = Duration(
-        milliseconds: distance >= 50 ? 2000 : 500,
-      );
-      _pulseController.repeat(reverse: true);
-    }
+  void _updatePulse(NavigationApproachStage stage) {
+    _pulseController.stop();
+    _pulseController.duration = Duration(
+      milliseconds: switch (stage) {
+        NavigationApproachStage.far         => 2000,
+        NavigationApproachStage.approaching => 1000,
+        NavigationApproachStage.imminent    => 400,
+      },
+    );
+    _pulseController.repeat(reverse: true);
   }
 
   @override
@@ -148,6 +152,7 @@ class _DynamicArrowWidgetState extends State<DynamicArrowWidget>
                       widget.direction,
                       color,
                       _flowController.value,
+                      widget.exitNumber,
                     ),
                   ),
                 ),
@@ -161,7 +166,7 @@ class _DynamicArrowWidgetState extends State<DynamicArrowWidget>
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      _distanceLabel(widget.distance),
+                      _labelText(),
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 18,
@@ -179,43 +184,94 @@ class _DynamicArrowWidgetState extends State<DynamicArrowWidget>
     );
   }
 
+  String _labelText() {
+    if (widget.direction == TurnDirection.roundabout) {
+      return widget.exitNumber != null
+          ? 'Take Exit ${widget.exitNumber}'
+          : 'Take the Exit';
+    }
+    return _distanceLabel(widget.distance);
+  }
+
   String _distanceLabel(double distance) {
     if (distance < 50) return 'Turn now!';
     if (distance >= 1000) return 'In ${(distance / 1000).toStringAsFixed(1)}km';
-    return 'In ${distance.toInt()}m';
+    final rounded = ((distance / 10).round() * 10).clamp(10, 990);
+    return 'In ${rounded}m';
   }
 }
 
 class _ArrowPainter extends CustomPainter {
-  const _ArrowPainter(this.direction, this.color, this.flowT);
+  const _ArrowPainter(this.direction, this.color, this.flowT, [this.exitNumber]);
 
   final TurnDirection direction;
   final Color color;
   final double flowT;
+  final int? exitNumber;
 
-  // Clockwise rotation in radians for straight-arrow directions.
-  // roundabout is excluded — paint() dispatches it to _paintRoundabout.
   double get _angle => switch (direction) {
-        TurnDirection.forward    => 0,
-        TurnDirection.right      => math.pi / 2,
-        TurnDirection.keepRight  => math.pi / 4,   // 45° clockwise
-        TurnDirection.uTurn      => math.pi,
-        TurnDirection.left       => -math.pi / 2,
-        TurnDirection.keepLeft   => -math.pi / 4,  // 45° counter-clockwise
-        TurnDirection.roundabout => 0,             // unused path
+        TurnDirection.forward  => 0,
+        TurnDirection.right    => math.pi / 2,
+        TurnDirection.uTurn    => math.pi,
+        TurnDirection.left     => -math.pi / 2,
+        _                      => 0, // keepLeft/keepRight/roundabout handled separately
       };
 
   @override
   void paint(Canvas canvas, Size size) {
     final scale = size.width / 120.0;
 
-    if (direction == TurnDirection.roundabout) {
-      _paintRoundabout(canvas, size, scale);
-      return;
+    switch (direction) {
+      case TurnDirection.roundabout:
+        _paintRoundabout(canvas, size, scale);
+        return;
+      case TurnDirection.keepLeft: {
+        final cx = size.width / 2;
+        final cy = size.height / 2;
+        // Mirror keepRight horizontally — rotation reverses automatically
+        canvas.translate(size.width, 0);
+        canvas.scale(-1, 1);
+        canvas.translate(cx, cy);
+        canvas.rotate(-15 * math.pi / 180); // visually +15° after mirror
+        canvas.scale(0.8);
+        canvas.rotate(math.pi / 2);
+        canvas.translate(-cx, -cy);
+        _paintChevrons(canvas, size, scale, mainStroke: 12.0, count: 2);
+        return;
+      }
+      case TurnDirection.keepRight: {
+        final cx = size.width / 2;
+        final cy = size.height / 2;
+        canvas.translate(cx, cy);
+        canvas.rotate(-15 * math.pi / 180); // tilt upward → gentle merge feel
+        canvas.scale(0.8);                  // 80% of full right
+        canvas.rotate(math.pi / 2);         // same 90° CW rotation as right
+        canvas.translate(-cx, -cy);
+        _paintChevrons(canvas, size, scale, mainStroke: 12.0, count: 2);
+        return;
+      }
+      case TurnDirection.forward:
+        _paintChevrons(canvas, size, scale, mainStroke: 12.0);
+        return;
+      case TurnDirection.uTurn:
+        _paintUTurn(canvas, size, scale);
+        return;
+      case TurnDirection.left: {
+        // Mirror right horizontally for pixel-perfect symmetry with right
+        final cx = size.width / 2;
+        final cy = size.height / 2;
+        canvas.translate(size.width, 0);
+        canvas.scale(-1, 1);
+        canvas.translate(cx, cy);
+        canvas.rotate(math.pi / 2);
+        canvas.translate(-cx, -cy);
+        _paintChevrons(canvas, size, scale, mainStroke: 12.0);
+        return;
+      }
+      default:
+        break;
     }
 
-    // Rotate around the canvas centre so the upward chevrons become the
-    // correct direction without changing the chevron geometry.
     if (_angle != 0) {
       final cx = size.width / 2;
       final cy = size.height / 2;
@@ -224,7 +280,7 @@ class _ArrowPainter extends CustomPainter {
       canvas.translate(-cx, -cy);
     }
 
-    _paintChevrons(canvas, size, scale);
+    _paintChevrons(canvas, size, scale, mainStroke: 12.0);
   }
 
   // 3 stacked chevrons (^) with a flowing bottom→top opacity wave.
@@ -232,138 +288,322 @@ class _ArrowPainter extends CustomPainter {
   // Canvas layout (top→bottom): canvasIdx 0 = top chevron (leading edge),
   //   canvasIdx 2 = bottom (trailing). Flow travels bottom→top so the
   //   wave sweeps flowIdx 0 (bottom) → 1 (mid) → 2 (top) as flowT: 0→1.
-  void _paintChevrons(Canvas canvas, Size size, double scale) {
-    final cx = size.width / 2;
-    final h = size.height;
-    // Chevron half-width and arm height, proportional to canvas size
+  void _paintChevrons(Canvas canvas, Size size, double scale,
+      {double mainStroke = 8.0, int count = 3}) {
+    final cx    = size.width / 2;
+    final h     = size.height;
     final halfW = size.width * 0.38;
     final armH  = h * 0.14;
 
-    for (int canvasIdx = 0; canvasIdx < 3; canvasIdx++) {
-      final cy      = h * (0.25 + canvasIdx * 0.25); // 0.25 / 0.50 / 0.75
-      final flowIdx = 2 - canvasIdx;                 // top=2, mid=1, bottom=0
+    for (int canvasIdx = 0; canvasIdx < count; canvasIdx++) {
+      // Evenly space: count=3 → 0.25/0.50/0.75, count=2 → 0.33/0.67
+      final cy      = h / (count + 1) * (canvasIdx + 1);
+      final flowIdx = (count - 1) - canvasIdx;
 
-      // Circular-distance from the travelling wave peak to this chevron.
-      // peak sweeps 0→3 over one full cycle (3 chevrons).
-      final peak = flowT * 3.0;
+      final halfN = count / 2.0;
+      final peak  = flowT * count.toDouble();
       double dist = (peak - flowIdx).abs();
-      if (dist > 1.5) dist = 3.0 - dist; // wrap: seamless at cycle boundary
-      final opacity = (1.0 - dist / 1.5).clamp(0.25, 1.0);
+      if (dist > halfN) dist = count.toDouble() - dist;
+      final opacity = (1.0 - dist / halfN).clamp(0.25, 1.0);
 
       final path = Path()
         ..moveTo(cx - halfW, cy + armH / 2)
         ..lineTo(cx,         cy - armH / 2)
         ..lineTo(cx + halfW, cy + armH / 2);
 
-      // Layer 1 — wide glow: same color at 0.3 base opacity, modulated by wave
       canvas.drawPath(
         path,
         Paint()
           ..color = color.withValues(alpha: 0.3 * opacity)
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 16.0 * scale
+          ..strokeWidth = mainStroke * 2.0 * scale
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round,
       );
 
-      // Layer 2 — sharp main stroke: full opacity, modulated by wave
       canvas.drawPath(
         path,
         Paint()
           ..color = color.withValues(alpha: opacity)
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 8.0 * scale
+          ..strokeWidth = mainStroke * scale
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round,
       );
     }
   }
 
-  // Circular-arc arrow.
-  //
-  // Arc:  12 o'clock → 3 → 6 → 9 o'clock  (270° clockwise, leaving the
-  //        upper-left quadrant open as a visual "gap" in the ring).
-  // At the end point (9 o'clock, left side) the clockwise tangent is exactly
-  // (0, −1), i.e. pointing straight UP — so the arrowhead caps the arc
-  // pointing upward and fills the gap, completing the circular-arrow look.
-  void _paintRoundabout(Canvas canvas, Size size, double scale) {
+  // U-shaped arc: left stem up → semicircle over top → right stem down → arrowhead.
+  // Arc uses clockwise sweep so it curves UPWARD (over the top) between the two stems.
+  void _paintUTurn(Canvas canvas, Size size, double scale) {
     final cx = size.width / 2;
-    final cy = size.height / 2;
-    final r = size.width * 0.27; // proportional arc centre-line radius
+    final h  = size.height;
+    final r  = size.width * 0.18; // arc radius → U width = 36% of widget
 
-    final arcRect = Rect.fromCircle(center: Offset(cx, cy), radius: r);
-    const startAngle = -math.pi / 2; // 12 o'clock
-    const sweepAngle = 3 * math.pi / 2; // 270° clockwise
+    final topY       = h * 0.26;  // arc centre Y (upper quarter)
+    final stemBottom = h * 0.78;  // bottom of both stems
+    const mainStroke = 12.0;
+    const headLen    = 14.0;
+    const headW      =  9.0;
 
-    // Shadow arc (offset + blurred)
-    canvas.drawArc(
-      arcRect.shift(Offset(3 * scale, 5 * scale)),
-      startAngle,
-      sweepAngle,
-      false,
+    final stemEnd = stemBottom - headLen * scale; // right stem stops here
+
+    // ── U path ────────────────────────────────────────────────────────
+    final uPath = Path()
+      ..moveTo(cx - r, stemBottom)   // bottom of left stem
+      ..lineTo(cx - r, topY)         // up to arc start
+      ..arcTo(
+        Rect.fromCircle(center: Offset(cx, topY), radius: r),
+        math.pi,  // start at left  (9 o'clock)
+        math.pi,  // +180° clockwise → curves up over the top to right
+        false,
+      )
+      ..lineTo(cx + r, stemEnd);     // right stem down to arrow base
+
+    // Glow layer
+    canvas.drawPath(
+      uPath,
       Paint()
-        ..color = const Color(0x66000000)
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, 8.0 * scale)
+        ..color = color.withValues(alpha: 0.3)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 16.0 * scale
-        ..strokeCap = StrokeCap.round,
+        ..strokeWidth = mainStroke * 2.0 * scale
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round,
     );
 
-    // White border arc
-    canvas.drawArc(
-      arcRect,
-      startAngle,
-      sweepAngle,
-      false,
-      Paint()
-        ..color = Colors.white
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 16.0 * scale
-        ..strokeCap = StrokeCap.round,
-    );
-
-    // Cyan arc
-    canvas.drawArc(
-      arcRect,
-      startAngle,
-      sweepAngle,
-      false,
+    // Main stroke
+    canvas.drawPath(
+      uPath,
       Paint()
         ..color = color
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 10.0 * scale
-        ..strokeCap = StrokeCap.round,
+        ..strokeWidth = mainStroke * scale
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round,
     );
 
-    // Arrowhead at arc end: (cx − r, cy), pointing UP
-    final ex = cx - r;
-    final ey = cy;
+    // ── Arrowhead at bottom of right stem, pointing DOWN ──────────────
     final arrowHead = Path()
-      ..moveTo(ex, ey - 13 * scale)           // tip
-      ..lineTo(ex + 10 * scale, ey + 7 * scale) // base-right
-      ..lineTo(ex - 10 * scale, ey + 7 * scale) // base-left
+      ..moveTo(cx + r,                 stemBottom) // tip
+      ..lineTo(cx + r - headW * scale, stemEnd)   // base left
+      ..lineTo(cx + r + headW * scale, stemEnd)   // base right
       ..close();
 
     canvas.drawPath(
       arrowHead,
       Paint()
-        ..color = Colors.white
+        ..color = color.withValues(alpha: 0.3)
+        ..style = PaintingStyle.fill
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, 4.0 * scale),
+    );
+    canvas.drawPath(
+      arrowHead,
+      Paint()..color = color..style = PaintingStyle.fill,
+    );
+  }
+
+  // Fork ("Y") shape: stem → fork → highlighted keep-branch + dim straight branch.
+  // keepRight: branch goes right; keepLeft: branch goes left.
+  void _paintFork(Canvas canvas, Size size, double scale,
+      {required bool keepRight}) {
+    final cx    = size.width / 2;
+    final h     = size.height;
+    final sign  = keepRight ? 1.0 : -1.0;
+
+    final baseY  = h * 0.85;
+    final forkY  = h * 0.52;
+    final keepX  = cx + sign * size.width * 0.28;
+    final keepY  = h * 0.18;
+
+    final dX  = keepX - cx;
+    final dY  = keepY - forkY;
+    final len = math.sqrt(dX * dX + dY * dY);
+    final nX  = dX / len;  // unit vector along keep branch
+    final nY  = dY / len;
+    final pX  = -nY;       // perpendicular (arrowhead width)
+    final pY  =  nX;
+
+    double flowOpacity(double idx) {
+      final peak = flowT * 3.0;
+      double dist = (peak - idx).abs();
+      if (dist > 1.5) dist = 3.0 - dist;
+      return (1.0 - dist / 1.5).clamp(0.25, 1.0);
+    }
+
+    Paint glow(double op) => Paint()
+      ..color = color.withValues(alpha: 0.3 * op)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 16.0 * scale
+      ..strokeCap = StrokeCap.round;
+    Paint main(double op) => Paint()
+      ..color = color.withValues(alpha: op)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 8.0 * scale
+      ..strokeCap = StrokeCap.round;
+
+    // Stem
+    final stemOp   = flowOpacity(0);
+    final stemPath = Path()..moveTo(cx, baseY)..lineTo(cx, forkY);
+    canvas.drawPath(stemPath, glow(stemOp));
+    canvas.drawPath(stemPath, main(stemOp));
+
+    // Dim straight branch — user is NOT going straight
+    canvas.drawPath(
+      Path()..moveTo(cx, forkY)..lineTo(cx, h * 0.32),
+      Paint()
+        ..color = color.withValues(alpha: 0.28)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 5.0 * scale
-        ..strokeJoin = StrokeJoin.round,
+        ..strokeCap = StrokeCap.round,
     );
-    canvas.drawPath(arrowHead, Paint()..color = color..style = PaintingStyle.fill);
+
+    // Highlighted keep branch
+    final branchOp = (flowOpacity(1.0) + flowOpacity(2.0)) / 2;
+    final keepPath = Path()..moveTo(cx, forkY)..lineTo(keepX, keepY);
+    canvas.drawPath(keepPath, glow(branchOp));
+    canvas.drawPath(keepPath, main(branchOp));
+
+    // Arrowhead at tip of keep branch
+    const headLen = 14.0;
+    const headW   = 8.0;
+    canvas.drawPath(
+      Path()
+        ..moveTo(keepX, keepY)
+        ..lineTo(keepX - nX * headLen * scale + pX * headW * scale,
+                 keepY - nY * headLen * scale + pY * headW * scale)
+        ..lineTo(keepX - nX * headLen * scale - pX * headW * scale,
+                 keepY - nY * headLen * scale - pY * headW * scale)
+        ..close(),
+      Paint()
+        ..color = color.withValues(alpha: branchOp)
+        ..style = PaintingStyle.fill,
+    );
+  }
+
+  // 3/4 circle CW: starts at lower-left (7:30 o'clock = 135° Flutter),
+  // sweeps 270° clockwise, ends at lower-right (4:30 o'clock = 45° Flutter).
+  // Gap sits at the bottom (6 o'clock) — the approach side for the driver.
+  // Entry indicator is a short line OUTSIDE the circle touching the arc start.
+  // Exit arrow is a radially-outward arrowhead at the arc end.
+  void _paintRoundabout(Canvas canvas, Size size, double scale) {
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+    final r  = size.width * 0.33;
+
+    // Arc geometry
+    const startAngle = 3 * math.pi / 4;  // 135° Flutter = lower-left
+    const sweepAngle = 3 * math.pi / 2;  // +270° clockwise
+    const endAngle   = math.pi / 4;       // 45°  Flutter = lower-right
+    const mainStroke = 14.0;
+
+    final arcRect = Rect.fromCircle(center: Offset(cx, cy), radius: r);
+
+    // ── Arc glow ──────────────────────────────────────────────────────
+    canvas.drawArc(arcRect, startAngle, sweepAngle, false,
+      Paint()
+        ..color = color.withValues(alpha: 0.3)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = mainStroke * 2.0 * scale
+        ..strokeCap = StrokeCap.round);
+
+    // ── Main arc ──────────────────────────────────────────────────────
+    canvas.drawArc(arcRect, startAngle, sweepAngle, false,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = mainStroke * scale
+        ..strokeCap = StrokeCap.round);
+
+    // ── Entry indicator: line from outside the circle to the arc start ─
+    // Drawn from (r + 15px) outward to exactly (r) at startAngle.
+    // Ends at the arc start → connected, not floating.
+    final entryOnX  = cx + r                    * math.cos(startAngle);
+    final entryOnY  = cy + r                    * math.sin(startAngle);
+    final entryOutX = cx + (r + 15.0 * scale)  * math.cos(startAngle);
+    final entryOutY = cy + (r + 15.0 * scale)  * math.sin(startAngle);
+
+    canvas.drawLine(
+      Offset(entryOutX, entryOutY),
+      Offset(entryOnX,  entryOnY),
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = mainStroke * scale
+        ..strokeCap = StrokeCap.round);
+
+    // ── Exit arrow: short stem + arrowhead pointing radially outward ───
+    final exX = cx + r * math.cos(endAngle);   // arc end X
+    final exY = cy + r * math.sin(endAngle);   // arc end Y
+    // Outward direction (away from circle centre)
+    final outDX  =  math.cos(endAngle);
+    final outDY  =  math.sin(endAngle);
+    // Perpendicular for arrowhead width
+    final perpDX = -math.sin(endAngle);
+    final perpDY =  math.cos(endAngle);
+
+    const stemLen = 6.0;
+    const headLen = 14.0;
+    const headW   =  9.0;
+
+    final baseX = exX + outDX * stemLen * scale;
+    final baseY = exY + outDY * stemLen * scale;
+    final tipX  = baseX + outDX * headLen * scale;
+    final tipY  = baseY + outDY * headLen * scale;
+
+    // Stem glow + main
+    canvas.drawLine(
+      Offset(exX, exY), Offset(baseX, baseY),
+      Paint()
+        ..color = color.withValues(alpha: 0.3)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = mainStroke * 2.0 * scale
+        ..strokeCap = StrokeCap.round);
+    canvas.drawLine(
+      Offset(exX, exY), Offset(baseX, baseY),
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = mainStroke * scale
+        ..strokeCap = StrokeCap.round);
+
+    // Arrowhead glow + fill
+    final arrowHead = Path()
+      ..moveTo(tipX, tipY)
+      ..lineTo(baseX + perpDX * headW * scale, baseY + perpDY * headW * scale)
+      ..lineTo(baseX - perpDX * headW * scale, baseY - perpDY * headW * scale)
+      ..close();
+
+    canvas.drawPath(arrowHead,
+      Paint()
+        ..color = color.withValues(alpha: 0.3)
+        ..style = PaintingStyle.fill
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, 4.0 * scale));
+    canvas.drawPath(arrowHead,
+      Paint()..color = color..style = PaintingStyle.fill);
+
+    // ── Exit number centered in circle (only when provided) ───────────
+    if (exitNumber != null) {
+      final tp = TextPainter(
+        text: TextSpan(
+          text: '$exitNumber',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 36.0 * scale,
+            fontWeight: FontWeight.bold,
+            height: 1.0,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(canvas, Offset(cx - tp.width / 2, cy - tp.height / 2));
+    }
   }
 
   @override
   bool shouldRepaint(covariant _ArrowPainter oldDelegate) =>
       oldDelegate.direction != direction ||
       oldDelegate.color != color ||
-      oldDelegate.flowT != flowT;
+      oldDelegate.flowT != flowT ||
+      oldDelegate.exitNumber != exitNumber;
 }
 
-Color _colorForDistance(double distance) {
-  if (distance > 100) return arArrowColor;
-  if (distance >= 50) return const Color(0xFFFFC107); // amber
-  return const Color(0xFFFF5252); // red
-}

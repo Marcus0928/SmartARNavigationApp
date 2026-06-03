@@ -62,6 +62,7 @@ class AROverlayWidget extends StatelessWidget {
 
   String _formatDistance(double metres) {
     if (metres >= 1000) return '${(metres / 1000).toStringAsFixed(1)} km';
-    return '${metres.toInt()} m';
+    final rounded = ((metres / 10).round() * 10).clamp(10, 990);
+    return '$rounded m';
   }
 }

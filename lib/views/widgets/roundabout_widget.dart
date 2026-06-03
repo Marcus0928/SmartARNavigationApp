@@ -1,105 +1,268 @@
-import 'dart:math';
-import 'package:flutter/material.dart';
-import 'package:smart_ar_navigation/core/constants/app_colors.dart';
+import 'dart:math' as math;
 
-class RoundaboutWidget extends StatelessWidget {
+import 'package:flutter/material.dart';
+
+import 'package:smart_ar_navigation/core/enums/navigation_approach_stage.dart';
+
+class RoundaboutWidget extends StatefulWidget {
   const RoundaboutWidget({
     super.key,
-    required this.exitNumber,
-    this.size = 56,
+    required this.distance,
+    required this.approachStage,
+    this.exitNumber,
+    this.streetName,
   });
 
-  final int exitNumber;
-  final double size;
+  final double distance;
+  final NavigationApproachStage approachStage;
+  final int? exitNumber;
+  final String? streetName;
+
+  @override
+  State<RoundaboutWidget> createState() => _RoundaboutWidgetState();
+}
+
+class _RoundaboutWidgetState extends State<RoundaboutWidget>
+    with TickerProviderStateMixin {
+  // Animation 1 — rotating ring
+  late AnimationController _rotateController;
+
+  // Animation 2 — distance-based pulse
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
+
+  // Animation 3 — entrance scale
+  late AnimationController _entranceController;
+  late Animation<double> _entranceAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _rotateController = AnimationController(vsync: this);
+    _updateRotation(widget.approachStage);
+
+    _pulseController = AnimationController(vsync: this);
+    _pulseAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+    _updatePulse(widget.approachStage);
+
+    _entranceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+    _entranceAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _entranceController, curve: Curves.elasticOut),
+    );
+    _entranceController.forward();
+  }
+
+  void _updateRotation(NavigationApproachStage stage) {
+    _rotateController.stop();
+    _rotateController.duration = switch (stage) {
+      NavigationApproachStage.far         => const Duration(seconds: 3),
+      NavigationApproachStage.approaching => const Duration(seconds: 2),
+      NavigationApproachStage.imminent    => const Duration(seconds: 1),
+    };
+    _rotateController.repeat();
+  }
+
+  void _updatePulse(NavigationApproachStage stage) {
+    _pulseController.stop();
+    _pulseController.duration = Duration(
+      milliseconds: switch (stage) {
+        NavigationApproachStage.far         => 2000,
+        NavigationApproachStage.approaching => 1000,
+        NavigationApproachStage.imminent    => 400,
+      },
+    );
+    _pulseController.repeat(reverse: true);
+  }
+
+  @override
+  void didUpdateWidget(RoundaboutWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.approachStage != oldWidget.approachStage) {
+      _updateRotation(widget.approachStage);
+      _updatePulse(widget.approachStage);
+    }
+  }
+
+  @override
+  void dispose() {
+    _rotateController.dispose();
+    _pulseController.dispose();
+    _entranceController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      size: Size(size, size),
-      painter: _RoundaboutPainter(exitNumber: exitNumber.clamp(1, 4)),
+    return AnimatedBuilder(
+      animation: Listenable.merge([
+        _rotateController,
+        _pulseController,
+        _entranceController,
+      ]),
+      builder: (_, __) {
+        final glowColor = widget.approachStage == NavigationApproachStage.imminent
+            ? const Color(0xFFFFC107)
+            : const Color(0xFF00E676);
+
+        // Map pulse scale 0.95–1.05 → glow opacity 0.10–0.25
+        final glowOpacity =
+            0.10 + (_pulseAnimation.value - 0.95) / 0.10 * 0.15;
+
+        return Transform.scale(
+          scale: _entranceAnimation.value,
+          child: Transform.scale(
+            scale: _pulseAnimation.value,
+            child: SizedBox(
+              width: 180,
+              height: 180,
+              child: CustomPaint(
+                painter: _RoundaboutPainter(
+                  exitNumber: widget.exitNumber,
+                  glowOpacity: glowOpacity.clamp(0.0, 1.0),
+                  glowColor: glowColor,
+                  rotationAngle: _rotateController.value * 2 * math.pi,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
 
 class _RoundaboutPainter extends CustomPainter {
-  const _RoundaboutPainter({required this.exitNumber});
-  final int exitNumber;
+  const _RoundaboutPainter({
+    required this.exitNumber,
+    required this.glowOpacity,
+    required this.glowColor,
+    required this.rotationAngle,
+  });
+
+  final int? exitNumber;
+  final double glowOpacity;
+  final Color glowColor;
+  final double rotationAngle; // 0 → 2π over 3 s
+
+  static const _cyan = Color(0xFF00E676);
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final ringRadius = size.width * 0.28;
-    final arrowLen = size.width * 0.20;
-    final strokeW = size.width * 0.075;
 
-    final paint = Paint()
-      ..color = arArrowColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeW
-      ..strokeCap = StrokeCap.round;
-
-    // Roundabout ring
-    canvas.drawCircle(center, ringRadius, paint);
-
-    // Entry arrow: from outside bottom pointing up into ring
-    final entryOuter = Offset(center.dx, center.dy + ringRadius + arrowLen);
-    final entryInner = Offset(center.dx, center.dy + ringRadius);
-    canvas.drawLine(entryOuter, entryInner, paint);
-    _drawArrowHead(canvas, entryInner, -pi / 2, strokeW, paint);
-
-    // Exit arrow: each exit is 90° counterclockwise from the entry (bottom)
-    // Exit 1 = right (3 o'clock), 2 = top (12 o'clock), 3 = left (9 o'clock), 4 = bottom (U-turn)
-    final exitAngle = pi / 2 - exitNumber * (pi / 2);
-    final exitInner = Offset(
-      center.dx + cos(exitAngle) * ringRadius,
-      center.dy + sin(exitAngle) * ringRadius,
+    // Layer 1 — Glow (filled, radius 80, colour + opacity change near turn)
+    canvas.drawCircle(
+      center,
+      80,
+      Paint()
+        ..color = glowColor.withValues(alpha: glowOpacity)
+        ..style = PaintingStyle.fill,
     );
-    final exitOuter = Offset(
-      center.dx + cos(exitAngle) * (ringRadius + arrowLen),
-      center.dy + sin(exitAngle) * (ringRadius + arrowLen),
-    );
-    canvas.drawLine(exitInner, exitOuter, paint);
-    _drawArrowHead(canvas, exitOuter, exitAngle, strokeW, paint);
 
-    // Exit number in centre of ring
-    final textPainter = TextPainter(
-      text: TextSpan(
-        text: '$exitNumber',
-        style: TextStyle(
-          color: arArrowColor,
-          fontSize: size.width * 0.30,
-          fontWeight: FontWeight.w900,
+    // Layer 2 — Dark background (filled, radius 65)
+    canvas.drawCircle(
+      center,
+      65,
+      Paint()
+        ..color = const Color(0xCC000000)
+        ..style = PaintingStyle.fill,
+    );
+
+    // Layer 3 — Rotating dashed ring (radius 60, stroke 6px)
+    // The dashes orbit the circle at rotationAngle; content inside stays fixed.
+    _paintRotatingRing(canvas, center);
+
+    // Layer 5 — Exit arrow (fixed, painted before number so number sits on top)
+    _paintExitArrow(canvas, center);
+
+    // Layer 4 — Exit number (fixed, only when provided)
+    if (exitNumber != null) {
+      final tp = TextPainter(
+        text: TextSpan(
+          text: '$exitNumber',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 48,
+            fontWeight: FontWeight.bold,
+            height: 1.0,
+          ),
         ),
-      ),
-      textDirection: TextDirection.ltr,
-    );
-    textPainter.layout();
-    textPainter.paint(
-      canvas,
-      center - Offset(textPainter.width / 2, textPainter.height / 2),
-    );
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(canvas, center - Offset(tp.width / 2, tp.height / 2));
+    }
   }
 
-  void _drawArrowHead(
-    Canvas canvas,
-    Offset tip,
-    double angle,
-    double size,
-    Paint paint,
-  ) {
-    const spread = pi / 5;
-    final p1 = Offset(
-      tip.dx - size * cos(angle - spread),
-      tip.dy - size * sin(angle - spread),
+  // 12 dashes evenly spaced; each occupies 65% of its slot, gap 35%.
+  // The whole pattern rotates clockwise via rotationAngle.
+  void _paintRotatingRing(Canvas canvas, Offset center) {
+    const dashCount = 12;
+    const slotAngle = 2 * math.pi / dashCount;
+    const fillFraction = 0.65;
+
+    final rect = Rect.fromCircle(center: center, radius: 60);
+    final paint = Paint()
+      ..color = _cyan
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 6
+      ..strokeCap = StrokeCap.round;
+
+    for (int i = 0; i < dashCount; i++) {
+      final start = rotationAngle + i * slotAngle;
+      canvas.drawArc(rect, start, slotAngle * fillFraction, false, paint);
+    }
+  }
+
+  // Exit 1 → right (0), 2 → up (−π/2), 3 → left (±π), 4 → down (π/2).
+  // Null exitNumber defaults to forward-right (−π/4).
+  double get _exitAngle {
+    if (exitNumber != null) {
+      return math.pi / 2 - exitNumber! * (math.pi / 2);
+    }
+    return -math.pi / 4;
+  }
+
+  void _paintExitArrow(Canvas canvas, Offset center) {
+    final angle = _exitAngle;
+    // Arrow starts at the ring edge (r = 60) and extends 40px outward.
+    final edgePoint = center + Offset(math.cos(angle) * 60, math.sin(angle) * 60);
+    final tipPoint  = center + Offset(math.cos(angle) * 100, math.sin(angle) * 100);
+
+    final paint = Paint()
+      ..color = _cyan
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 6
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawLine(edgePoint, tipPoint, paint);
+
+    // Arrowhead — two lines spreading 36° from the tip back toward the shaft
+    const spread = math.pi / 5;
+    const headLen = 14.0;
+    canvas.drawLine(
+      tipPoint,
+      Offset(tipPoint.dx - headLen * math.cos(angle - spread),
+             tipPoint.dy - headLen * math.sin(angle - spread)),
+      paint,
     );
-    final p2 = Offset(
-      tip.dx - size * cos(angle + spread),
-      tip.dy - size * sin(angle + spread),
+    canvas.drawLine(
+      tipPoint,
+      Offset(tipPoint.dx - headLen * math.cos(angle + spread),
+             tipPoint.dy - headLen * math.sin(angle + spread)),
+      paint,
     );
-    canvas.drawLine(tip, p1, paint);
-    canvas.drawLine(tip, p2, paint);
   }
 
   @override
-  bool shouldRepaint(_RoundaboutPainter old) => old.exitNumber != exitNumber;
+  bool shouldRepaint(_RoundaboutPainter old) =>
+      old.exitNumber != exitNumber ||
+      old.glowOpacity != glowOpacity ||
+      old.glowColor != glowColor ||
+      old.rotationAngle != rotationAngle;
 }

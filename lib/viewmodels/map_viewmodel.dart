@@ -45,6 +45,7 @@ class MapViewModel extends ChangeNotifier {
   bool _isFetchingRoute = false;
   StreamSubscription<LatLng>? _locationSubscription;
   Timer? _searchDebounce;
+  Timer? _navRefreshTimer;
 
   LatLng? get currentLocation => _currentLocation;
   double? get currentHeading => _currentHeading;
@@ -98,13 +99,25 @@ class MapViewModel extends ChangeNotifier {
           _navigationViewModel.recalculateRoute(from: location);
         }
       }
+    });
 
+    // Heartbeat: force-refresh the AR overlay every 5 s so the screen stays
+    // current after the app returns from background (GPS stream may stall
+    // briefly after resume).
+    _navRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      final loc = _currentLocation;
+      if (loc != null &&
+          _navigationViewModel.navigationStatus == NavigationStatus.navigating) {
+        _arViewModel.updateAROverlay(loc);
+      }
     });
   }
 
   void stopLocationTracking() {
     _locationSubscription?.cancel();
     _locationSubscription = null;
+    _navRefreshTimer?.cancel();
+    _navRefreshTimer = null;
     _locationService.stopLocationStream();
   }
 
