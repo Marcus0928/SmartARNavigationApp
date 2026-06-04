@@ -118,7 +118,12 @@ class _ARNavigationScreenState extends State<ARNavigationScreen>
             top: 0,
             left: 0,
             right: 0,
-            child: _NavInfoCard(directionOverride: _debugDirection),
+            child: _NavInfoCard(
+              directionOverride: _debugDirection,
+              approachStageOverride: _debugDirection != null
+                  ? NavigationApproachStage.far
+                  : null,
+            ),
           ),
 
           // ── Layer 4: DEBUG direction buttons (remove before release) ─
@@ -150,9 +155,10 @@ class _ARNavigationScreenState extends State<ARNavigationScreen>
 // ── Floating top info card ────────────────────────────────────────────────────
 
 class _NavInfoCard extends StatelessWidget {
-  const _NavInfoCard({this.directionOverride});
+  const _NavInfoCard({this.directionOverride, this.approachStageOverride});
 
   final TurnDirection? directionOverride;
+  final NavigationApproachStage? approachStageOverride;
 
   @override
   Widget build(BuildContext context) {
@@ -220,7 +226,7 @@ class _NavInfoCard extends StatelessWidget {
               DynamicArrowWidget(
                 direction: direction,
                 distance: distance,
-                approachStage: arVM.approachStage,
+                approachStage: approachStageOverride ?? arVM.approachStage,
                 size: 48,
                 showLabel: false,
                 exitNumber: arVM.roundaboutExit,
