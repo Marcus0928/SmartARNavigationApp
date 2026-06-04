@@ -19,11 +19,6 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 
-        <!-- Google Maps API key -->
-        <meta-data
-            android:name="com.google.android.geo.API_KEY"
-            android:value="TEMP_KEY"/>
-
         <!-- ARCore — marks this app as requiring AR support -->
         <meta-data
             android:name="com.google.ar.core"
