@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import 'package:smart_ar_navigation/core/constants/app_colors.dart';
-import 'package:smart_ar_navigation/core/constants/app_strings.dart';
 import 'package:smart_ar_navigation/models/place_model.dart';
 import 'package:smart_ar_navigation/models/route_model.dart';
 

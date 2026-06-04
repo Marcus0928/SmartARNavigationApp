@@ -47,6 +47,7 @@ class ARViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+
   Future<void> initializeOverlay(RouteModel route) async {
     _remainingTurns = List.from(route.turns);
 

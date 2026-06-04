@@ -43,6 +43,7 @@ class MapViewModel extends ChangeNotifier {
   List<RouteModel> _previewRoutes = [];
   int _selectedRouteIndex = 0;
   bool _isFetchingRoute = false;
+  int _routeVersion = 0;
   StreamSubscription<LatLng>? _locationSubscription;
   Timer? _searchDebounce;
   Timer? _navRefreshTimer;
@@ -58,6 +59,7 @@ class MapViewModel extends ChangeNotifier {
   RouteModel? get selectedRoute =>
       _previewRoutes.isNotEmpty ? _previewRoutes[_selectedRouteIndex] : null;
   bool get isFetchingRoute => _isFetchingRoute;
+  int get routeVersion => _routeVersion;
 
   Future<void> startLocationTracking() async {
     if (_trackingStarted) return;
@@ -190,6 +192,12 @@ class MapViewModel extends ChangeNotifier {
       _isFetchingRoute = false;
       notifyListeners();
     }
+  }
+
+  Future<void> refreshPreviewRoute() async {
+    if (_selectedDestination == null) return;
+    _routeVersion++;
+    await _fetchPreviewRoute();
   }
 
   void selectRoute(int index) {
