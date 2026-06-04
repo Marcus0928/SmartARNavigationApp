@@ -24,6 +24,7 @@ import 'package:smart_ar_navigation/views/screens/home_screen.dart';
 import 'package:smart_ar_navigation/views/screens/plan_drive_screen.dart';
 import 'package:smart_ar_navigation/views/screens/profile_screen.dart';
 import 'package:smart_ar_navigation/views/screens/settings_screen.dart';
+import 'package:smart_ar_navigation/views/screens/debug/arrow_test_screen.dart';
 import 'package:smart_ar_navigation/views/screens/splash_screen.dart';
 
 class SmartARNavigationApp extends StatelessWidget {
@@ -134,6 +135,7 @@ class SmartARNavigationApp extends StatelessWidget {
           '/ar-navigation': (_) => const ARNavigationScreen(),
           '/settings': (_) => const SettingsScreen(),
           '/profile': (_) => const ProfileScreen(),
+          '/arrow-test': (_) => const ArrowTestScreen(), // TODO: remove after testing
           '/plan-drive': (ctx) => ChangeNotifierProvider(
                 create: (c) => PlanDriveViewModel(
                   placesRepository: c.read<PlacesRepository>(),

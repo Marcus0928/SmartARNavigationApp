@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:provider/provider.dart';
 
 import 'package:smart_ar_navigation/core/constants/app_colors.dart';
 import 'package:smart_ar_navigation/core/constants/app_strings.dart';
+import 'package:smart_ar_navigation/viewmodels/map_viewmodel.dart';
 import 'package:smart_ar_navigation/views/screens/splash/widgets/animated_logo.dart';
 import 'package:smart_ar_navigation/views/screens/splash/widgets/permission_dialogs.dart';
 
@@ -45,8 +47,12 @@ class _SplashScreenState extends State<SplashScreen>
       await _handleLocationPermission();
     } catch (_) {}
     if (!mounted) return;
-    setState(() => _statusText = 'Ready');
-    await Future.delayed(const Duration(milliseconds: 400));
+
+    // Await the first location fix (last-known cache, < 100 ms) so that
+    // HomeScreen's initialCenter is already set when the map first builds.
+    // The idempotency guard in MapViewModel makes the HomeScreen call a no-op.
+    await context.read<MapViewModel>().startLocationTracking();
+
     if (!mounted) return;
     Navigator.of(context).pushReplacementNamed('/home');
   }

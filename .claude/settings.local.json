@@ -13,7 +13,9 @@
       "Bash(Get-ChildItem -Path lib -Recurse -Filter \"*.dart\")",
       "Bash(Select-Object -ExpandProperty FullName)",
       "Bash(Sort-Object)",
-      "PowerShell($srs = \\(Get-Content \"C:\\\\Sunway\\\\Bachelor in Software Engineering\\\\Semester 9\\\\Capstone 2\\\\SmartARNavigationApp\\\\docs\\\\SRS_SmartARNavigation.md\" | Measure-Object -Line\\).Lines; $sdd = \\(Get-Content \"C:\\\\Sunway\\\\Bachelor in Software Engineering\\\\Semester 9\\\\Capstone 2\\\\SmartARNavigationApp\\\\docs\\\\SDD_SmartARNavigation.md\" | Measure-Object -Line\\).Lines; \"SRS: $srs lines | SDD: $sdd lines\")"
+      "PowerShell($srs = \\(Get-Content \"C:\\\\Sunway\\\\Bachelor in Software Engineering\\\\Semester 9\\\\Capstone 2\\\\SmartARNavigationApp\\\\docs\\\\SRS_SmartARNavigation.md\" | Measure-Object -Line\\).Lines; $sdd = \\(Get-Content \"C:\\\\Sunway\\\\Bachelor in Software Engineering\\\\Semester 9\\\\Capstone 2\\\\SmartARNavigationApp\\\\docs\\\\SDD_SmartARNavigation.md\" | Measure-Object -Line\\).Lines; \"SRS: $srs lines | SDD: $sdd lines\")",
+      "Bash(flutter run *)",
+      "Bash(dart analyze *)"
     ]
   }
 }

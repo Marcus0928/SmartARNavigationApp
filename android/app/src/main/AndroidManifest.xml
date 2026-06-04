@@ -11,6 +11,9 @@
     <!-- Camera — required for AR camera feed -->
     <uses-permission android:name="android.permission.CAMERA"/>
 
+    <!-- Keep screen on during AR navigation -->
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+
     <!-- ARCore — device must support AR -->
     <uses-feature android:name="android.hardware.camera.ar" android:required="true"/>
 

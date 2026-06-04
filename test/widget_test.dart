@@ -59,6 +59,7 @@ void main() {
           distanceFromPrev: 50,
           streetName: 'Jalan Test',
           position: LatLng(3.0738, 101.5077), // same as currentLocation → 0m
+          maneuver: 'turn-left',
         ),
       ];
       expect(findNextTurn(currentLocation, turns), isNull);
@@ -70,6 +71,7 @@ void main() {
         distanceFromPrev: 100,
         streetName: 'Jalan Far',
         position: const LatLng(3.0800, 101.5150),
+        maneuver: 'turn-right',
       );
       expect(findNextTurn(currentLocation, [farTurn]), equals(farTurn));
     });

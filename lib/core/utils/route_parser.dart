@@ -37,14 +37,16 @@ List<RouteModel> parseRouteResponse(Map<String, dynamic> json) {
       );
       waypoints.add(position);
       final htmlInstructions = step['html_instructions'] as String;
-      final direction = _parseManeuver(step['maneuver'] as String?);
+      final rawManeuver = step['maneuver'] as String? ?? 'straight';
+      final direction = _parseManeuver(rawManeuver);
       turns.add(TurnInstruction(
         direction: direction,
         distanceFromPrev: (step['distance']['value'] as num).toDouble(),
         streetName: _extractStreetName(htmlInstructions),
         position: position,
-        exitNumber: direction == TurnDirection.roundabout
-            ? _extractExitNumber(htmlInstructions)
+        maneuver: rawManeuver,
+        exitNumber: rawManeuver.contains('roundabout')
+            ? step['exit'] as int?
             : null,
       ));
     }
@@ -77,62 +79,46 @@ List<RouteModel> parseRouteResponse(Map<String, dynamic> json) {
   }).toList();
 }
 
-TurnDirection _parseManeuver(String? maneuver) {
-  switch (maneuver) {
-    case 'turn-left':
-    case 'turn-sharp-left':
-      return TurnDirection.left;
-    case 'turn-right':
-    case 'turn-sharp-right':
-      return TurnDirection.right;
-    case 'turn-slight-left':
-    case 'keep-left':
-    case 'ramp-left':
-    case 'fork-left':
-      return TurnDirection.keepLeft;
-    case 'turn-slight-right':
-    case 'keep-right':
-    case 'ramp-right':
-    case 'fork-right':
-      return TurnDirection.keepRight;
-    case 'uturn-left':
-    case 'uturn-right':
-      return TurnDirection.uTurn;
-    case 'roundabout-left':
-    case 'roundabout-right':
-      return TurnDirection.roundabout;
-    default:
-      return TurnDirection.forward;
-  }
-}
-
-// Returns the road name from the first bold tag that isn't an ordinal or compass direction.
-// Google Maps wraps both the compass word ("northwest") and the road name in <b> tags on
-// "Head <b>northwest</b> on <b>Jalan ABC</b>" steps — we skip the direction word.
-// Falls back to the full stripped text when no suitable bold tag exists.
-String _extractStreetName(String html) {
-  final ordinal = RegExp(r'^\d+(st|nd|rd|th)$', caseSensitive: false);
-  const compassWords = {
-    'north', 'south', 'east', 'west',
-    'northeast', 'northwest', 'southeast', 'southwest',
+TurnDirection _parseManeuver(String maneuver) {
+  const map = <String, TurnDirection>{
+    'turn-left':        TurnDirection.left,
+    'turn-right':       TurnDirection.right,
+    'keep-left':        TurnDirection.keepLeft,
+    'keep-right':       TurnDirection.keepRight,
+    'straight':         TurnDirection.forward,
+    'uturn-left':       TurnDirection.uTurn,
+    'uturn-right':      TurnDirection.uTurn,
+    'roundabout-left':  TurnDirection.roundabout,
+    'roundabout-right': TurnDirection.roundabout,
+    'merge':            TurnDirection.forward,
+    'fork-left':        TurnDirection.keepLeft,
+    'fork-right':       TurnDirection.keepRight,
+    'ramp-left':        TurnDirection.keepLeft,
+    'ramp-right':       TurnDirection.keepRight,
   };
-  for (final m in RegExp(r'<b>(.*?)</b>').allMatches(html)) {
-    final text = _stripHtml(m.group(1)!); // strip nested tags like <wbr/>
-    if (ordinal.hasMatch(text)) continue;
-    if (compassWords.contains(text.toLowerCase())) continue;
-    return text;
-  }
-  return _stripHtml(html);
+  return map[maneuver] ?? TurnDirection.forward;
 }
 
-int? _extractExitNumber(String html) {
-  final text = _stripHtml(html);
+// Strips HTML then extracts the road name that follows "onto", "on", or "toward".
+// Only inspects the main instruction text (before any supplementary <div> blocks
+// that Google Maps appends, e.g. "Partial result", "Destination on the right").
+// Returns null when no keyword is found. Never returns an empty string.
+// Truncates to 25 characters with "..." if the name is longer.
+String? _extractStreetName(String html) {
+  // The main instruction text always precedes the first supplementary <div>.
+  final mainHtml = html.split(RegExp(r'<div')).first;
+  final text = _stripHtml(mainHtml).trim();
   final match = RegExp(
-    r'(\d+)(?:st|nd|rd|th)\s+exit',
+    r'(?:onto|on|toward)\s+(.+)',
     caseSensitive: false,
   ).firstMatch(text);
-  return match != null ? int.tryParse(match.group(1)!) : null;
+  if (match == null) return null;
+  final name = match.group(1)!.trim();
+  if (name.isEmpty) return null;
+  if (name.length <= 25) return name;
+  return '${name.substring(0, 25)}...';
 }
 
+// Replace tags with a space so adjacent words don't merge (e.g. </b><b> → " ").
 String _stripHtml(String html) =>
-    html.replaceAll(RegExp(r'<[^>]*>'), '');
+    html.replaceAll(RegExp(r'<[^>]*>'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();

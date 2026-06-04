@@ -79,15 +79,16 @@ class NavigationViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> recalculateRoute() async {
+  /// Recalculates the route from [from] (the live GPS position already known
+  /// by the caller) so we never stall waiting for a fresh GPS fix.
+  Future<void> recalculateRoute({required LatLng from}) async {
     if (_currentDestination == null) return;
     _navigationStatus = NavigationStatus.rerouting;
     notifyListeners();
 
     try {
-      final origin = await _locationService.getCurrentLocation();
       final routes = await _routeRepository.getRoute(
-        origin: origin,
+        origin: from,
         destination: _currentDestination!.coordinates,
       );
       _currentRoute = routes.first;
@@ -102,7 +103,9 @@ class NavigationViewModel extends ChangeNotifier {
 
   void checkIfArrived(LatLng currentLocation) {
     if (_currentDestination == null ||
-        _navigationStatus != NavigationStatus.navigating) return;
+        _navigationStatus != NavigationStatus.navigating) {
+      return;
+    }
 
     final distance =
         calculateDistance(currentLocation, _currentDestination!.coordinates);

@@ -30,10 +30,17 @@ class HomeMapLayer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Use the last-known location as the initial center so the map opens
+    // already on the user's position instead of flying from the default.
+    final loc = mapVM.currentLocation;
+    final initialCenter = loc != null
+        ? LatLng(loc.latitude, loc.longitude)
+        : _defaultCenter;
+
     return FlutterMap(
       mapController: mapController,
       options: MapOptions(
-        initialCenter: _defaultCenter,
+        initialCenter: initialCenter,
         initialZoom: 16,
         onTap: onTap,
         onMapEvent: onMapEvent,

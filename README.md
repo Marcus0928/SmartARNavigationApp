@@ -22,7 +22,7 @@ Think of it as **Google Maps or Waze, but with AR directions on your camera view
 - 🗺️ **Google Maps Integration** — Accurate route and navigation data via Directions & Places API
 - 🎨 **Waze-Inspired Map Style** — CartoDB Voyager tiles: blue water, green parks, amber highways, no Google branding
 - 🧭 **Turn-by-Turn AR Directions** — Seven distinct arrow types: straight, turn left/right, keep left/right, U-turn, and roundabout with exit number
-- 🔄 **Roundabout Guidance** — Custom-painted diagram showing the roundabout ring, entry arrow, exit arrow, and the exit number in the centre
+- 🔄 **Roundabout Guidance** — Custom-painted 3/4-circle arc (CCW) with a glow trail, exit arrowhead at the left, entry indicator line at 135°, and the exit number centred inside the arc
 - 🏷️ **Road Name Display** — AR overlay shows only the upcoming street name, extracted from the bold text in Google Maps step instructions
 - 📍 **Real-Time GPS Tracking** — Continuous location with Waze-style directional arrow and accuracy ring
 - 🔄 **Auto Rerouting** — Recalculates route when you go off path

@@ -36,6 +36,8 @@ class MapViewModel extends ChangeNotifier {
   double? _currentHeading;
   double? _currentAccuracy;
   double? _currentSpeed;
+  bool _trackingStarted = false;
+  DateTime? _lastRerouteTime;
   List<PlaceModel> _searchResults = [];
   PlaceModel? _selectedDestination;
   List<RouteModel> _previewRoutes = [];
@@ -43,6 +45,7 @@ class MapViewModel extends ChangeNotifier {
   bool _isFetchingRoute = false;
   StreamSubscription<LatLng>? _locationSubscription;
   Timer? _searchDebounce;
+  Timer? _navRefreshTimer;
 
   LatLng? get currentLocation => _currentLocation;
   double? get currentHeading => _currentHeading;
@@ -57,13 +60,19 @@ class MapViewModel extends ChangeNotifier {
   bool get isFetchingRoute => _isFetchingRoute;
 
   Future<void> startLocationTracking() async {
-    try {
-      _currentLocation = await _locationService.getCurrentLocation();
+    if (_trackingStarted) return;
+    _trackingStarted = true;
+    // Use the OS-cached last-known position for an instant first fix, then
+    // let the live stream replace it as GPS warms up. This avoids blocking
+    // on getCurrentPosition() which can take 15–30 s on a cold start.
+    final lastKnown = await _locationService.getLastKnownLocation();
+    if (lastKnown != null) {
+      _currentLocation = lastKnown;
       _currentHeading = _locationService.currentHeading;
       _currentAccuracy = _locationService.currentAccuracy;
       _currentSpeed = _locationService.currentSpeed;
       notifyListeners();
-    } catch (_) {}
+    }
 
     _locationSubscription =
         _locationService.getLocationStream().listen((location) {
@@ -82,15 +91,33 @@ class MapViewModel extends ChangeNotifier {
 
       final route = _navigationViewModel.currentRoute;
       if (route != null && _isOffRoute(location, route)) {
-        _navigationViewModel.recalculateRoute();
+        final now = DateTime.now();
+        final cooldownElapsed = _lastRerouteTime == null ||
+            now.difference(_lastRerouteTime!) >= const Duration(seconds: 15);
+        if (cooldownElapsed) {
+          _lastRerouteTime = now;
+          _navigationViewModel.recalculateRoute(from: location);
+        }
       }
+    });
 
+    // Heartbeat: force-refresh the AR overlay every 5 s so the screen stays
+    // current after the app returns from background (GPS stream may stall
+    // briefly after resume).
+    _navRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      final loc = _currentLocation;
+      if (loc != null &&
+          _navigationViewModel.navigationStatus == NavigationStatus.navigating) {
+        _arViewModel.updateAROverlay(loc);
+      }
     });
   }
 
   void stopLocationTracking() {
     _locationSubscription?.cancel();
     _locationSubscription = null;
+    _navRefreshTimer?.cancel();
+    _navRefreshTimer = null;
     _locationService.stopLocationStream();
   }
 
