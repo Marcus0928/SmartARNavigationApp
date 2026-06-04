@@ -18,15 +18,17 @@ Think of it as **Google Maps or Waze, but with AR directions on your camera view
 
 ### 🎯 Key Features
 
-- 📷 **Live Camera AR View** — Real-time camera feed with AR overlays
+- 📷 **Live Camera AR View** — Real-time camera feed with AR overlays powered by ARCore
 - 🗺️ **Google Maps Integration** — Accurate route and navigation data via Directions & Places API
 - 🎨 **Waze-Inspired Map Style** — CartoDB Voyager tiles: blue water, green parks, amber highways, no Google branding
 - 🧭 **Turn-by-Turn AR Directions** — Seven distinct arrow types: straight, turn left/right, keep left/right, U-turn, and roundabout with exit number
+- 🎨 **Approach-Stage Arrow Colours** — Arrow colour changes automatically as you near a turn: cyan (> 200 m), amber (50–200 m), red (< 50 m)
 - 🔄 **Roundabout Guidance** — Custom-painted 3/4-circle arc (CCW) with a glow trail, exit arrowhead at the left, entry indicator line at 135°, and the exit number centred inside the arc
 - 🏷️ **Road Name Display** — AR overlay shows only the upcoming street name, extracted from the bold text in Google Maps step instructions
 - 📍 **Real-Time GPS Tracking** — Continuous location with Waze-style directional arrow and accuracy ring
-- 🔄 **Auto Rerouting** — Recalculates route when you go off path
-- ✅ **Arrival Detection** — Notifies when you reach your destination
+- 🔄 **Auto Rerouting** — Recalculates route when you deviate more than 30 m from the planned path
+- ✅ **Arrival Detection** — Notifies when you reach your destination (within 20 m)
+- 📱 **Screen Wake Lock** — Display stays on automatically throughout the AR navigation session
 - 📋 **Waze-Style Side Menu** — Hamburger (≡) button opens a drawer with Profile, Plan a drive, Inbox, Settings, Help & Feedback, and Shutdown
 - 🎬 **Animated Map Transitions** — Smooth eased fly-to animation (650 ms, `easeInOut`) when centering on location
 - 🏠 **Quick-Access Saved Places** — Home, Work, and Favourite one-tap buttons persist destinations via `shared_preferences`
@@ -48,6 +50,7 @@ Think of it as **Google Maps or Waze, but with AR directions on your camera view
 | [Geolocator](https://pub.dev/packages/geolocator) | Real-time GPS location |
 | [sqflite](https://pub.dev/packages/sqflite) | SQLite database for saved locations list |
 | [shared_preferences](https://pub.dev/packages/shared_preferences) | Persistent key-value storage for Home / Work / Favourite places and settings |
+| [wakelock_plus](https://pub.dev/packages/wakelock_plus) | Keeps the screen on during AR navigation |
 
 ---
 
@@ -67,8 +70,14 @@ smart_ar_navigation/
 │   ├── main.dart                # App entry point
 │   ├── app.dart                 # MaterialApp setup, routing & Provider tree
 │   ├── core/                    # Shared constants, enums, utilities
-│   │   ├── enums/turn_direction.dart   # forward, left, right, keepLeft, keepRight, uTurn, roundabout
-│   │   └── utils/route_parser.dart    # Parses Google Maps steps; extracts street name & exit number
+│   │   ├── enums/
+│   │   │   ├── turn_direction.dart              # forward, left, right, keepLeft, keepRight, uTurn, roundabout
+│   │   │   ├── navigation_status.dart           # idle, loading, navigating, rerouting, arrived
+│   │   │   └── navigation_approach_stage.dart   # far (>200m), approaching (50-200m), imminent (<50m)
+│   │   └── utils/
+│   │       ├── route_parser.dart        # Parses Google Maps steps; extracts street name & exit number
+│   │       ├── instruction_builder.dart # Builds human-readable instruction text from maneuver string
+│   │       └── location_utils.dart      # calculateDistance / findNextTurn helpers
 │   ├── models/                  # Data classes
 │   ├── services/                # ARCore, GPS, and SQLite service wrappers
 │   ├── repositories/            # Google Maps API and SQLite communication
@@ -138,14 +147,9 @@ Create a `.env` file in the project root:
 GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
 ```
 
-Then add it to `android/app/src/main/AndroidManifest.xml`:
-```xml
-<meta-data
-    android:name="com.google.android.geo.API_KEY"
-    android:value="${GOOGLE_MAPS_API_KEY}"/>
-```
+The key is loaded at runtime by `flutter_dotenv` and is **not** stored in `AndroidManifest.xml` or any tracked file.
 
-> ⚠️ Never commit your `.env` file or API key to Git. It is already listed in `.gitignore`.
+> ⚠️ Never commit your `.env` file or API key to Git. `.env` is already listed in `.gitignore`.
 
 **4. Connect your Android device**
 
@@ -198,6 +202,7 @@ dependencies:
   shared_preferences: ^2.2.0       # Persistent key-value storage (settings, Home/Work/Favourite)
   sqflite: ^2.3.3                  # SQLite database for bookmarked saved locations list
   path: ^1.9.0                     # File path utilities (required by sqflite)
+  wakelock_plus: ^1.2.8            # Keeps screen on during AR navigation
 ```
 
 ---
@@ -244,7 +249,12 @@ All project documentation is located in the `/docs` folder:
 - [x] Street name extraction from Google Maps step instructions
 - [x] Real-time GPS tracking & AR overlay updates
 - [x] Arrival detection (20 m proximity threshold)
-- [ ] Auto rerouting
+- [x] Auto rerouting — deviations > 30 m trigger a new route fetch with 15 s cooldown
+- [x] Screen wake lock — display stays on throughout AR navigation
+- [x] Transparent edge-to-edge status bar — no overlap with system UI
+- [x] AR camera feed restart on app resume — fixes black screen after backgrounding
+- [x] Route refresh from current location — Routes button re-fetches from GPS position
+- [x] Resume / Go / Start button labels — reflects in-progress navigation state
 - [ ] Voice guidance
 - [ ] Manual testing & bug fixes
 - [ ] Final APK build & submission

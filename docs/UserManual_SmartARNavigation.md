@@ -11,8 +11,8 @@
 | **Supervisor** | Dr Javid Iqbal Thirupattur |
 | **Institution** | Sunway University — School of Computing and Artificial Intelligence |
 | **Programme** | Bachelor of Software Engineering (Hons) |
-| **App Version** | 1.1 |
-| **Last Updated** | May 2026 |
+| **App Version** | 1.2 |
+| **Last Updated** | June 2026 |
 
 ---
 
@@ -276,28 +276,30 @@ After you navigate to any destination, it is automatically saved in your recent 
 While navigating, you will see the following on screen:
 
 ```
-┌─────────────────────────┐
-│ ←  Sunway University    │  ← Your destination (top bar)
-├─────────────────────────┤
-│                         │
-│   [ LIVE CAMERA FEED ]  │
-│                         │
-│        ↑  50m           │  ← AR arrow + distance to next turn
-│     Go Straight         │  ← Instruction text
-│                         │
-├─────────────────────────┤
-│  ETA: 5 min   1.2 km    │  ← Estimated time and distance left
-│           [ ■ Stop ]    │  ← Tap to stop navigation
-└─────────────────────────┘
+┌─────────────────────────────────────┐
+│  Turn Left        50m         [↑]   │  ← Top info card (semi-transparent black)
+│  Jalan Universiti                   │    instruction · distance · mini arrow · street name
+├─────────────────────────────────────┤
+│                                     │
+│         [ LIVE CAMERA FEED ]        │  ← Full-screen AR camera view
+│                                     │
+│              [ ←←← ]               │  ← Large animated arrow (turns amber/red as you get closer)
+│                                     │
+├─────────────────────────────────────┤
+│ [✕]    5 min · 1.2 km    [Routes]   │  ← Bottom bar
+│         Arrive 2:45 PM              │    Stop · ETA · Routes button
+└─────────────────────────────────────┘
 ```
 
 | Element | What it means |
 |---|---|
-| **Arrow** | The direction you need to go |
-| **Distance (e.g. 50m)** | How far until the next turn |
-| **Instruction text** | What action to take (Go Straight, Turn Left, Turn Right) |
-| **ETA** | Estimated time remaining to destination |
-| **Distance remaining** | Total distance left to destination |
+| **Top info card** | Shows the instruction, distance to next turn, mini direction arrow, and street name |
+| **Large centre arrow** | The direction you need to go — colour changes as you approach the turn |
+| **✕ Stop button** | Tap to end navigation and return to the map |
+| **ETA / Distance** | Estimated minutes remaining and total distance left |
+| **Routes button** | Returns to the route selection screen, automatically showing the route from your current location |
+
+> 💡 **Tip:** The screen will stay on automatically throughout navigation — you do not need to tap it to prevent it from sleeping.
 
 ---
 
@@ -307,9 +309,15 @@ While navigating, you will see the following on screen:
 - Tap **"Cancel"** to dismiss the route selection panel
 - The drawer returns to its default position and the map re-centres on your current location
 
-**During active AR navigation:**
-- Tap the **"Stop"** button at the bottom right of the AR Navigation Screen
-- The app returns to the Home Screen
+**During active AR navigation — stopping:**
+- Tap the **✕ Stop** button at the bottom left of the AR Navigation Screen
+- Navigation ends and the app returns to the Home Screen
+
+**During active AR navigation — changing route:**
+- Tap the **Routes** button at the bottom right of the AR Navigation Screen
+- The app returns to the route selection screen, with the route re-fetched from your **current location** (not the original starting point)
+- The active route row shows **"Resume"**; other rows show **"Go"**
+- Tap **Resume** to continue on the same route, or select a different row and tap **Go** to switch
 
 Navigation also stops automatically when you **arrive at your destination**, and the app will show:
 ```
@@ -362,8 +370,8 @@ The arrow colour changes automatically as you get closer to the next turn. No ac
 
 | Colour | Distance to next turn | Meaning |
 |---|---|---|
-| 🟢 Cyan / Green | More than 100 m | Normal navigation — follow the arrow, plenty of time |
-| 🟡 Amber / Yellow | 50 – 100 m | Approaching the turn — start preparing to turn |
+| 🟢 Cyan / Green | More than 200 m | Normal navigation — follow the arrow, plenty of time |
+| 🟡 Amber / Yellow | 50 – 200 m | Approaching the turn — start preparing to turn |
 | 🔴 Red | Less than 50 m | Turn now — the turn is immediately ahead |
 
 ---
@@ -443,6 +451,7 @@ These are known limitations of the current Version 1.0 of the app. They are docu
 | **Tunnel / underpass** | AR and GPS performance degrades in tunnels or underpasses |
 | **Lighting sensitivity** | AR overlays may be harder to see in very bright sunlight or at night |
 | **No traffic data** | The app does not account for real-time traffic conditions |
+| **Camera after backgrounding** | If the app is sent to the background and returned, the AR camera feed restarts automatically — there may be a brief black flash during the restart |
 
 ---
 
@@ -489,13 +498,9 @@ GOOGLE_MAPS_API_KEY=your_api_key_here
 
 ### 10.5 Enable Google Maps on Android
 
-Open `android/app/src/main/AndroidManifest.xml` and add your API key:
+The API key is loaded at runtime from the `.env` file via `flutter_dotenv`. No changes to `AndroidManifest.xml` are required — the key is **not** hard-coded in the manifest.
 
-```xml
-<meta-data
-    android:name="com.google.android.geo.API_KEY"
-    android:value="${GOOGLE_MAPS_API_KEY}"/>
-```
+Verify that `android/app/src/main/AndroidManifest.xml` does **not** contain a hard-coded `com.google.android.geo.API_KEY` entry. If it does, remove it and use `.env` instead.
 
 ### 10.6 Run the App
 
@@ -525,6 +530,6 @@ build/app/outputs/flutter-apk/app-release.apk
 
 ---
 
-*End of User Manual — Version 1.1*
+*End of User Manual — Version 1.2*
 
 *Prepared by: Liew Sau Yang | Sunway University | Bachelor of Software Engineering (Hons)*
