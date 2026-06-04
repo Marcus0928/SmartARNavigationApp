@@ -34,18 +34,22 @@ class NavigationViewModel extends ChangeNotifier {
   RouteModel? _currentRoute;
   NavigationStatus _navigationStatus = NavigationStatus.idle;
   String? _errorMessage;
+  int? _activeRouteIndex;
 
   PlaceModel? get currentDestination => _currentDestination;
   RouteModel? get currentRoute => _currentRoute;
   NavigationStatus get navigationStatus => _navigationStatus;
   String? get errorMessage => _errorMessage;
+  int? get activeRouteIndex => _activeRouteIndex;
 
   Future<void> startNavigation(
     PlaceModel destination, {
     RouteModel? route,
+    int? routeIndex,
   }) async {
     _navigationStatus = NavigationStatus.loading;
     _currentDestination = destination;
+    _activeRouteIndex = routeIndex;
     _errorMessage = null;
     notifyListeners();
 
@@ -75,6 +79,7 @@ class NavigationViewModel extends ChangeNotifier {
     _arViewModel.resetOverlay();
     _currentRoute = null;
     _currentDestination = null;
+    _activeRouteIndex = null;
     _navigationStatus = NavigationStatus.idle;
     notifyListeners();
   }

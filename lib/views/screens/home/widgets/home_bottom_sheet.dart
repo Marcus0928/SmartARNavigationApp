@@ -21,10 +21,11 @@ class HomeBottomSheet extends StatelessWidget {
     required this.mapVM,
     required this.savedVM,
     required this.savedLocationsVM,
+    required this.recentVM,
+    this.activeRouteIndex,
     required this.onSearchFocused,
     required this.onStartNavigation,
     required this.onCancelRoute,
-    required this.recentVM,
   });
 
   final DraggableScrollableController sheetController;
@@ -32,6 +33,7 @@ class HomeBottomSheet extends StatelessWidget {
   final SavedPlacesViewModel savedVM;
   final SavedLocationsViewModel savedLocationsVM;
   final RecentPlacesViewModel recentVM;
+  final int? activeRouteIndex;
   final VoidCallback onSearchFocused;
   final VoidCallback onStartNavigation;
   final VoidCallback onCancelRoute;
@@ -203,6 +205,7 @@ class HomeBottomSheet extends StatelessWidget {
           routes: mapVM.previewRoutes,
           selectedIndex: mapVM.selectedRouteIndex,
           isFetching: mapVM.isFetchingRoute,
+          activeRouteIndex: activeRouteIndex,
           onSelectRoute: mapVM.selectRoute,
           onClear: () {
             mapVM.clearDestination();
