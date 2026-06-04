@@ -15,6 +15,7 @@ class RoutePreviewCard extends StatelessWidget {
     required this.onSelectRoute,
     required this.onClear,
     required this.onStart,
+    this.activeRouteIndex,
   });
 
   final PlaceModel destination;
@@ -24,6 +25,9 @@ class RoutePreviewCard extends StatelessWidget {
   final ValueChanged<int> onSelectRoute;
   final VoidCallback onClear;
   final VoidCallback onStart;
+  /// Non-null when the user arrived here from AR navigation.
+  /// Identifies which route index is currently being navigated.
+  final int? activeRouteIndex;
 
   @override
   Widget build(BuildContext context) {
@@ -166,47 +170,62 @@ class RoutePreviewCard extends StatelessWidget {
           const SizedBox(height: 12),
 
           // ── Action buttons ───────────────────────────────────────────
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.grey.shade700,
-                    side: BorderSide(color: Colors.grey.shade300),
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+          Builder(builder: (context) {
+            final String label;
+            final IconData icon;
+            if (activeRouteIndex == null) {
+              label = 'Start';
+              icon  = Icons.navigation_rounded;
+            } else if (selectedIndex == activeRouteIndex) {
+              label = 'Resume';
+              icon  = Icons.play_arrow_rounded;
+            } else {
+              label = 'Go';
+              icon  = Icons.navigation_rounded;
+            }
+            return Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.grey.shade700,
+                      side: BorderSide(color: Colors.grey.shade300),
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: onClear,
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                     ),
                   ),
-                  onPressed: onClear,
-                  child: const Text(
-                    'Cancel',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                flex: 2,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
+                    icon: Icon(icon, size: 18),
+                    label: Text(
+                      label,
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
+                    onPressed: routes.isEmpty ? null : onStart,
                   ),
-                  icon: const Icon(Icons.navigation_rounded, size: 18),
-                  label: const Text(
-                    'Start',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                  ),
-                  onPressed: routes.isEmpty ? null : onStart,
                 ),
-              ),
-            ],
-          ),
+              ],
+            );
+          }),
         ],
     );
   }
