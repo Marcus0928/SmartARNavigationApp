@@ -105,10 +105,10 @@ class MapViewModel extends ChangeNotifier {
       }
     });
 
-    // Heartbeat: force-refresh the AR overlay every 5 s so the screen stays
+    // Heartbeat: force-refresh the AR overlay every 2 s so the screen stays
     // current after the app returns from background (GPS stream may stall
     // briefly after resume).
-    _navRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+    _navRefreshTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       final loc = _currentLocation;
       if (loc != null &&
           _navigationViewModel.navigationStatus == NavigationStatus.navigating) {
