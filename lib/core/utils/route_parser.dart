@@ -93,8 +93,8 @@ TurnDirection _parseManeuver(String maneuver) {
     'merge':            TurnDirection.forward,
     'fork-left':        TurnDirection.keepLeft,
     'fork-right':       TurnDirection.keepRight,
-    'ramp-left':        TurnDirection.keepLeft,
-    'ramp-right':       TurnDirection.keepRight,
+    'ramp-left':        TurnDirection.left,
+    'ramp-right':       TurnDirection.right,
   };
   return map[maneuver] ?? TurnDirection.forward;
 }
