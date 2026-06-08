@@ -44,6 +44,7 @@ class MapViewModel extends ChangeNotifier {
   int _selectedRouteIndex = 0;
   bool _isFetchingRoute = false;
   int _routeVersion = 0;
+  int _fetchGeneration = 0;
   StreamSubscription<LatLng>? _locationSubscription;
   Timer? _searchDebounce;
   Timer? _navRefreshTimer;
@@ -104,10 +105,10 @@ class MapViewModel extends ChangeNotifier {
       }
     });
 
-    // Heartbeat: force-refresh the AR overlay every 5 s so the screen stays
+    // Heartbeat: force-refresh the AR overlay every 2 s so the screen stays
     // current after the app returns from background (GPS stream may stall
     // briefly after resume).
-    _navRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+    _navRefreshTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       final loc = _currentLocation;
       if (loc != null &&
           _navigationViewModel.navigationStatus == NavigationStatus.navigating) {
@@ -150,7 +151,6 @@ class MapViewModel extends ChangeNotifier {
 
   Future<void> selectDestination(PlaceModel place) async {
     _isFetchingRoute = true;
-    _previewRoutes = [];
     _searchResults = [];
     notifyListeners();
 
@@ -168,7 +168,6 @@ class MapViewModel extends ChangeNotifier {
   // Sets a fully-resolved place (coordinates already present) as destination.
   void setSelectedDestination(PlaceModel place) {
     _selectedDestination = place;
-    _previewRoutes = [];
     _searchResults = [];
     notifyListeners();
     _fetchPreviewRoute();
@@ -176,6 +175,7 @@ class MapViewModel extends ChangeNotifier {
 
   Future<void> _fetchPreviewRoute() async {
     if (_selectedDestination == null) return;
+    final int generation = ++_fetchGeneration;
     _isFetchingRoute = true;
     _selectedRouteIndex = 0;
     notifyListeners();
@@ -183,15 +183,19 @@ class MapViewModel extends ChangeNotifier {
     try {
       final origin =
           _currentLocation ?? await _locationService.getCurrentLocation();
-      _previewRoutes = await _routeRepository.getRoute(
+      final routes = await _routeRepository.getRoute(
         origin: origin,
         destination: _selectedDestination!.coordinates,
       );
+      if (generation != _fetchGeneration) return;
+      _previewRoutes = routes;
     } catch (_) {
       // Route fetch failure is non-critical — destination stays selected.
     } finally {
-      _isFetchingRoute = false;
-      notifyListeners();
+      if (generation == _fetchGeneration) {
+        _isFetchingRoute = false;
+        notifyListeners();
+      }
     }
   }
 

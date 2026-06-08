@@ -50,6 +50,9 @@ class NavigationViewModel extends ChangeNotifier {
     RouteModel? route,
     int? routeIndex,
   }) async {
+    if (_navigationStatus == NavigationStatus.navigating) {
+      stopNavigation(stopService: false);
+    }
     _navigationStatus = NavigationStatus.loading;
     _currentDestination = destination;
     _activeRouteIndex = routeIndex;
@@ -81,7 +84,7 @@ class NavigationViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void stopNavigation() {
+  void stopNavigation({bool stopService = true}) {
     _locationService.stopLocationStream();
     _arService.clearOverlays();
     _arViewModel.resetOverlay();
@@ -89,7 +92,9 @@ class NavigationViewModel extends ChangeNotifier {
     _currentDestination = null;
     _activeRouteIndex = null;
     _remainingPolyline = const [];
-    NavigationForegroundService.stopService();
+    if (stopService) {
+      NavigationForegroundService.stopService();
+    }
     _navigationStatus = NavigationStatus.idle;
     notifyListeners();
   }

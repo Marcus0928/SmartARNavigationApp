@@ -69,14 +69,12 @@ class ARViewModel extends ChangeNotifier {
   void updateAROverlay(LatLng currentLocation) {
     if (_remainingTurns.isEmpty) return;
 
-    // Drop turns the user has already passed (within 10m).
+    // Drop turns the user has already passed (10m threshold preserves short keepLeft/keepRight nodes).
     _remainingTurns.removeWhere(
       (turn) => calculateDistance(currentLocation, turn.position) < 10.0,
     );
 
-    final next = findNextTurn(currentLocation, _remainingTurns);
-
-    if (next == null) {
+    if (_remainingTurns.isEmpty) {
       _nextTurnDirection = TurnDirection.forward;
       _distanceToNextTurn = 0;
       _instructionText = 'Continue';
@@ -86,16 +84,56 @@ class ARViewModel extends ChangeNotifier {
       return;
     }
 
-    final distance = calculateDistance(currentLocation, next.position);
-    _nextTurnDirection = next.direction;
-    _distanceToNextTurn = distance;
-    _instructionText = InstructionBuilder.buildInstruction(
-      next.maneuver,
-      next.exitNumber,
-    );
-    _currentStreetName = next.streetName;
-    _roundaboutExit = next.exitNumber;
-    _arService.updateArrow(next.direction, distance);
+    final currentStep = _remainingTurns[0];
+    final distanceToCurrentStep =
+        calculateDistance(currentLocation, currentStep.position);
+
+    if (currentStep.direction != TurnDirection.forward) {
+      // Immediate next step is already a real turn — show it directly, no lookahead.
+      _distanceToNextTurn = distanceToCurrentStep;
+      _nextTurnDirection = currentStep.direction;
+      _instructionText = InstructionBuilder.buildInstruction(
+        currentStep.maneuver,
+        currentStep.exitNumber,
+      );
+      _currentStreetName = currentStep.streetName;
+      _roundaboutExit = currentStep.exitNumber;
+      _arService.updateArrow(currentStep.direction, distanceToCurrentStep);
+    } else {
+      // Current step is forward — scan ahead for the first non-forward turn within 1 km.
+      final upcomingTurn = _remainingTurns.firstWhere(
+        (t) => t.direction != TurnDirection.forward,
+        orElse: () => currentStep,
+      );
+      final distanceToUpcoming =
+          calculateDistance(currentLocation, upcomingTurn.position);
+
+      _distanceToNextTurn = distanceToUpcoming;
+
+      if (distanceToUpcoming <= 1000.0 &&
+          upcomingTurn.direction != TurnDirection.forward) {
+        // Within 1 km of a real turn — show it early so drivers can react.
+        _nextTurnDirection = upcomingTurn.direction;
+        _instructionText = InstructionBuilder.buildInstruction(
+          upcomingTurn.maneuver,
+          upcomingTurn.exitNumber,
+        );
+        _currentStreetName = upcomingTurn.streetName;
+        _roundaboutExit = upcomingTurn.exitNumber;
+        _arService.updateArrow(upcomingTurn.direction, distanceToUpcoming);
+      } else {
+        // More than 1 km away — show the current forward step.
+        _nextTurnDirection = currentStep.direction;
+        _instructionText = InstructionBuilder.buildInstruction(
+          currentStep.maneuver,
+          currentStep.exitNumber,
+        );
+        _currentStreetName = currentStep.streetName;
+        _roundaboutExit = currentStep.exitNumber;
+        _arService.updateArrow(currentStep.direction, distanceToUpcoming);
+      }
+    }
+
     notifyListeners();
   }
 

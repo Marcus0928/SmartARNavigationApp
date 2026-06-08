@@ -23,7 +23,8 @@ Think of it as **Google Maps or Waze, but with AR directions on your camera view
 - 🎨 **Waze-Inspired Map Style** — CartoDB Voyager tiles: blue water, green parks, amber highways, no Google branding
 - 🧭 **Turn-by-Turn AR Directions** — Seven distinct arrow types: straight, turn left/right, keep left/right, U-turn, and roundabout with exit number
 - 🎨 **Approach-Stage Arrow Colours** — Arrow colour changes automatically as you near a turn: cyan (> 200 m), amber (50–200 m), red (< 50 m)
-- 🔄 **Roundabout Guidance** — Custom-painted 3/4-circle arc (CCW) with a glow trail, exit arrowhead at the left, entry indicator line at 135°, and the exit number centred inside the arc
+- 🔄 **Roundabout Guidance** — Custom-painted 3/4-circle arc (CCW) with a glow trail, exit arrowhead at the left, entry indicator line at 135°, and the exit number centred inside the arc; exit number is parsed from the structured `exit` field or falls back to the ordinal in `html_instructions` (e.g. "take the 3rd exit")
+- ⚡ **Early Turn Warning** — Arrow switches to the upcoming non-forward turn direction up to 1 km ahead (instead of at the last moment), giving drivers ample time to prepare; distance displayed always reflects that upcoming turn
 - 🏷️ **Road Name Display** — AR overlay shows only the upcoming street name, extracted from the bold text in Google Maps step instructions
 - 📍 **Real-Time GPS Tracking** — Continuous location with Waze-style directional arrow and accuracy ring
 - 🔄 **Auto Rerouting** — Recalculates route when you deviate more than 30 m from the planned path
@@ -255,6 +256,9 @@ All project documentation is located in the `/docs` folder:
 - [x] AR camera feed restart on app resume — fixes black screen after backgrounding
 - [x] Route refresh from current location — Routes button re-fetches from GPS position
 - [x] Resume / Go / Start button labels — reflects in-progress navigation state
+- [x] Early turn warning — arrow preemptively shows upcoming non-forward turn (left/right/roundabout) within 1 km
+- [x] GPS accuracy improvement — passed-turn threshold raised from 10 m to 25 m for Malaysian urban GPS conditions
+- [x] Roundabout exit number fallback — parses ordinal from `html_instructions` when structured `exit` field is absent
 - [ ] Voice guidance
 - [ ] Manual testing & bug fixes
 - [ ] Final APK build & submission

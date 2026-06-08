@@ -11,7 +11,7 @@
 | **Supervisor** | Dr Javid Iqbal Thirupattur |
 | **Institution** | Sunway University — School of Computing and Artificial Intelligence |
 | **Programme** | Bachelor of Software Engineering (Hons) |
-| **App Version** | 1.2 |
+| **App Version** | 1.3 |
 | **Last Updated** | June 2026 |
 
 ---
@@ -356,13 +356,14 @@ All arrows are drawn as animated glowing shapes directly on the camera feed. The
 
 ### 6.2 Distance Display
 
-The distance shown next to the arrow is the distance to your **next turn**, not your final destination.
+The distance shown next to the arrow is always the distance to the **next non-forward turn** (a left, right, keep, U-turn, or roundabout), not your final destination and not just the end of the current straight segment.
 
 | Display | Meaning |
 |---|---|
+| `1.2km` | The next real turn (left/right/roundabout) is 1.2 km ahead |
 | `500m` | Your next turn is 500 metres ahead |
 | `50m` | Your next turn is coming up soon — get ready |
-| `10m` | Turn now! |
+| `Turn now!` | You are within 50 m of the turn |
 
 ### 6.3 Arrow Colour Meaning
 
@@ -373,6 +374,14 @@ The arrow colour changes automatically as you get closer to the next turn. No ac
 | 🟢 Cyan / Green | More than 200 m | Normal navigation — follow the arrow, plenty of time |
 | 🟡 Amber / Yellow | 50 – 200 m | Approaching the turn — start preparing to turn |
 | 🔴 Red | Less than 50 m | Turn now — the turn is immediately ahead |
+
+### 6.4 Early Turn Warning
+
+When you are within **1 km** of an upcoming turn (left, right, keep, U-turn, or roundabout), the arrow automatically switches from forward/straight to show that turn's direction — even if you are still on a straight segment of road. This gives you extra time to move into the correct lane before reaching the junction.
+
+**Example:** You are driving straight along a road. The next roundabout is 800 m ahead. The arrow will already be showing the **roundabout** shape with the correct exit number, rather than waiting until you reach the roundabout to change.
+
+> 💡 **Tip:** The distance label on the info card always shows the distance to that upcoming turn, so you can gauge when to start signalling or changing lanes.
 
 ---
 
@@ -530,6 +539,6 @@ build/app/outputs/flutter-apk/app-release.apk
 
 ---
 
-*End of User Manual — Version 1.2*
+*End of User Manual — Version 1.3*
 
 *Prepared by: Liew Sau Yang | Sunway University | Bachelor of Software Engineering (Hons)*

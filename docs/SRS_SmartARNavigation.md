@@ -12,8 +12,8 @@
 | **Institution** | Sunway University — School of Computing and Artificial Intelligence |
 | **Programme** | Bachelor of Software Engineering (Hons) |
 | **Semester** | September 2025 |
-| **Version** | 2.1 |
-| **Last Updated** | May 2026 |
+| **Version** | 2.2 |
+| **Last Updated** | June 2026 |
 
 ---
 
@@ -190,12 +190,13 @@ Primary users are assumed to be comfortable with basic smartphone usage. No tech
 | ID | Requirement |
 |---|---|
 | FR-12 | The system shall overlay directional arrows on the camera view using seven distinct maneuver types: straight (forward), turn left, turn right, keep left, keep right, U-turn, and roundabout. |
-| FR-12a | For roundabout maneuvers, the system shall display a custom-painted diagram showing the roundabout ring, an entry arrow, an exit arrow at the correct clock position, and the exit number (e.g. "2") in the centre of the ring. |
+| FR-12a | For roundabout maneuvers, the system shall display a custom-painted diagram showing the roundabout ring, an entry arrow, an exit arrow at the correct clock position, and the exit number (e.g. "2") in the centre of the ring. The exit number shall be read from the structured route data if available, or extracted via regex from the step's HTML instruction text as a fallback. |
 | FR-12b | The system shall display only the name of the upcoming road on the AR overlay (extracted from the bold text in the Google Maps step instruction), not the full instruction sentence. |
-| FR-13 | The system shall display the distance to the next turn as text on the AR overlay. |
+| FR-13 | The system shall display the distance to the next turn as text on the AR overlay. The distance displayed shall always reflect the upcoming non-forward turn (left, right, keep, U-turn, or roundabout), not merely the end of the current straight segment. |
 | FR-14 | The system shall update AR overlays in real-time as the user's GPS position changes. |
 | FR-15 | The system shall align AR overlays with the real-world environment using ARCore plane detection. |
-| FR-16 | The system shall remove or update AR cues after a turn is completed (within 10 m of the turn waypoint). |
+| FR-16 | The system shall remove or update AR cues after a turn is completed (within 25 m of the turn waypoint, to accommodate Malaysian urban GPS accuracy of 10–30 m). |
+| FR-16a | When the user is within 1 000 m of the next non-forward turn, the system shall pre-emptively switch the AR arrow and instruction to show that upcoming turn's direction — even if the current step is still straight — so the driver has sufficient warning time to prepare. |
 
 ---
 
@@ -504,6 +505,6 @@ dependencies:
 
 ---
 
-*End of SRS Document — Version 2.1*
+*End of SRS Document — Version 2.2*
 
 *Prepared by: Liew Sau Yang | Sunway University | Bachelor of Software Engineering (Hons)*

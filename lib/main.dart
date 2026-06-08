@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'package:smart_ar_navigation/app.dart';
+import 'package:smart_ar_navigation/services/navigation_foreground_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,5 +19,6 @@ Future<void> main() async {
   ));
 
   await dotenv.load(fileName: '.env');
+  NavigationForegroundService.initialize();
   runApp(const SmartARNavigationApp());
 }

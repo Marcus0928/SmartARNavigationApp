@@ -184,6 +184,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               onStartNavigation: () async {
                 final navigator  = Navigator.of(context);
                 final messenger  = ScaffoldMessenger.of(context);
+                if (navVM.navigationStatus == NavigationStatus.navigating) {
+                  navigator.pop();
+                }
                 await navVM.startNavigation(
                   mapVM.selectedDestination!,
                   route: mapVM.selectedRoute,

@@ -11,7 +11,7 @@
 | **Supervisor** | Dr Javid Iqbal Thirupattur |
 | **Institution** | Sunway University — School of Computing and Artificial Intelligence |
 | **Programme** | Bachelor of Software Engineering (Hons) |
-| **Version** | 3.0 |
+| **Version** | 3.1 |
 | **Last Updated** | June 2026 |
 
 ---
@@ -345,7 +345,7 @@ Check Location Permission
 | `isARInitialized` | `bool` | Whether ARCore session is ready |
 | `initializeAR(sessionManager, objectManager)` | `Future<void>` | Initialises the ARCore session via `ARService` |
 | `initializeOverlay(route)` | `Future<void>` | Seeds the turn queue from a `RouteModel` and sets initial overlay state |
-| `updateAROverlay(location)` | `void` | Drops passed turns (< 10 m) and recalculates overlay from current GPS position |
+| `updateAROverlay(location)` | `void` | Drops passed turns (< 25 m); finds the first upcoming non-forward turn; within 1 km of that turn switches the arrow and instruction to it early; `distanceToNextTurn` always reflects the upcoming non-forward turn |
 | `resetOverlay()` | `void` | Clears all overlay state (called on navigation stop or arrival) |
 
 #### `MapViewModel`
@@ -598,7 +598,11 @@ MapViewModel.currentLocation updates
             ↓
 ARViewModel.updateAROverlay(newLocation) called
             ↓
-Calculates: distance to next turn, turn direction, street name
+Drops turns within 25 m (passed); finds first upcoming non-forward turn
+            ↓
+If within 1 000 m of that turn: show its direction early
+Otherwise: show current step direction (forward/straight)
+distanceToNextTurn always = distance to upcoming non-forward turn
             ↓
 ARViewModel notifies listeners
             ↓
@@ -1033,6 +1037,6 @@ These features are **out of scope for the current FYP phase** but the design has
 
 ---
 
-*End of SDD Document — Version 3.0*
+*End of SDD Document — Version 3.1*
 
 *Prepared by: Liew Sau Yang | Sunway University | Bachelor of Software Engineering (Hons)*

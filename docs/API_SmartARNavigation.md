@@ -11,7 +11,7 @@
 | **Supervisor** | Dr Javid Iqbal Thirupattur |
 | **Institution** | Sunway University — School of Computing and Artificial Intelligence |
 | **Programme** | Bachelor of Software Engineering (Hons) |
-| **Version** | 1.2 |
+| **Version** | 1.3 |
 | **Last Updated** | June 2026 |
 
 ---
@@ -193,7 +193,7 @@ List<RouteModel> parseRouteResponse(Map<String, dynamic> json)
 **Notes:**
 - Sets `hasTolls = true` when the route-level `warnings` array contains the word "toll", **or** when any step's `html_instructions` contains the word "toll" (covers Malaysian routes where warnings may be absent)
 - Extracts the road name from the first non-compass, non-ordinal `<b>` tag in `html_instructions`
-- Extracts roundabout exit numbers (e.g. "2nd exit") via regex from `html_instructions`
+- Extracts roundabout exit numbers via `_parseRoundaboutExit()`: tries the structured `step['exit']` integer field first; falls back to parsing the ordinal in `html_instructions` (e.g. "take the **3rd** exit") when the field is absent — common in Malaysian API responses
 
 ---
 
@@ -447,8 +447,10 @@ void updateAROverlay(LatLng currentLocation)
 
 **Notes:**
 - Called on every GPS stream update
-- Finds the next upcoming `TurnInstruction` from the current `RouteModel`
-- Updates `nextTurnDirection`, `distanceToNextTurn`, and `currentStreetName`
+- Drops any turn whose position is within **25 m** of `currentLocation` (threshold raised from 10 m to account for Malaysian urban GPS accuracy of 10–30 m)
+- Finds the first **non-forward** turn in `_remainingTurns` (i.e. the next real maneuver — left, right, keep, U-turn, or roundabout) and calculates the distance to it; this distance is always assigned to `distanceToNextTurn`
+- **If within 1 000 m** of that upcoming non-forward turn: sets `nextTurnDirection`, `instructionText`, `currentStreetName`, and `roundaboutExit` from that upcoming turn so the driver gets early warning
+- **If more than 1 000 m** away: shows the current step direction (forward/straight) while `distanceToNextTurn` still reflects the upcoming non-forward turn
 - Notifies listeners so the AR overlay widget rebuilds
 
 ---
@@ -1091,6 +1093,7 @@ TurnInstruction? findNextTurn(LatLng currentLocation, List<TurnInstruction> turn
 **Notes:**
 - Iterates through the turns list and returns the first one the user hasn't passed yet
 - A turn is considered "passed" when the user is within 10 metres of its position
+- **Deprecated usage:** As of v1.3, `ARViewModel.updateAROverlay()` no longer calls `findNextTurn()`. The ViewModel removes passed turns with a 25 m threshold via `removeWhere`, then uses `List.firstWhere` directly on `_remainingTurns`. `findNextTurn` remains in `location_utils.dart` and may be used by other callers.
 
 ---
 
@@ -1217,6 +1220,6 @@ All shapes use a 24 px glow layer (alpha 0.3) beneath the 12 px main stroke and 
 
 ---
 
-*End of API & Function Documentation — Version 1.2*
+*End of API & Function Documentation — Version 1.3*
 
 *Prepared by: Liew Sau Yang | Sunway University | Bachelor of Software Engineering (Hons)*

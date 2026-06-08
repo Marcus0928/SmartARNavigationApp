@@ -53,13 +53,18 @@ class LocationService {
   Stream<LatLng> getLocationStream() {
     final settings = Platform.isAndroid
         ? AndroidSettings(
-            accuracy: LocationAccuracy.high,
-            distanceFilter: 0,
-            intervalDuration: const Duration(seconds: 1),
+            accuracy: LocationAccuracy.bestForNavigation,
+            distanceFilter: 3,
+            intervalDuration: const Duration(milliseconds: 500),
+            foregroundNotificationConfig: const ForegroundNotificationConfig(
+              notificationText: 'Smart AR Navigate is running',
+              notificationTitle: 'Navigation Active',
+              enableWakeLock: true,
+            ),
           )
         : const LocationSettings(
-            accuracy: LocationAccuracy.high,
-            distanceFilter: 0,
+            accuracy: LocationAccuracy.bestForNavigation,
+            distanceFilter: 3,
           );
 
     _streamSubscription = Geolocator.getPositionStream(
