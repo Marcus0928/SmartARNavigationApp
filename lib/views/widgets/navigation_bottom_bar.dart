@@ -92,7 +92,10 @@ class NavigationBottomBar extends StatelessWidget {
               _IconLabelButton(
                 icon: Icons.alt_route_rounded,
                 label: 'Routes',
-                onTap: () => Navigator.of(context).pop(),
+                onTap: () {
+                  context.read<MapViewModel>().refreshPreviewRoute();
+                  Navigator.of(context).pop();
+                },
               ),
             ],
           ),

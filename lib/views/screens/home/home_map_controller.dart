@@ -22,6 +22,7 @@ class HomeMapController extends ChangeNotifier {
   bool _centeredOnUser = false;
   PlaceModel? _lastDestination;
   bool _routeFitted = false;
+  int _lastRouteVersion = -1;
 
   AnimationController? _moveController;
   Animation<double>? _latAnim;
@@ -181,6 +182,10 @@ class HomeMapController extends ChangeNotifier {
     BuildContext context,
     DraggableScrollableController sheet,
   ) {
+    if (mapVM.routeVersion != _lastRouteVersion) {
+      _lastRouteVersion = mapVM.routeVersion;
+      _routeFitted = false;
+    }
     if (!_routeFitted && mapVM.previewRoutes.isNotEmpty) {
       _routeFitted = true;
       final sheetHeight = MediaQuery.of(context).size.height * 0.40;

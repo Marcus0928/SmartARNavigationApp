@@ -45,6 +45,9 @@ dependencies:
   # Keep screen on during AR navigation
   wakelock_plus: ^1.2.8
 
+  # Foreground service to keep GPS/navigation alive when app is backgrounded
+  flutter_foreground_task: ^8.0.0
+
 dev_dependencies: 
   flutter_test:
     sdk: flutter

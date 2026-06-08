@@ -15,7 +15,13 @@
       "Bash(Sort-Object)",
       "PowerShell($srs = \\(Get-Content \"C:\\\\Sunway\\\\Bachelor in Software Engineering\\\\Semester 9\\\\Capstone 2\\\\SmartARNavigationApp\\\\docs\\\\SRS_SmartARNavigation.md\" | Measure-Object -Line\\).Lines; $sdd = \\(Get-Content \"C:\\\\Sunway\\\\Bachelor in Software Engineering\\\\Semester 9\\\\Capstone 2\\\\SmartARNavigationApp\\\\docs\\\\SDD_SmartARNavigation.md\" | Measure-Object -Line\\).Lines; \"SRS: $srs lines | SDD: $sdd lines\")",
       "Bash(flutter run *)",
-      "Bash(dart analyze *)"
+      "Bash(dart analyze *)",
+      "Bash(git rm *)",
+      "Bash(xargs -I{} git grep -l \"AIzaSyBJHtuc8_-K7GdN0B9dkekUQVGNGKBZvTQ\" {} --)",
+      "Bash(git remote *)",
+      "Bash(git push *)",
+      "Bash(git fetch *)",
+      "Bash(git *)"
     ]
   }
 }

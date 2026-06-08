@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
+import 'package:smart_ar_navigation/core/enums/navigation_status.dart';
 import 'package:smart_ar_navigation/core/utils/map_utils.dart';
 import 'package:smart_ar_navigation/viewmodels/map_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/navigation_viewmodel.dart';
@@ -80,11 +82,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final userLatLng = loc != null ? LatLng(loc.latitude, loc.longitude) : null;
     final topPadding = MediaQuery.of(context).padding.top;
 
+    final navPolyline = navVM.navigationStatus == NavigationStatus.navigating &&
+            navVM.remainingPolyline.isNotEmpty
+        ? navVM.remainingPolyline
+            .map((p) => LatLng(p.latitude, p.longitude))
+            .toList()
+        : null;
+
     _ctrl.handleInitialCentering(userLatLng);
     _ctrl.handleDestinationChange(mapVM, _sheetController);
     _ctrl.handleRouteFitting(mapVM, context, _sheetController);
 
-    return Scaffold(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.dark.copyWith(
+        statusBarColor: Colors.transparent,
+      ),
+      child: Scaffold(
       key: _scaffoldKey,
       drawer: const WazeDrawer(),
       body: Stack(
@@ -99,6 +112,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 smoothedHeading: _ctrl.smoothedHeading,
                 currentAccuracy: mapVM.currentAccuracy,
                 mapVM: mapVM,
+                navigationPolyline: navPolyline,
                 onTap: (_, point) => handleRouteTap(point, mapVM),
                 onMapEvent: _ctrl.onMapEvent,
               ),
@@ -153,17 +167,27 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 curve: Curves.easeOut,
               ),
               onCancelRoute: () {
+                // If the user came from AR navigation (Routes button), return
+                // them there instead of dropping them on the home screen.
+                if (navVM.navigationStatus == NavigationStatus.navigating) {
+                  Navigator.of(context).pushNamed('/ar-navigation');
+                  return;
+                }
                 final loc = mapVM.currentLocation;
                 if (loc != null) {
                   _ctrl.animatedMove(LatLng(loc.latitude, loc.longitude), 16);
                 }
               },
+              activeRouteIndex: navVM.navigationStatus == NavigationStatus.navigating
+                  ? navVM.activeRouteIndex
+                  : null,
               onStartNavigation: () async {
                 final navigator  = Navigator.of(context);
                 final messenger  = ScaffoldMessenger.of(context);
                 await navVM.startNavigation(
                   mapVM.selectedDestination!,
                   route: mapVM.selectedRoute,
+                  routeIndex: mapVM.selectedRouteIndex,
                 );
                 if (navVM.errorMessage != null) {
                   messenger.showSnackBar(
@@ -188,6 +212,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             },
           ),
         ],
+      ),
       ),
     );
   }

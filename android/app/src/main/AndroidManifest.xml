@@ -14,6 +14,11 @@
     <!-- Keep screen on during AR navigation -->
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
 
+    <!-- Foreground service for keeping GPS/navigation alive in background -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
     <!-- ARCore — device must support AR -->
     <uses-feature android:name="android.hardware.camera.ar" android:required="true"/>
 
@@ -48,6 +53,11 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2"/>
+
+        <service
+            android:name="com.pravera.flutter_foreground_task.service.ForegroundTaskService"
+            android:foregroundServiceType="location"
+            android:exported="false"/>
     </application>
 
     <queries>
