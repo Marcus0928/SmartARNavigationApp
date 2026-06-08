@@ -35,12 +35,14 @@ class NavigationViewModel extends ChangeNotifier {
   NavigationStatus _navigationStatus = NavigationStatus.idle;
   String? _errorMessage;
   int? _activeRouteIndex;
+  List<LatLng> _remainingPolyline = const [];
 
   PlaceModel? get currentDestination => _currentDestination;
   RouteModel? get currentRoute => _currentRoute;
   NavigationStatus get navigationStatus => _navigationStatus;
   String? get errorMessage => _errorMessage;
   int? get activeRouteIndex => _activeRouteIndex;
+  List<LatLng> get remainingPolyline => _remainingPolyline;
 
   Future<void> startNavigation(
     PlaceModel destination, {
@@ -65,6 +67,7 @@ class NavigationViewModel extends ChangeNotifier {
         _currentRoute = routes.first;
       }
       await _arViewModel.initializeOverlay(_currentRoute!);
+      _remainingPolyline = List.from(_currentRoute!.polylinePoints);
       _navigationStatus = NavigationStatus.navigating;
     } catch (e) {
       _errorMessage = e.toString();
@@ -80,6 +83,7 @@ class NavigationViewModel extends ChangeNotifier {
     _currentRoute = null;
     _currentDestination = null;
     _activeRouteIndex = null;
+    _remainingPolyline = const [];
     _navigationStatus = NavigationStatus.idle;
     notifyListeners();
   }
@@ -98,11 +102,30 @@ class NavigationViewModel extends ChangeNotifier {
       );
       _currentRoute = routes.first;
       await _arViewModel.initializeOverlay(_currentRoute!);
+      _remainingPolyline = List.from(_currentRoute!.polylinePoints);
       _navigationStatus = NavigationStatus.navigating;
     } catch (e) {
       _errorMessage = e.toString();
       _navigationStatus = NavigationStatus.navigating;
     }
+    notifyListeners();
+  }
+
+  void updateRemainingPolyline(LatLng currentLocation) {
+    final points = _currentRoute?.polylinePoints;
+    if (points == null || points.isEmpty) return;
+
+    var closestIndex = 0;
+    var closestDist = double.infinity;
+    for (var i = 0; i < points.length; i++) {
+      final dist = calculateDistance(currentLocation, points[i]);
+      if (dist < closestDist) {
+        closestDist = dist;
+        closestIndex = i;
+      }
+    }
+
+    _remainingPolyline = points.sublist(closestIndex);
     notifyListeners();
   }
 

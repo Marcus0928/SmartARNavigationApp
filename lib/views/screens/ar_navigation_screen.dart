@@ -30,6 +30,7 @@ class _ARNavigationScreenState extends State<ARNavigationScreen>
     with WidgetsBindingObserver {
   bool _arrivalHandled = false;
   Key _arViewKey = UniqueKey();
+  ARSessionManager? _arSessionManager;
 
   // TODO: remove — debug only
   TurnDirection? _debugDirection;
@@ -50,14 +51,16 @@ class _ARNavigationScreenState extends State<ARNavigationScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      // Rebuild ARView with a new key so the camera feed fully restarts
-      // after the app returns from background (ARCore pauses on backgrounding).
-      setState(() => _arViewKey = UniqueKey());
-      final loc = context.read<MapViewModel>().currentLocation;
-      if (loc != null) {
-        context.read<ARViewModel>().updateAROverlay(loc);
-      }
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _arSessionManager?.onResume();
+        setState(() {});
+      case AppLifecycleState.paused:
+        _arSessionManager?.onPause();
+      case AppLifecycleState.inactive:
+        _arSessionManager?.onPause();
+      default:
+        break;
     }
   }
 
@@ -67,6 +70,7 @@ class _ARNavigationScreenState extends State<ARNavigationScreen>
     ARAnchorManager anchorManager,
     ARLocationManager locationManager,
   ) {
+    _arSessionManager = sessionManager;
     context.read<ARViewModel>().initializeAR(sessionManager, objectManager);
   }
 

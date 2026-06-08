@@ -89,6 +89,7 @@ class MapViewModel extends ChangeNotifier {
       }
 
       _navigationViewModel.checkIfArrived(location);
+      _navigationViewModel.updateRemainingPolyline(location);
       _arViewModel.updateAROverlay(location);
 
       final route = _navigationViewModel.currentRoute;

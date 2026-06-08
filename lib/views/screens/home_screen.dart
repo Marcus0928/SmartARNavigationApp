@@ -82,6 +82,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final userLatLng = loc != null ? LatLng(loc.latitude, loc.longitude) : null;
     final topPadding = MediaQuery.of(context).padding.top;
 
+    final navPolyline = navVM.navigationStatus == NavigationStatus.navigating &&
+            navVM.remainingPolyline.isNotEmpty
+        ? navVM.remainingPolyline
+            .map((p) => LatLng(p.latitude, p.longitude))
+            .toList()
+        : null;
+
     _ctrl.handleInitialCentering(userLatLng);
     _ctrl.handleDestinationChange(mapVM, _sheetController);
     _ctrl.handleRouteFitting(mapVM, context, _sheetController);
@@ -105,6 +112,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 smoothedHeading: _ctrl.smoothedHeading,
                 currentAccuracy: mapVM.currentAccuracy,
                 mapVM: mapVM,
+                navigationPolyline: navPolyline,
                 onTap: (_, point) => handleRouteTap(point, mapVM),
                 onMapEvent: _ctrl.onMapEvent,
               ),

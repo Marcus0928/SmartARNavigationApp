@@ -14,6 +14,7 @@ class HomeMapLayer extends StatelessWidget {
     required this.smoothedHeading,
     required this.currentAccuracy,
     required this.mapVM,
+    this.navigationPolyline,
     required this.onTap,
     required this.onMapEvent,
   });
@@ -23,6 +24,7 @@ class HomeMapLayer extends StatelessWidget {
   final double smoothedHeading;
   final double? currentAccuracy;
   final MapViewModel mapVM;
+  final List<LatLng>? navigationPolyline;
   final void Function(TapPosition, LatLng) onTap;
   final void Function(MapEvent) onMapEvent;
 
@@ -76,7 +78,19 @@ class HomeMapLayer extends StatelessWidget {
               ),
             ],
           ),
-        if (mapVM.previewRoutes.isNotEmpty)
+        if (navigationPolyline != null && navigationPolyline!.isNotEmpty)
+          PolylineLayer(
+            polylines: [
+              Polyline(
+                points: navigationPolyline!,
+                color: primaryColor,
+                strokeWidth: 6.0,
+                borderColor: Colors.white,
+                borderStrokeWidth: 2.0,
+              ),
+            ],
+          )
+        else if (mapVM.previewRoutes.isNotEmpty)
           PolylineLayer(
             polylines: [
               // Transparent hit-buffer on unselected routes (wider tap target)
