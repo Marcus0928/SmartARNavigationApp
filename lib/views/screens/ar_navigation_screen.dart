@@ -6,6 +6,7 @@ import 'package:ar_flutter_plugin_2/managers/ar_session_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:flutter/services.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'package:smart_ar_navigation/core/constants/app_strings.dart';
@@ -28,6 +29,7 @@ class ARNavigationScreen extends StatefulWidget {
 class _ARNavigationScreenState extends State<ARNavigationScreen>
     with WidgetsBindingObserver {
   bool _arrivalHandled = false;
+  bool _showAR = true;
 
   // TODO: remove — debug only
   TurnDirection? _debugDirection;
@@ -48,11 +50,13 @@ class _ARNavigationScreenState extends State<ARNavigationScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      final loc = context.read<MapViewModel>().currentLocation;
-      if (loc != null) {
-        context.read<ARViewModel>().updateAROverlay(loc);
-      }
+    if (state == AppLifecycleState.paused) {
+      setState(() => _showAR = false);
+    } else if (state == AppLifecycleState.resumed) {
+      setState(() => _showAR = false);
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) setState(() => _showAR = true);
+      });
     }
   }
 
@@ -90,11 +94,18 @@ class _ARNavigationScreenState extends State<ARNavigationScreen>
 
     final arVM = context.watch<ARViewModel>();
 
-    return Scaffold(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light.copyWith(
+        statusBarColor: Colors.transparent,
+      ),
+      child: Scaffold(
       body: Stack(
         children: [
           // ── Layer 1: Full-screen AR camera feed ───────────────────
-          ARView(onARViewCreated: _onARViewCreated),
+          if (_showAR)
+            ARView(onARViewCreated: _onARViewCreated)
+          else
+            Container(color: Colors.black),
 
           // ── Layer 2: Chevron arrow ────────────────────────────────
           if (_debugDirection != null || arVM.nextTurnDirection != null)
@@ -147,6 +158,7 @@ class _ARNavigationScreenState extends State<ARNavigationScreen>
             child: NavigationBottomBar(),
           ),
         ],
+      ),
       ),
     );
   }

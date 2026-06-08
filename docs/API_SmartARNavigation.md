@@ -11,8 +11,8 @@
 | **Supervisor** | Dr Javid Iqbal Thirupattur |
 | **Institution** | Sunway University — School of Computing and Artificial Intelligence |
 | **Programme** | Bachelor of Software Engineering (Hons) |
-| **Version** | 1.1 |
-| **Last Updated** | May 2026 |
+| **Version** | 1.2 |
+| **Last Updated** | June 2026 |
 
 ---
 
@@ -278,19 +278,10 @@ Future<bool> initializeAR()
 void placeArrow(TurnDirection direction, double distance)
 ```
 
-**Purpose:** Places a directional arrow AR overlay on the camera feed.
-
-**Parameters:**
-| Parameter | Type | Description |
-|---|---|---|
-| `direction` | `TurnDirection` | The direction of the next turn (forward, left, right, uTurn) |
-| `distance` | `double` | Distance in metres to the next turn |
-
-**Returns:** Nothing
+**Purpose:** Notifies the widget layer that arrow state has changed (intentional no-op in the current implementation).
 
 **Notes:**
-- Uses ARCore anchor nodes to attach the arrow to the real-world environment
-- Call this every time `ARViewModel.nextTurnDirection` changes
+- Arrow overlays are rendered as Flutter widget overlays driven by `ARViewModel` state, not as 3D ARCore anchor nodes. `ARNavigationScreen` rebuilds `DynamicArrowWidget` whenever `ARViewModel` notifies listeners. This method exists to maintain the service interface; no ARCore calls are made inside it.
 
 ---
 
@@ -300,19 +291,7 @@ void placeArrow(TurnDirection direction, double distance)
 void updateArrow(TurnDirection direction, double distance)
 ```
 
-**Purpose:** Updates the existing AR arrow overlay with new direction and distance values.
-
-**Parameters:**
-| Parameter | Type | Description |
-|---|---|---|
-| `direction` | `TurnDirection` | Updated turn direction |
-| `distance` | `double` | Updated distance in metres |
-
-**Returns:** Nothing
-
-**Notes:**
-- More efficient than removing and re-placing the arrow each GPS update
-- Called on every GPS stream update during active navigation
+**Purpose:** Same as `placeArrow()` — no-op; the ViewModel drives the widget rebuild.
 
 ---
 
@@ -322,15 +301,10 @@ void updateArrow(TurnDirection direction, double distance)
 void clearOverlays()
 ```
 
-**Purpose:** Removes all AR overlays from the camera feed.
-
-**Parameters:** None
-
-**Returns:** Nothing
+**Purpose:** Resets arrow state on navigation end (intentional no-op in the current implementation).
 
 **Notes:**
-- Call this when navigation ends or is stopped by the user
-- Also call this before placing a new set of overlays after rerouting
+- Overlay clearing is handled by `ARViewModel.resetOverlay()` which sets all state to null and notifies listeners, causing `ARNavigationScreen` to hide the arrow widget.
 
 ---
 
@@ -362,7 +336,11 @@ void disposeAR()
 ### `startNavigation()`
 
 ```dart
-Future<void> startNavigation(PlaceModel destination)
+Future<void> startNavigation(
+  PlaceModel destination, {
+  RouteModel? route,
+  int? routeIndex,
+})
 ```
 
 **Purpose:** Starts a navigation session to the selected destination.
@@ -371,12 +349,15 @@ Future<void> startNavigation(PlaceModel destination)
 | Parameter | Type | Description |
 |---|---|---|
 | `destination` | `PlaceModel` | The place the user wants to navigate to |
+| `route` | `RouteModel?` | Pre-fetched route to use directly (skips the API call) |
+| `routeIndex` | `int?` | Index of the selected route in the preview list; stored as `activeRouteIndex` |
 
 **Returns:** Nothing
 
 **Notes:**
-- Fetches the current location, then calls `RouteRepository.getRoute()`
+- If `route` is provided, uses it directly and skips `RouteRepository.getRoute()`
 - Sets `navigationStatus` to `NavigationStatus.navigating`
+- Records `activeRouteIndex` so the route selection UI can show Resume vs Go labels
 - Notifies listeners so the UI navigates to the AR screen
 
 ---
@@ -686,6 +667,25 @@ void selectRoute(int index)
 
 ---
 
+### `refreshPreviewRoute()`
+
+```dart
+Future<void> refreshPreviewRoute()
+```
+
+**Purpose:** Re-fetches preview routes from the user's **current GPS position** as the new origin. Called by the Routes button in `NavigationBottomBar` when returning to route selection during active navigation.
+
+**Parameters:** None
+
+**Returns:** Nothing
+
+**Notes:**
+- Increments `routeVersion`, which signals `HomeMapController` to reset `_routeFitted = false` and re-fit the camera to the updated route bounds
+- Resets `selectedRouteIndex` to `0` and sets `isFetchingRoute = true` while the request is in flight
+- Has no effect if `selectedDestination` is null
+
+---
+
 ### Key properties
 
 | Property | Type | Description |
@@ -694,6 +694,7 @@ void selectRoute(int index)
 | `selectedRouteIndex` | `int` | Index of the currently highlighted route (default `0`) |
 | `selectedRoute` | `RouteModel?` | Convenience getter: `previewRoutes[selectedRouteIndex]`, or `null` if empty |
 | `isFetchingRoute` | `bool` | `true` while a route request is in flight |
+| `routeVersion` | `int` | Incremented by `refreshPreviewRoute()`; read by `HomeMapController` to trigger camera re-fit |
 
 ---
 
@@ -1129,13 +1130,16 @@ enum NavigationStatus {
 
 ```dart
 enum NavigationApproachStage {
-  far,         // > 100 m to next turn — arrow is cyan, slow pulse
-  approaching, // 50–100 m to next turn — arrow turns amber, medium pulse
+  far,         // > 200 m to next turn — arrow is cyan, slow pulse
+  approaching, // 50–200 m to next turn — arrow turns amber, medium pulse
   imminent,    // < 50 m to next turn — arrow turns red, fast pulse
 }
 ```
 
-Used by `DynamicArrowWidget` to drive arrow colour and pulse animation speed. `ARViewModel` computes the stage from `distanceToNextTurn` and exposes it as `approachStage`.
+Used by `DynamicArrowWidget` to drive arrow colour and pulse animation speed. `ARViewModel.approachStage` computes the stage from `distanceToNextTurn`:
+- `d == null || d > 200` → `far`
+- `d > 50` → `approaching`
+- otherwise → `imminent`
 
 ---
 
@@ -1213,6 +1217,6 @@ All shapes use a 24 px glow layer (alpha 0.3) beneath the 12 px main stroke and 
 
 ---
 
-*End of API & Function Documentation — Version 1.1*
+*End of API & Function Documentation — Version 1.2*
 
 *Prepared by: Liew Sau Yang | Sunway University | Bachelor of Software Engineering (Hons)*

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import 'package:smart_ar_navigation/core/utils/location_utils.dart';
-import 'package:smart_ar_navigation/core/constants/app_colors.dart';
 import 'package:smart_ar_navigation/viewmodels/map_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/recent_places_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/saved_locations_viewmodel.dart';

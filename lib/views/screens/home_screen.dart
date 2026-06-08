@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
@@ -81,11 +82,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final userLatLng = loc != null ? LatLng(loc.latitude, loc.longitude) : null;
     final topPadding = MediaQuery.of(context).padding.top;
 
+    final navPolyline = navVM.navigationStatus == NavigationStatus.navigating &&
+            navVM.remainingPolyline.isNotEmpty
+        ? navVM.remainingPolyline
+            .map((p) => LatLng(p.latitude, p.longitude))
+            .toList()
+        : null;
+
     _ctrl.handleInitialCentering(userLatLng);
     _ctrl.handleDestinationChange(mapVM, _sheetController);
     _ctrl.handleRouteFitting(mapVM, context, _sheetController);
 
-    return Scaffold(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.dark.copyWith(
+        statusBarColor: Colors.transparent,
+      ),
+      child: Scaffold(
       key: _scaffoldKey,
       drawer: const WazeDrawer(),
       body: Stack(
@@ -100,6 +112,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 smoothedHeading: _ctrl.smoothedHeading,
                 currentAccuracy: mapVM.currentAccuracy,
                 mapVM: mapVM,
+                navigationPolyline: navPolyline,
                 onTap: (_, point) => handleRouteTap(point, mapVM),
                 onMapEvent: _ctrl.onMapEvent,
               ),
@@ -199,6 +212,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             },
           ),
         ],
+      ),
       ),
     );
   }

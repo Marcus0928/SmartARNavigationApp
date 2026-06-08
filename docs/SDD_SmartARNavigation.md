@@ -11,8 +11,8 @@
 | **Supervisor** | Dr Javid Iqbal Thirupattur |
 | **Institution** | Sunway University — School of Computing and Artificial Intelligence |
 | **Programme** | Bachelor of Software Engineering (Hons) |
-| **Version** | 2.0 |
-| **Last Updated** | May 2026 |
+| **Version** | 3.0 |
+| **Last Updated** | June 2026 |
 
 ---
 
@@ -326,10 +326,11 @@ Check Location Permission
 | `currentDestination` | `PlaceModel?` | The user's selected destination |
 | `currentRoute` | `RouteModel?` | Active route data from Google Maps API |
 | `navigationStatus` | `NavigationStatus` | Enum: idle / loading / navigating / rerouting / arrived |
+| `activeRouteIndex` | `int?` | Index of the route that is currently being navigated; `null` when not navigating |
 | `errorMessage` | `String?` | Last navigation error, if any |
-| `startNavigation(destination, {route})` | `Future<void>` | Fetches route (or uses pre-fetched route) and starts session |
-| `stopNavigation()` | `void` | Ends navigation session, clears state |
-| `checkIfArrived(location)` | `void` | Detects arrival (< 10 m from destination); on arrival calls `ProfileViewModel.incrementDriveCount()` and `ProfileViewModel.addDistance()` |
+| `startNavigation(destination, {route, routeIndex})` | `Future<void>` | Fetches route (or uses pre-fetched route) and starts session; records `activeRouteIndex` |
+| `stopNavigation()` | `void` | Ends navigation session, clears state and `activeRouteIndex` |
+| `checkIfArrived(location)` | `void` | Detects arrival (< 20 m from destination); on arrival calls `ProfileViewModel.incrementDriveCount()` and `ProfileViewModel.addDistance()` |
 
 #### `ARViewModel`
 **Responsibility:** Manages AR overlay state and rendering instructions.
@@ -338,9 +339,11 @@ Check Location Permission
 |---|---|---|
 | `nextTurnDirection` | `TurnDirection?` | Current maneuver: forward, left, right, keepLeft, keepRight, uTurn, or roundabout |
 | `distanceToNextTurn` | `double?` | Distance in metres to the next turn |
+| `approachStage` | `NavigationApproachStage` | Computed from distance: `far` (> 200 m), `approaching` (50–200 m), `imminent` (< 50 m) |
 | `currentStreetName` | `String?` | Name of the upcoming street (extracted from Google Maps step instruction) |
-| `exitNumber` | `int?` | Roundabout exit number (1–4); non-null only when `nextTurnDirection == roundabout` |
+| `roundaboutExit` | `int?` | Roundabout exit number (1–4); non-null only when `nextTurnDirection == roundabout` |
 | `isARInitialized` | `bool` | Whether ARCore session is ready |
+| `initializeAR(sessionManager, objectManager)` | `Future<void>` | Initialises the ARCore session via `ARService` |
 | `initializeOverlay(route)` | `Future<void>` | Seeds the turn queue from a `RouteModel` and sets initial overlay state |
 | `updateAROverlay(location)` | `void` | Drops passed turns (< 10 m) and recalculates overlay from current GPS position |
 | `resetOverlay()` | `void` | Clears all overlay state (called on navigation stop or arrival) |
@@ -353,9 +356,15 @@ Check Location Permission
 | `currentLocation` | `LatLng?` | User's real-time GPS coordinates |
 | `currentHeading` | `double?` | Direction of travel in degrees (0 = North, clockwise); null when stationary |
 | `currentAccuracy` | `double?` | GPS accuracy radius in metres |
-| `startLocationTracking()` | `Future<void>` | One-shot fix then continuous GPS stream |
-| `stopLocationTracking()` | `void` | Ends GPS stream |
-| `searchPlaces(query)` | `Future<List<PlaceModel>>` | Returns autocomplete results |
+| `currentSpeed` | `double?` | Speed in m/s from GPS; used by `SpeedIndicator` widget |
+| `routeVersion` | `int` | Increments each time `refreshPreviewRoute()` is called; used by `HomeMapController` to re-fit the camera |
+| `startLocationTracking()` | `Future<void>` | One-shot fix then continuous GPS stream + 5-second AR overlay heartbeat |
+| `stopLocationTracking()` | `void` | Ends GPS stream and heartbeat timer |
+| `refreshPreviewRoute()` | `Future<void>` | Re-fetches preview routes from current GPS position; bumps `routeVersion` so the map camera re-fits |
+| `selectDestination(place)` | `Future<void>` | Resolves full place details then fetches preview routes |
+| `setSelectedDestination(place)` | `void` | Sets a pre-resolved place as destination and fetches preview routes |
+| `clearDestination()` | `void` | Clears destination, routes, and search state |
+| `selectRoute(index)` | `void` | Changes the active route selection in the preview panel |
 
 #### `SavedPlacesViewModel`
 **Responsibility:** Manages the three fixed saved-place slots (Home, Work, Favourite), persisted via `shared_preferences`.
@@ -546,9 +555,9 @@ class PlaceModel {
 - `clear()` — removes the key entirely
 
 #### `ARService`
-- Wraps `ar_flutter_plugin`
-- Manages ARCore session lifecycle (initialize, pause, resume, dispose)
-- Provides methods to place and update AR anchor objects on the camera feed
+- Wraps `ar_flutter_plugin_2`
+- Manages ARCore session lifecycle (initialize, dispose)
+- Arrow overlays are rendered as Flutter widget overlays driven by `ARViewModel` state; `placeArrow`, `updateArrow`, and `clearOverlays` are intentional no-ops that notify the widget layer via `ARViewModel` rather than placing 3D ARCore nodes directly
 
 ---
 
@@ -678,7 +687,8 @@ smart_ar_navigation/
 │   │   │   │
 │   │   │   ├── home/widgets/              # Extracted widgets for HomeScreen
 │   │   │   │   ├── home_map_layer.dart        # FlutterMap tile + polyline + marker stack
-│   │   │   │   ├── home_controls.dart         # Menu button (left) + my-location / compass (right)
+│   │   │   │   ├── compass_button.dart        # Rotating compass FAB
+│   │   │   ├── floating_icon_button.dart  # Reusable floating circular button (replaces home_controls)
 │   │   │   │   ├── home_bottom_sheet.dart     # DraggableScrollableSheet: idle / search results / route preview
 │   │   │   │   ├── quick_actions_section.dart # Home/Work/Favourite quick buttons + Saved Places tile
 │   │   │   │   ├── search_result_item.dart    # Search result row with bookmark toggle
@@ -871,8 +881,10 @@ GET https://maps.googleapis.com/maps/api/directions/json
 │  Alt 1      31 min  22.4 km 🏧│  ← 🏧 Toll pill shown when hasTolls = true
 │  Alt 2      35 min  25.1 km  │  ← Divider between rows
 │  ─────────────────────────── │
-│  [  Cancel  ] [ ▶  Start  ]  │  ← Cancel → clears destination + re-centres map
-└──────────────────────────────┘    Start → launches AR Navigation Screen
+│  [  Cancel  ] [ ▶  Resume ]  │  ← Button label adapts:
+└──────────────────────────────┘    • Resume — already navigating this exact route
+                                    • Go     — navigating but a different route is selected
+                                    • Start  — not yet navigating
 ```
 
 #### Home Screen — Search State
@@ -974,20 +986,20 @@ Search overlay (shown when a field is focused):
 
 #### AR Navigation Screen
 ```
-┌─────────────────────┐
-│ ← Sunway University │  ← Destination name (top bar, semi-transparent)
-├─────────────────────┤
-│                     │
-│  [LIVE CAMERA FEED] │
-│                     │
-│      ↑ 50m          │  ← AR overlay: arrow + distance
-│   Turn Left         │  ← AR overlay: instruction text
-│                     │
-│                     │
-├─────────────────────┤
-│ ETA: 5 min  1.2 km  │  ← Bottom info bar
-│         [■ Stop]    │  ← Stop navigation button
-└─────────────────────┘
+┌─────────────────────────────────┐
+│ Turn Left         50m      [↑]  │  ← Top info card (semi-transparent black)
+│ Jalan Universiti                │    instruction · distance · mini arrow · street name
+├─────────────────────────────────┤
+│                                 │
+│      [ LIVE CAMERA FEED ]       │  ← Full-screen ARCore camera feed (edge-to-edge)
+│                                 │
+│           [↑↑↑]                 │  ← DynamicArrowWidget (large, centred)
+│                                 │    colour: cyan/amber/red by approach stage
+│                                 │
+├─────────────────────────────────┤
+│ [✕]   5 min · 1.2 km   [Routes] │  ← NavigationBottomBar
+│       Arrive 2:45 PM             │    Stop circle · ETA · Routes button
+└─────────────────────────────────┘
 ```
 
 ### 9.3 Color Palette
@@ -1007,16 +1019,20 @@ Search overlay (shown when a field is focused):
 
 These features are **out of scope for the current FYP phase** but the design has been structured to accommodate them easily.
 
-| Feature | Design Note |
-|---|---|
-| **Auto Rerouting** | `NavigationViewModel` already holds the `RouteModel`. Add a deviation check in the GPS update loop (> 30 m from polyline) and call `RouteRepository.getRoute()` again. `ARViewModel.resetOverlay()` and `initializeOverlay()` already handle the reset/re-seed cycle. |
-| **Voice Instructions** | Add a `VoiceService` in the services layer. `ARViewModel` already exposes `nextTurnDirection`, `distanceToNextTurn`, and `currentStreetName` — pass these to a `flutter_tts` call at appropriate distance thresholds. |
-| **2D Map Toggle** | Add `map_screen.dart` as a new View. `NavigationViewModel` already holds the `RouteModel` — pass it to a `GoogleMap` widget. A toggle button on `ARNavigationScreen` can push/pop between screens. |
-| **Offline Navigation** | Replace `RouteRepository` with a cached route strategy. No changes needed in ViewModels or Views. |
-| **Speed Warning** | Add a `speedLimit` property to `MapViewModel` using location speed data from `geolocator`. |
+| Feature | Status | Design Note |
+|---|---|---|
+| **Auto Rerouting** | ✅ Implemented | `MapViewModel` GPS loop detects > 30 m deviation and calls `NavigationViewModel.recalculateRoute()` with a 15 s cooldown. `ARViewModel.resetOverlay()` + `initializeOverlay()` handle the re-seed. |
+| **Screen Wake Lock** | ✅ Implemented | `WakelockPlus.enable()` in `ARNavigationScreen.initState()`; disabled on dispose. |
+| **Edge-to-Edge Status Bar** | ✅ Implemented | `SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge)` in `main()`; per-screen `AnnotatedRegion<SystemUiOverlayStyle>` for icon brightness. |
+| **AR Camera Fix on Resume** | ✅ Implemented | `ARNavigationScreen` uses `UniqueKey _arViewKey`; `didChangeAppLifecycleState` assigns a new `UniqueKey` on resume, forcing Flutter to fully dispose and recreate the `ARView` native widget. |
+| **Route Refresh from Current Location** | ✅ Implemented | `MapViewModel.refreshPreviewRoute()` re-fetches from current GPS; `routeVersion` counter triggers camera re-fit in `HomeMapController`. |
+| **Voice Instructions** | 🔮 Planned | Add a `VoiceService` in the services layer. `ARViewModel` already exposes `nextTurnDirection`, `distanceToNextTurn`, and `currentStreetName` — pass these to a `flutter_tts` call at appropriate distance thresholds. |
+| **2D Map Toggle** | 🔮 Planned | Add `map_screen.dart` as a new View. `NavigationViewModel` already holds the `RouteModel` — pass it to a `GoogleMap` widget. A toggle button on `ARNavigationScreen` can push/pop between screens. |
+| **Offline Navigation** | 🔮 Planned | Replace `RouteRepository` with a cached route strategy. No changes needed in ViewModels or Views. |
+| **Speed Warning** | 🔮 Planned | `MapViewModel.currentSpeed` already exposes GPS speed. Add a `speedLimit` property and a warning overlay widget. |
 
 ---
 
-*End of SDD Document — Version 2.0*
+*End of SDD Document — Version 3.0*
 
 *Prepared by: Liew Sau Yang | Sunway University | Bachelor of Software Engineering (Hons)*
