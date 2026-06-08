@@ -1,10 +1,7 @@
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
 class NavigationForegroundService {
-  static Future<void> startService({
-    required String destination,
-    required String eta,
-  }) async {
+  static void initialize() {
     FlutterForegroundTask.init(
       androidNotificationOptions: AndroidNotificationOptions(
         channelId: 'smart_ar_navigation',
@@ -18,9 +15,15 @@ class NavigationForegroundService {
         eventAction: ForegroundTaskEventAction.repeat(5000),
         allowWakeLock: true,
         allowWifiLock: true,
+        isSticky: true,
       ),
     );
+  }
 
+  static Future<void> startService({
+    required String destination,
+    required String eta,
+  }) async {
     await FlutterForegroundTask.startService(
       notificationTitle: 'Navigating to $destination',
       notificationText: 'ETA: $eta',
