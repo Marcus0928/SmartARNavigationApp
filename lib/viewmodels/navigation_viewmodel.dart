@@ -9,6 +9,7 @@ import 'package:smart_ar_navigation/repositories/route_repository.dart';
 import 'package:smart_ar_navigation/services/ar_service.dart';
 import 'package:smart_ar_navigation/services/location_service.dart';
 import 'package:smart_ar_navigation/viewmodels/ar_viewmodel.dart';
+import 'package:smart_ar_navigation/services/navigation_foreground_service.dart';
 import 'package:smart_ar_navigation/viewmodels/profile_viewmodel.dart';
 
 class NavigationViewModel extends ChangeNotifier {
@@ -68,6 +69,10 @@ class NavigationViewModel extends ChangeNotifier {
       }
       await _arViewModel.initializeOverlay(_currentRoute!);
       _remainingPolyline = List.from(_currentRoute!.polylinePoints);
+      NavigationForegroundService.startService(
+        destination: _currentDestination?.name ?? '',
+        eta: '${(_currentRoute!.estimatedDuration / 60).ceil()} min',
+      );
       _navigationStatus = NavigationStatus.navigating;
     } catch (e) {
       _errorMessage = e.toString();
@@ -84,6 +89,7 @@ class NavigationViewModel extends ChangeNotifier {
     _currentDestination = null;
     _activeRouteIndex = null;
     _remainingPolyline = const [];
+    NavigationForegroundService.stopService();
     _navigationStatus = NavigationStatus.idle;
     notifyListeners();
   }
@@ -141,6 +147,7 @@ class NavigationViewModel extends ChangeNotifier {
     if (distance < 20.0) {
       _arService.clearOverlays();
       _arViewModel.resetOverlay();
+      NavigationForegroundService.stopService();
       _navigationStatus = NavigationStatus.arrived;
       notifyListeners();
       _profileViewModel.incrementDriveCount();

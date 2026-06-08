@@ -29,8 +29,7 @@ class ARNavigationScreen extends StatefulWidget {
 class _ARNavigationScreenState extends State<ARNavigationScreen>
     with WidgetsBindingObserver {
   bool _arrivalHandled = false;
-  Key _arViewKey = UniqueKey();
-  ARSessionManager? _arSessionManager;
+  bool _showAR = true;
 
   // TODO: remove — debug only
   TurnDirection? _debugDirection;
@@ -51,16 +50,13 @@ class _ARNavigationScreenState extends State<ARNavigationScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    switch (state) {
-      case AppLifecycleState.resumed:
-        _arSessionManager?.onResume();
-        setState(() {});
-      case AppLifecycleState.paused:
-        _arSessionManager?.onPause();
-      case AppLifecycleState.inactive:
-        _arSessionManager?.onPause();
-      default:
-        break;
+    if (state == AppLifecycleState.paused) {
+      setState(() => _showAR = false);
+    } else if (state == AppLifecycleState.resumed) {
+      setState(() => _showAR = false);
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) setState(() => _showAR = true);
+      });
     }
   }
 
@@ -70,7 +66,6 @@ class _ARNavigationScreenState extends State<ARNavigationScreen>
     ARAnchorManager anchorManager,
     ARLocationManager locationManager,
   ) {
-    _arSessionManager = sessionManager;
     context.read<ARViewModel>().initializeAR(sessionManager, objectManager);
   }
 
@@ -107,7 +102,10 @@ class _ARNavigationScreenState extends State<ARNavigationScreen>
       body: Stack(
         children: [
           // ── Layer 1: Full-screen AR camera feed ───────────────────
-          ARView(key: _arViewKey, onARViewCreated: _onARViewCreated),
+          if (_showAR)
+            ARView(onARViewCreated: _onARViewCreated)
+          else
+            Container(color: Colors.black),
 
           // ── Layer 2: Chevron arrow ────────────────────────────────
           if (_debugDirection != null || arVM.nextTurnDirection != null)
