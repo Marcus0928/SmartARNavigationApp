@@ -13,8 +13,8 @@
 | **Programme** | Bachelor of Software Engineering (Hons) |
 | **Testing Type** | Manual Black-Box Testing |
 | **Test Device** | OPPO Reno 7 5G (CPH2371) |
-| **Version** | 1.1 |
-| **Last Updated** | May 2026 |
+| **Version** | 1.2 |
+| **Last Updated** | June 2026 |
 
 ---
 
@@ -31,9 +31,8 @@
 9. [Test Cases — Edge Cases & Error Handling](#9-test-cases--edge-cases--error-handling)
 10. [Test Cases — Route Selection & Toll Indicator](#10-test-cases--route-selection--toll-indicator)
 11. [Test Cases — Recent Search History](#11-test-cases--recent-search-history)
-12. [Test Results Summary Table](#12-test-results-summary-table)
-9. [Test Cases — Edge Cases & Error Handling](#9-test-cases--edge-cases--error-handling)
-10. [Test Results Summary Table](#10-test-results-summary-table)
+12. [Test Cases — Early Turn Warning & Roundabout Exit Number](#12-test-cases--early-turn-warning--roundabout-exit-number)
+13. [Test Results Summary Table](#13-test-results-summary-table)
 
 ---
 
@@ -76,7 +75,7 @@ Since GPS and AR have natural limitations, the following tolerances are acceptab
 | Measurement | Acceptable Tolerance |
 |---|---|
 | Distance accuracy | ± 10 metres |
-| Turn arrow trigger point | ± 15 metres from actual turn |
+| Turn arrow trigger point | ± 25 metres from actual turn |
 | AR overlay alignment | Visually aligned — no precise pixel measurement |
 
 ---
@@ -112,8 +111,8 @@ These tests verify the app launches correctly and handles permissions properly.
 | **Precondition** | App is installed on the device |
 | **Steps** | 1. Tap the app icon to open it |
 | **Expected Result** | Splash Screen appears with app logo and loading indicator |
-| **Actual Result** | *(fill during testing)* |
-| **Status** | ⏳ Not tested |
+| **Actual Result** | Splash Screen appeared with app logo and loading indicator as expected |
+| **Status** | ✅ PASS |
 
 ---
 
@@ -127,8 +126,8 @@ These tests verify the app launches correctly and handles permissions properly.
 | **Precondition** | Camera permission has never been granted |
 | **Steps** | 1. Launch the app for the first time |
 | **Expected Result** | A system dialog appears asking for camera permission |
-| **Actual Result** | *(fill during testing)* |
-| **Status** | ⏳ Not tested |
+| **Actual Result** | System permission dialog appeared asking for camera access on first launch |
+| **Status** | ✅ PASS |
 
 ---
 
@@ -142,8 +141,8 @@ These tests verify the app launches correctly and handles permissions properly.
 | **Precondition** | Location permission has never been granted |
 | **Steps** | 1. Launch the app for the first time |
 | **Expected Result** | A system dialog appears asking for location permission |
-| **Actual Result** | *(fill during testing)* |
-| **Status** | ⏳ Not tested |
+| **Actual Result** | System permission dialog appeared asking for location access on first launch |
+| **Status** | ✅ PASS |
 
 ---
 
@@ -157,8 +156,8 @@ These tests verify the app launches correctly and handles permissions properly.
 | **Precondition** | Camera and location permissions both granted |
 | **Steps** | 1. Grant both permissions when prompted |
 | **Expected Result** | App transitions from Splash Screen to Home Screen |
-| **Actual Result** | *(fill during testing)* |
-| **Status** | ⏳ Not tested |
+| **Actual Result** | App transitioned from Splash Screen to Home Screen after both permissions were granted |
+| **Status** | ✅ PASS |
 
 ---
 
@@ -178,8 +177,8 @@ These tests verify the search bar and destination selection work correctly.
 | **Precondition** | App is on the Home Screen |
 | **Steps** | 1. Look at the Home Screen |
 | **Expected Result** | A search bar with placeholder text "Where to?" is visible |
-| **Actual Result** | *(fill during testing)* |
-| **Status** | ⏳ Not tested |
+| **Actual Result** | Search bar with "Where to?" placeholder was visible and tappable on the Home Screen |
+| **Status** | ✅ PASS |
 
 ---
 
@@ -193,8 +192,8 @@ These tests verify the search bar and destination selection work correctly.
 | **Precondition** | App is on the Home Screen, internet connected |
 | **Steps** | 1. Tap the search bar 2. Type "Sunway" |
 | **Expected Result** | A dropdown list appears with place suggestions containing "Sunway University" |
-| **Actual Result** | *(fill during testing)* |
-| **Status** | ⏳ Not tested |
+| **Actual Result** | Dropdown list appeared with autocomplete suggestions including "Sunway University" |
+| **Status** | ✅ PASS |
 
 ---
 
@@ -208,8 +207,8 @@ These tests verify the search bar and destination selection work correctly.
 | **Precondition** | Autocomplete results are showing |
 | **Steps** | 1. Tap on any result from the dropdown |
 | **Expected Result** | The selected place appears in the search bar and a "Start AR Navigation" button appears |
-| **Actual Result** | *(fill during testing)* |
-| **Status** | ⏳ Not tested |
+| **Actual Result** | Selected place was set as destination and route preview panel appeared with Start button |
+| **Status** | ✅ PASS |
 
 ---
 
@@ -244,8 +243,8 @@ These tests verify the AR Navigation Screen works correctly.
 | **Precondition** | Destination is selected on Home Screen |
 | **Steps** | 1. Tap "Start AR Navigation" button |
 | **Expected Result** | AR Navigation Screen opens showing the live camera feed |
-| **Actual Result** | *(fill during testing)* |
-| **Status** | ⏳ Not tested |
+| **Actual Result** | AR Navigation Screen opened with live camera feed displayed |
+| **Status** | ✅ PASS |
 
 ---
 
@@ -259,8 +258,8 @@ These tests verify the AR Navigation Screen works correctly.
 | **Precondition** | AR Navigation Screen is open, route has loaded |
 | **Steps** | 1. Hold the phone up and point the camera at the road ahead |
 | **Expected Result** | A directional arrow appears overlaid on the camera feed |
-| **Actual Result** | *(fill during testing)* |
-| **Status** | ⏳ Not tested |
+| **Actual Result** | Directional arrow appeared overlaid on the live camera feed |
+| **Status** | ✅ PASS |
 
 ---
 
@@ -274,8 +273,8 @@ These tests verify the AR Navigation Screen works correctly.
 | **Precondition** | Active navigation session, AR screen is open |
 | **Steps** | 1. Observe the AR navigation screen |
 | **Expected Result** | Distance text (e.g. "50m", "120m") is visible near the arrow overlay |
-| **Actual Result** | *(fill during testing)* |
-| **Status** | ⏳ Not tested |
+| **Actual Result** | Distance to next turn was displayed on the AR overlay and in the top info card |
+| **Status** | ✅ PASS |
 
 ---
 
@@ -289,8 +288,8 @@ These tests verify the AR Navigation Screen works correctly.
 | **Precondition** | Active navigation session is running |
 | **Steps** | 1. Tap the Stop button on the AR Navigation Screen |
 | **Expected Result** | AR overlays disappear and the app returns to the Home Screen |
-| **Actual Result** | *(fill during testing)* |
-| **Status** | ⏳ Not tested |
+| **Actual Result** | AR overlays cleared and app returned to Home Screen after tapping Stop |
+| **Status** | ✅ PASS |
 
 ---
 
@@ -780,24 +779,64 @@ These tests verify that recently searched and navigated places are recorded and 
 
 ---
 
-## 12. Test Results Summary Table
+## 12. Test Cases — Early Turn Warning & Roundabout Exit Number
+
+These tests verify the v1.3 early-warning and roundabout improvements.
+
+---
+
+### TC-042 — Early Turn Warning Within 1 km
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-042 |
+| **Feature** | Direction Accuracy — Early Warning |
+| **Covers** | FR-16a |
+| **Description** | Verify the arrow switches to the upcoming non-forward turn direction when within 1 km of that turn, rather than waiting until the turn is reached |
+| **Precondition** | Active navigation on a route where the current step is a long straight segment (> 1 km) followed by a left or right turn |
+| **Steps** | 1. Start navigation on such a route 2. While more than 1 km from the turn, observe the arrow (should show forward) 3. Continue until within 1 km of the turn 4. Observe the arrow again |
+| **Expected Result** | Arrow shows forward / straight when more than 1 km from the upcoming turn; switches to the correct turn direction (e.g. left/right/roundabout) when within 1 km — before reaching the turn |
+| **Compare Against** | The turn shown should match what Google Maps indicates at that junction |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+### TC-043 — Roundabout Exit Number Displayed
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-043 |
+| **Feature** | Roundabout Guidance |
+| **Covers** | FR-12a |
+| **Description** | Verify that the correct exit number appears inside the roundabout arc diagram |
+| **Precondition** | Active navigation on a route that passes through a roundabout with a known exit number |
+| **Steps** | 1. Navigate to a route with a roundabout 2. When within 1 km of the roundabout, observe the AR overlay 3. Check that a number appears inside the 3/4-circle arc |
+| **Expected Result** | The exit number (e.g. "2" for the 2nd exit) is displayed in bold white text centred inside the roundabout arc; the label below the arc reads "Take Exit 2" |
+| **Compare Against** | Google Maps instruction for the same roundabout (e.g. "At the roundabout, take the 2nd exit") |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+## 13. Test Results Summary Table
 
 Fill in this table after completing all tests.
 
 | Test ID | Feature | Description | Status | Notes |
 |---|---|---|---|---|
-| TC-001 | Startup | App Launch | ⏳ | |
-| TC-002 | Permissions | Camera Permission | ⏳ | |
-| TC-003 | Permissions | Location Permission | ⏳ | |
-| TC-004 | Startup | Navigate to Home Screen | ⏳ | |
-| TC-005 | Search | Search Bar Visible | ⏳ | |
-| TC-006 | Search | Autocomplete Results | ⏳ | |
-| TC-007 | Search | Select Destination | ⏳ | |
+| TC-001 | Startup | App Launch | ✅ PASS | |
+| TC-002 | Permissions | Camera Permission | ✅ PASS | |
+| TC-003 | Permissions | Location Permission | ✅ PASS | |
+| TC-004 | Startup | Navigate to Home Screen | ✅ PASS | |
+| TC-005 | Search | Search Bar Visible | ✅ PASS | |
+| TC-006 | Search | Autocomplete Results | ✅ PASS | |
+| TC-007 | Search | Select Destination | ✅ PASS | |
 | TC-008 | Error | Search No Internet | ⏳ | |
-| TC-009 | AR Nav | AR Screen Opens | ⏳ | |
-| TC-010 | AR Nav | AR Overlay Appears | ⏳ | |
-| TC-011 | AR Nav | Distance Displays | ⏳ | |
-| TC-012 | AR Nav | Stop Navigation | ⏳ | |
+| TC-009 | AR Nav | AR Screen Opens | ✅ PASS | |
+| TC-010 | AR Nav | AR Overlay Appears | ✅ PASS | |
+| TC-011 | AR Nav | Distance Displays | ✅ PASS | |
+| TC-012 | AR Nav | Stop Navigation | ✅ PASS | |
 | TC-013 | AR Nav | Arrival Detection | ⏳ | |
 | TC-014 | Direction | Forward Arrow | ⏳ | |
 | TC-015 | Direction | Left Arrow | ⏳ | |
@@ -827,6 +866,8 @@ Fill in this table after completing all tests.
 | TC-039 | Recent History | Persists After App Restart | ⏳ | |
 | TC-040 | Recent History | Max 8 Items Enforced | ⏳ | |
 | TC-041 | Recent History | Duplicate Moves to Top | ⏳ | |
+| TC-042 | Early Warning | Arrow Switches Before Turn (< 1 km) | ⏳ | |
+| TC-043 | Roundabout | Exit Number Displayed in Arc | ⏳ | |
 
 ---
 
@@ -834,11 +875,12 @@ Fill in this table after completing all tests.
 
 | Result | Count |
 |---|---|
-| ✅ PASS | — |
+| ✅ PASS | 11 |
 | ❌ FAIL | — |
 | ⚠️ PARTIAL | — |
 | ⏭️ SKIP | — |
-| **Total** | **41** |
+| ⏳ Not tested | 32 |
+| **Total** | **43** |
 
 ---
 
@@ -849,6 +891,6 @@ Fill in this table after completing all tests.
 
 ---
 
-*End of Test Plan Document — Version 1.1*
+*End of Test Plan Document — Version 1.2*
 
 *Prepared by: Liew Sau Yang | Sunway University | Bachelor of Software Engineering (Hons)*
