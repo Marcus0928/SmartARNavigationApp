@@ -69,9 +69,9 @@ class ARViewModel extends ChangeNotifier {
   void updateAROverlay(LatLng currentLocation) {
     if (_remainingTurns.isEmpty) return;
 
-    // Drop turns the user has already passed (25m accounts for Malaysian GPS accuracy of 10–30m).
+    // Drop turns the user has already passed (10m threshold preserves short keepLeft/keepRight nodes).
     _remainingTurns.removeWhere(
-      (turn) => calculateDistance(currentLocation, turn.position) < 25.0,
+      (turn) => calculateDistance(currentLocation, turn.position) < 10.0,
     );
 
     if (_remainingTurns.isEmpty) {
@@ -85,32 +85,12 @@ class ARViewModel extends ChangeNotifier {
     }
 
     final currentStep = _remainingTurns[0];
+    final distanceToCurrentStep =
+        calculateDistance(currentLocation, currentStep.position);
 
-    // Find the first upcoming non-forward turn to give early warning within 1 km.
-    final upcomingTurn = _remainingTurns.firstWhere(
-      (t) => t.direction != TurnDirection.forward,
-      orElse: () => currentStep,
-    );
-
-    final distanceToUpcoming =
-        calculateDistance(currentLocation, upcomingTurn.position);
-
-    // distanceToNextTurn always reflects distance to the upcoming non-forward turn.
-    _distanceToNextTurn = distanceToUpcoming;
-
-    if (distanceToUpcoming <= 1000.0 &&
-        upcomingTurn.direction != TurnDirection.forward) {
-      // Within 1 km of a real turn — show that turn early so drivers can react.
-      _nextTurnDirection = upcomingTurn.direction;
-      _instructionText = InstructionBuilder.buildInstruction(
-        upcomingTurn.maneuver,
-        upcomingTurn.exitNumber,
-      );
-      _currentStreetName = upcomingTurn.streetName;
-      _roundaboutExit = upcomingTurn.exitNumber;
-      _arService.updateArrow(upcomingTurn.direction, distanceToUpcoming);
-    } else {
-      // More than 1 km away — show the current step (forward/straight).
+    if (currentStep.direction != TurnDirection.forward) {
+      // Immediate next step is already a real turn — show it directly, no lookahead.
+      _distanceToNextTurn = distanceToCurrentStep;
       _nextTurnDirection = currentStep.direction;
       _instructionText = InstructionBuilder.buildInstruction(
         currentStep.maneuver,
@@ -118,7 +98,40 @@ class ARViewModel extends ChangeNotifier {
       );
       _currentStreetName = currentStep.streetName;
       _roundaboutExit = currentStep.exitNumber;
-      _arService.updateArrow(currentStep.direction, distanceToUpcoming);
+      _arService.updateArrow(currentStep.direction, distanceToCurrentStep);
+    } else {
+      // Current step is forward — scan ahead for the first non-forward turn within 1 km.
+      final upcomingTurn = _remainingTurns.firstWhere(
+        (t) => t.direction != TurnDirection.forward,
+        orElse: () => currentStep,
+      );
+      final distanceToUpcoming =
+          calculateDistance(currentLocation, upcomingTurn.position);
+
+      _distanceToNextTurn = distanceToUpcoming;
+
+      if (distanceToUpcoming <= 1000.0 &&
+          upcomingTurn.direction != TurnDirection.forward) {
+        // Within 1 km of a real turn — show it early so drivers can react.
+        _nextTurnDirection = upcomingTurn.direction;
+        _instructionText = InstructionBuilder.buildInstruction(
+          upcomingTurn.maneuver,
+          upcomingTurn.exitNumber,
+        );
+        _currentStreetName = upcomingTurn.streetName;
+        _roundaboutExit = upcomingTurn.exitNumber;
+        _arService.updateArrow(upcomingTurn.direction, distanceToUpcoming);
+      } else {
+        // More than 1 km away — show the current forward step.
+        _nextTurnDirection = currentStep.direction;
+        _instructionText = InstructionBuilder.buildInstruction(
+          currentStep.maneuver,
+          currentStep.exitNumber,
+        );
+        _currentStreetName = currentStep.streetName;
+        _roundaboutExit = currentStep.exitNumber;
+        _arService.updateArrow(currentStep.direction, distanceToUpcoming);
+      }
     }
 
     notifyListeners();
