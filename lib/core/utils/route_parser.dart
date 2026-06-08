@@ -46,7 +46,7 @@ List<RouteModel> parseRouteResponse(Map<String, dynamic> json) {
         position: position,
         maneuver: rawManeuver,
         exitNumber: rawManeuver.contains('roundabout')
-            ? step['exit'] as int?
+            ? _parseRoundaboutExit(step)
             : null,
       ));
     }
@@ -117,6 +117,23 @@ String? _extractStreetName(String html) {
   if (name.isEmpty) return null;
   if (name.length <= 25) return name;
   return '${name.substring(0, 25)}...';
+}
+
+// Reads the roundabout exit number from the step JSON.
+// Prefers the structured 'exit' field; falls back to parsing the ordinal from
+// html_instructions (e.g. "take the 3rd exit") when the field is absent —
+// common in Malaysian API responses where Google omits the structured field.
+int? _parseRoundaboutExit(dynamic step) {
+  final direct = step['exit'] as int?;
+  if (direct != null) return direct;
+
+  final html = step['html_instructions'] as String? ?? '';
+  final text = _stripHtml(html);
+  final match = RegExp(
+    r'\b(\d+)(?:st|nd|rd|th)\s+exit',
+    caseSensitive: false,
+  ).firstMatch(text);
+  return match != null ? int.tryParse(match.group(1)!) : null;
 }
 
 // Replace tags with a space so adjacent words don't merge (e.g. </b><b> → " ").
