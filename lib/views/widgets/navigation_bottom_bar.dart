@@ -103,7 +103,9 @@ class NavigationBottomBar extends StatelessWidget {
                   context
                       .findAncestorStateOfType<ARNavigationScreenState>()
                       ?.isExiting = true;
-                  context.read<MapViewModel>().refreshPreviewRoute();
+                  final mapVM = context.read<MapViewModel>();
+                  mapVM.setSelectingRouteFromNav(true);
+                  await mapVM.refreshPreviewRoute();
                   await Future.delayed(const Duration(milliseconds: 100));
                   if (context.mounted) Navigator.of(context).pop();
                 },

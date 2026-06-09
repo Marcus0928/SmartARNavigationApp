@@ -83,7 +83,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final topPadding = MediaQuery.of(context).padding.top;
 
     final navPolyline = navVM.navigationStatus == NavigationStatus.navigating &&
-            navVM.remainingPolyline.isNotEmpty
+            navVM.remainingPolyline.isNotEmpty &&
+            !mapVM.isSelectingRouteFromNav
         ? navVM.remainingPolyline
             .map((p) => LatLng(p.latitude, p.longitude))
             .toList()
