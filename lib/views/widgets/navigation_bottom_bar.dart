@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'package:smart_ar_navigation/viewmodels/map_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/navigation_viewmodel.dart';
+import 'package:smart_ar_navigation/views/screens/ar_navigation_screen.dart';
 
 class NavigationBottomBar extends StatelessWidget {
   const NavigationBottomBar({super.key});
@@ -41,10 +42,13 @@ class NavigationBottomBar extends StatelessWidget {
             children: [
               // ── Left: Stop button (✕, no text) ───────────────────
               GestureDetector(
-                onTap: () {
+                onTap: () async {
+                  context
+                      .findAncestorStateOfType<ARNavigationScreenState>()
+                      ?.isExiting = true;
                   context.read<NavigationViewModel>().stopNavigation();
-                  context.read<MapViewModel>().stopLocationTracking();
-                  Navigator.of(context).pop();
+                  await Future.delayed(const Duration(milliseconds: 100));
+                  if (context.mounted) Navigator.of(context).pop();
                 },
                 child: Container(
                   width: 54,
@@ -92,9 +96,13 @@ class NavigationBottomBar extends StatelessWidget {
               _IconLabelButton(
                 icon: Icons.alt_route_rounded,
                 label: 'Routes',
-                onTap: () {
+                onTap: () async {
+                  context
+                      .findAncestorStateOfType<ARNavigationScreenState>()
+                      ?.isExiting = true;
                   context.read<MapViewModel>().refreshPreviewRoute();
-                  Navigator.of(context).pop();
+                  await Future.delayed(const Duration(milliseconds: 100));
+                  if (context.mounted) Navigator.of(context).pop();
                 },
               ),
             ],

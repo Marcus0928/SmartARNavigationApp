@@ -23,6 +23,7 @@ class HomeMapController extends ChangeNotifier {
   PlaceModel? _lastDestination;
   bool _routeFitted = false;
   int _lastRouteVersion = -1;
+  int _lastSelectedRouteIndex = 0;
 
   AnimationController? _moveController;
   Animation<double>? _latAnim;
@@ -186,6 +187,10 @@ class HomeMapController extends ChangeNotifier {
       _lastRouteVersion = mapVM.routeVersion;
       _routeFitted = false;
     }
+    if (mapVM.selectedRouteIndex != _lastSelectedRouteIndex) {
+      _lastSelectedRouteIndex = mapVM.selectedRouteIndex;
+      _routeFitted = false;
+    }
     if (!_routeFitted && mapVM.previewRoutes.isNotEmpty) {
       _routeFitted = true;
       final sheetHeight = MediaQuery.of(context).size.height * 0.40;
@@ -199,12 +204,8 @@ class HomeMapController extends ChangeNotifier {
           CameraFit.bounds(
             bounds: LatLngBounds.fromPoints(points),
             padding: EdgeInsets.fromLTRB(40, 80, 40, sheetHeight + 24),
-            maxZoom: 16,
           ),
         );
-        if (_mapController.camera.zoom < 12) {
-          _mapController.move(_mapController.camera.center, 12.0);
-        }
       });
     }
   }
