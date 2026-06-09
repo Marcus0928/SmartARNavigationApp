@@ -83,7 +83,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final topPadding = MediaQuery.of(context).padding.top;
 
     final navPolyline = navVM.navigationStatus == NavigationStatus.navigating &&
-            navVM.remainingPolyline.isNotEmpty
+            navVM.remainingPolyline.isNotEmpty &&
+            !mapVM.isSelectingRouteFromNav
         ? navVM.remainingPolyline
             .map((p) => LatLng(p.latitude, p.longitude))
             .toList()
@@ -184,9 +185,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               onStartNavigation: () async {
                 final navigator  = Navigator.of(context);
                 final messenger  = ScaffoldMessenger.of(context);
-                if (navVM.navigationStatus == NavigationStatus.navigating) {
-                  navigator.pop();
-                }
                 await navVM.startNavigation(
                   mapVM.selectedDestination!,
                   route: mapVM.selectedRoute,
