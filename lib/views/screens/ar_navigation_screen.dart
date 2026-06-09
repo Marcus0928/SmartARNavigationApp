@@ -30,7 +30,7 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
     with WidgetsBindingObserver {
   bool _arrivalHandled = false;
   bool _showAR = true;
-  bool _isExiting = false;
+  bool isExiting = false;
 
   // TODO: remove — debug only
   TurnDirection? _debugDirection;
@@ -51,13 +51,13 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_isExiting) return;
+    if (isExiting) return;
     if (state == AppLifecycleState.paused) {
       setState(() => _showAR = false);
     } else if (state == AppLifecycleState.resumed) {
       setState(() => _showAR = false);
       Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted && !_isExiting) setState(() => _showAR = true);
+        if (mounted && !isExiting) setState(() => _showAR = true);
       });
     }
   }

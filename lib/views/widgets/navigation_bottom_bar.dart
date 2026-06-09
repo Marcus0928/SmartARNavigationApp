@@ -45,7 +45,7 @@ class NavigationBottomBar extends StatelessWidget {
                 onTap: () async {
                   context
                       .findAncestorStateOfType<ARNavigationScreenState>()
-                      ?._isExiting = true;
+                      ?.isExiting = true;
                   context.read<NavigationViewModel>().stopNavigation();
                   await Future.delayed(const Duration(milliseconds: 100));
                   if (context.mounted) Navigator.of(context).pop();
@@ -99,7 +99,7 @@ class NavigationBottomBar extends StatelessWidget {
                 onTap: () async {
                   context
                       .findAncestorStateOfType<ARNavigationScreenState>()
-                      ?._isExiting = true;
+                      ?.isExiting = true;
                   context.read<MapViewModel>().refreshPreviewRoute();
                   await Future.delayed(const Duration(milliseconds: 100));
                   if (context.mounted) Navigator.of(context).pop();
