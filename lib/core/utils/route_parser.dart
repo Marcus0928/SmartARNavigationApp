@@ -39,16 +39,19 @@ List<RouteModel> parseRouteResponse(Map<String, dynamic> json) {
       final htmlInstructions = step['html_instructions'] as String;
       final rawManeuver = step['maneuver'] as String? ?? 'straight';
       final direction = _parseManeuver(rawManeuver);
-      turns.add(TurnInstruction(
-        direction: direction,
-        distanceFromPrev: (step['distance']['value'] as num).toDouble(),
-        streetName: _extractStreetName(htmlInstructions),
-        position: position,
-        maneuver: rawManeuver,
-        exitNumber: rawManeuver.contains('roundabout')
-            ? _parseRoundaboutExit(step)
-            : null,
-      ));
+      final stepDistance = (step['distance']['value'] as num).toDouble();
+      if (stepDistance >= 15.0) {
+        turns.add(TurnInstruction(
+          direction: direction,
+          distanceFromPrev: stepDistance,
+          streetName: _extractStreetName(htmlInstructions),
+          position: position,
+          maneuver: rawManeuver,
+          exitNumber: rawManeuver.contains('roundabout')
+              ? _parseRoundaboutExit(step)
+              : null,
+        ));
+      }
     }
 
     final warnings = (route['warnings'] as List<dynamic>?)

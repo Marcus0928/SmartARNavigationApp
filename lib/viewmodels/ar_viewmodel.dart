@@ -69,10 +69,16 @@ class ARViewModel extends ChangeNotifier {
   void updateAROverlay(LatLng currentLocation) {
     if (_remainingTurns.isEmpty) return;
 
-    // Drop turns the user has already passed (10m threshold preserves short keepLeft/keepRight nodes).
-    _remainingTurns.removeWhere(
-      (turn) => calculateDistance(currentLocation, turn.position) < 10.0,
-    );
+    // Drop turns one-at-a-time from the head only — bulk removeWhere would skip
+    // multiple turns simultaneously when consecutive positions are close together.
+    while (_remainingTurns.isNotEmpty &&
+        calculateDistance(
+              currentLocation,
+              _remainingTurns.first.position,
+            ) <
+            10.0) {
+      _remainingTurns.removeAt(0);
+    }
 
     if (_remainingTurns.isEmpty) {
       _nextTurnDirection = TurnDirection.forward;
