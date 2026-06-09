@@ -46,8 +46,11 @@ class NavigationBottomBar extends StatelessWidget {
                   context
                       .findAncestorStateOfType<ARNavigationScreenState>()
                       ?.isExiting = true;
-                  context.read<NavigationViewModel>().stopNavigation();
-                  await Future.delayed(const Duration(milliseconds: 100));
+                  await context
+                      .read<NavigationViewModel>()
+                      .stopNavigation();
+                  context.read<MapViewModel>().stopLocationTracking();
+                  await Future.delayed(const Duration(milliseconds: 300));
                   if (context.mounted) Navigator.of(context).pop();
                 },
                 child: Container(

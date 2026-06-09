@@ -51,7 +51,7 @@ class NavigationViewModel extends ChangeNotifier {
     int? routeIndex,
   }) async {
     if (_navigationStatus == NavigationStatus.navigating) {
-      stopNavigation(stopService: false);
+      await stopNavigation(stopService: false);
     }
     _navigationStatus = NavigationStatus.loading;
     _currentDestination = destination;
@@ -84,7 +84,7 @@ class NavigationViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void stopNavigation({bool stopService = true}) {
+  Future<void> stopNavigation({bool stopService = true}) async {
     _locationService.stopLocationStream();
     _arService.clearOverlays();
     _arViewModel.resetOverlay();
@@ -92,11 +92,11 @@ class NavigationViewModel extends ChangeNotifier {
     _currentDestination = null;
     _activeRouteIndex = null;
     _remainingPolyline = const [];
-    if (stopService) {
-      NavigationForegroundService.stopService();
-    }
     _navigationStatus = NavigationStatus.idle;
     notifyListeners();
+    if (stopService) {
+      await NavigationForegroundService.stopService();
+    }
   }
 
   /// Recalculates the route from [from] (the live GPS position already known
