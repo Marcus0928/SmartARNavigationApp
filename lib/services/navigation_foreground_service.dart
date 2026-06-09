@@ -15,7 +15,6 @@ class NavigationForegroundService {
         eventAction: ForegroundTaskEventAction.repeat(5000),
         allowWakeLock: true,
         allowWifiLock: true,
-        isSticky: true,
       ),
     );
   }
