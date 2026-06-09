@@ -85,24 +85,32 @@ class MapViewModel extends ChangeNotifier {
       _currentSpeed = _locationService.currentSpeed;
       notifyListeners();
 
-      if (_navigationViewModel.navigationStatus != NavigationStatus.navigating) {
+      final status = _navigationViewModel.navigationStatus;
+      if (status != NavigationStatus.navigating &&
+          status != NavigationStatus.rerouting) {
         return;
       }
 
-      _navigationViewModel.checkIfArrived(location);
-      _navigationViewModel.updateRemainingPolyline(location);
-      _arViewModel.updateAROverlay(location);
-
-      final route = _navigationViewModel.currentRoute;
-      if (route != null && _isOffRoute(location, route)) {
-        final now = DateTime.now();
-        final cooldownElapsed = _lastRerouteTime == null ||
-            now.difference(_lastRerouteTime!) >= const Duration(seconds: 15);
-        if (cooldownElapsed) {
-          _lastRerouteTime = now;
-          _navigationViewModel.recalculateRoute(from: location);
+      // Off-route check only when actively navigating — skip during rerouting
+      // to avoid triggering a second reroute while the first is in flight.
+      if (status == NavigationStatus.navigating) {
+        final route = _navigationViewModel.currentRoute;
+        if (route != null && _isOffRoute(location, route)) {
+          final now = DateTime.now();
+          final cooldownElapsed = _lastRerouteTime == null ||
+              now.difference(_lastRerouteTime!) >= const Duration(seconds: 8);
+          if (cooldownElapsed) {
+            _lastRerouteTime = now;
+            _navigationViewModel.recalculateRoute(from: location);
+          }
         }
       }
+
+      // Always update AR overlay and polyline — including during rerouting so
+      // the display keeps refreshing while the new route API call is in flight.
+      _arViewModel.updateAROverlay(location);
+      _navigationViewModel.updateRemainingPolyline(location);
+      _navigationViewModel.checkIfArrived(location);
     });
 
     // Heartbeat: force-refresh the AR overlay every 2 s so the screen stays
@@ -221,8 +229,12 @@ class MapViewModel extends ChangeNotifier {
   }
 
   bool _isOffRoute(LatLng location, RouteModel route) {
-    for (final waypoint in route.waypoints) {
-      if (calculateDistance(location, waypoint) <= 30.0) return false;
+    for (final point in route.polylinePoints) {
+      if (calculateDistance(
+            location,
+            LatLng(point.latitude, point.longitude),
+          ) <=
+          30.0) return false;
     }
     return true;
   }
