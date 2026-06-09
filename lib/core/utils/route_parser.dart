@@ -30,10 +30,10 @@ List<RouteModel> parseRouteResponse(Map<String, dynamic> json) {
     final List<LatLng> waypoints = [];
 
     for (final step in leg['steps']) {
-      final endLoc = step['end_location'];
+      final startLoc = step['start_location'];
       final position = LatLng(
-        (endLoc['lat'] as num).toDouble(),
-        (endLoc['lng'] as num).toDouble(),
+        (startLoc['lat'] as num).toDouble(),
+        (startLoc['lng'] as num).toDouble(),
       );
       waypoints.add(position);
       final htmlInstructions = step['html_instructions'] as String;
