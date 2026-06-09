@@ -67,7 +67,15 @@ class ARViewModel extends ChangeNotifier {
   }
 
   void updateAROverlay(LatLng currentLocation) {
-    if (_remainingTurns.isEmpty) return;
+    if (_remainingTurns.isEmpty) {
+      _nextTurnDirection = TurnDirection.forward;
+      _distanceToNextTurn = 0;
+      _instructionText = 'Continue';
+      _currentStreetName = null;
+      _roundaboutExit = null;
+      notifyListeners();
+      return;
+    }
 
     // Drop turns one-at-a-time from the head only — bulk removeWhere would skip
     // multiple turns simultaneously when consecutive positions are close together.
@@ -88,6 +96,23 @@ class ARViewModel extends ChangeNotifier {
       _roundaboutExit = null;
       notifyListeners();
       return;
+    }
+
+    // Pop stale forward step if user has moved past its start position (GPS missed 10m window).
+    if (_remainingTurns.isNotEmpty) {
+      final head = _remainingTurns.first;
+      if (head.direction == TurnDirection.forward) {
+        final distToHead = calculateDistance(currentLocation, head.position);
+        if (distToHead > 50.0 && _remainingTurns.length > 1) {
+          final nextDist = calculateDistance(
+            currentLocation,
+            _remainingTurns[1].position,
+          );
+          if (nextDist < distToHead) {
+            _remainingTurns.removeAt(0);
+          }
+        }
+      }
     }
 
     final currentStep = _remainingTurns[0];
@@ -137,6 +162,12 @@ class ARViewModel extends ChangeNotifier {
         _currentStreetName = currentStep.streetName;
         _roundaboutExit = currentStep.exitNumber;
         _arService.updateArrow(currentStep.direction, distanceToUpcoming);
+        if (upcomingTurn == currentStep && _remainingTurns.isNotEmpty) {
+          _distanceToNextTurn = calculateDistance(
+            currentLocation,
+            _remainingTurns.last.position,
+          );
+        }
       }
     }
 
