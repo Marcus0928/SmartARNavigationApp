@@ -85,7 +85,6 @@ class NavigationViewModel extends ChangeNotifier {
   }
 
   Future<void> stopNavigation({bool stopService = true}) async {
-    _locationService.stopLocationStream();
     _arService.clearOverlays();
     _arViewModel.resetOverlay();
     _currentRoute = null;
