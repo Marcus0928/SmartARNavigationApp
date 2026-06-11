@@ -186,6 +186,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               onStartNavigation: () async {
                 final navigator  = Navigator.of(context);
                 final messenger  = ScaffoldMessenger.of(context);
+                mapVM.setSelectingRouteFromNav(false);
                 await navVM.startNavigation(
                   mapVM.selectedDestination!,
                   route: mapVM.selectedRoute,
@@ -196,6 +197,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     SnackBar(content: Text(navVM.errorMessage!)),
                   );
                 } else {
+                  await mapVM.restartLocationTracking();
                   navigator.pushNamed('/ar-navigation');
                 }
               },

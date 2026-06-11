@@ -129,12 +129,18 @@ class MapViewModel extends ChangeNotifier {
     });
   }
 
-  void stopLocationTracking() {
-    _locationSubscription?.cancel();
+  Future<void> stopLocationTracking() async {
+    await _locationSubscription?.cancel();
     _locationSubscription = null;
     _navRefreshTimer?.cancel();
     _navRefreshTimer = null;
+    _trackingStarted = false;
     _locationService.stopLocationStream();
+  }
+
+  Future<void> restartLocationTracking() async {
+    await stopLocationTracking();
+    await startLocationTracking();
   }
 
   @override
