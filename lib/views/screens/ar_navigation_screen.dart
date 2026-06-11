@@ -74,15 +74,28 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
   void _handleArrival(BuildContext context) {
     if (_arrivalHandled) return;
     _arrivalHandled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(arrivedMessage),
-          backgroundColor: Color(0xFF2E7D32),
-        ),
-      );
-      Navigator.of(context).pop();
+
+    isExiting = true;
+
+    final navVM = context.read<NavigationViewModel>();
+    final mapVM = context.read<MapViewModel>();
+    final navigator = Navigator.of(context);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('You have arrived!'),
+        backgroundColor: Colors.green,
+        duration: Duration(seconds: 3),
+      ),
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      mapVM.stopLocationTracking();
+      await navVM.stopNavigation();
+      mapVM.clearDestination();
+      mapVM.requestRecenter();
+
+      navigator.pop();
     });
   }
 

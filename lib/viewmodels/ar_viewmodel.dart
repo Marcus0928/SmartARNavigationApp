@@ -23,6 +23,7 @@ class ARViewModel extends ChangeNotifier {
   int? _roundaboutExit;
   bool _isARInitialized = false;
   List<TurnInstruction> _remainingTurns = [];
+  double? _lastDistanceToNextTurn;
 
   TurnDirection? get nextTurnDirection => _nextTurnDirection;
   double? get distanceToNextTurn => _distanceToNextTurn;
@@ -86,6 +87,7 @@ class ARViewModel extends ChangeNotifier {
             ) <
             10.0) {
       _remainingTurns.removeAt(0);
+      _lastDistanceToNextTurn = null;
     }
 
     if (_remainingTurns.isEmpty) {
@@ -121,7 +123,14 @@ class ARViewModel extends ChangeNotifier {
 
     if (currentStep.direction != TurnDirection.forward) {
       // Immediate next step is already a real turn — show it directly, no lookahead.
-      _distanceToNextTurn = distanceToCurrentStep;
+      double newDistance = distanceToCurrentStep;
+      if (_lastDistanceToNextTurn != null &&
+          newDistance < 500.0 &&
+          newDistance > _lastDistanceToNextTurn! + 20.0) {
+        newDistance = _lastDistanceToNextTurn!;
+      }
+      _lastDistanceToNextTurn = newDistance;
+      _distanceToNextTurn = newDistance;
       _nextTurnDirection = currentStep.direction;
       _instructionText = InstructionBuilder.buildInstruction(
         currentStep.maneuver,
@@ -139,7 +148,14 @@ class ARViewModel extends ChangeNotifier {
       final distanceToUpcoming =
           calculateDistance(currentLocation, upcomingTurn.position);
 
-      _distanceToNextTurn = distanceToUpcoming;
+      double newDistance = distanceToUpcoming;
+      if (_lastDistanceToNextTurn != null &&
+          newDistance < 500.0 &&
+          newDistance > _lastDistanceToNextTurn! + 20.0) {
+        newDistance = _lastDistanceToNextTurn!;
+      }
+      _lastDistanceToNextTurn = newDistance;
+      _distanceToNextTurn = newDistance;
 
       if (distanceToUpcoming <= 1000.0 &&
           upcomingTurn.direction != TurnDirection.forward) {
@@ -181,6 +197,7 @@ class ARViewModel extends ChangeNotifier {
     _currentStreetName = null;
     _roundaboutExit = null;
     _remainingTurns = [];
+    _lastDistanceToNextTurn = null;
     _arService.clearOverlays();
     notifyListeners();
   }
