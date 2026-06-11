@@ -213,6 +213,7 @@ dependencies:
 | Device | Model | ARCore | Android | Status |
 |---|---|---|---|---|
 | OPPO Reno 7 5G | CPH2371 | ✅ Pre-installed | Android 11/12 | ✅ Confirmed |
+| OPPO Reno 15 5G | CPH2825 | ✅ Pre-installed | Android 16 | ✅ Confirmed |
 
 ---
 

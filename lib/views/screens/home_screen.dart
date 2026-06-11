@@ -91,6 +91,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         : null;
 
     _ctrl.handleInitialCentering(userLatLng);
+    _ctrl.handleRecenter(mapVM, userLatLng, _sheetController);
     _ctrl.handleDestinationChange(mapVM, _sheetController);
     _ctrl.handleRouteFitting(mapVM, context, _sheetController);
 

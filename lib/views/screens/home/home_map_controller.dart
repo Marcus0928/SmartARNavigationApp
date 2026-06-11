@@ -157,6 +157,26 @@ class HomeMapController extends ChangeNotifier {
     }
   }
 
+  void handleRecenter(
+    MapViewModel mapVM,
+    LatLng? userLatLng,
+    DraggableScrollableController sheet,
+  ) {
+    if (mapVM.pendingRecenter && userLatLng != null) {
+      mapVM.consumeRecenter();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        animatedMove(userLatLng, 16);
+        if (sheet.isAttached) {
+          sheet.animateTo(
+            0.22,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    }
+  }
+
   void handleDestinationChange(
     MapViewModel mapVM,
     DraggableScrollableController sheet,

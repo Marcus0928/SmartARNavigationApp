@@ -43,15 +43,20 @@ class NavigationBottomBar extends StatelessWidget {
               // ── Left: Stop button (✕, no text) ───────────────────
               GestureDetector(
                 onTap: () async {
+                  final navVM = context.read<NavigationViewModel>();
+                  final mapVM = context.read<MapViewModel>();
+                  final navigator = Navigator.of(context);
+
                   context
                       .findAncestorStateOfType<ARNavigationScreenState>()
                       ?.isExiting = true;
-                  await context
-                      .read<NavigationViewModel>()
-                      .stopNavigation();
-                  context.read<MapViewModel>().stopLocationTracking();
-                  await Future.delayed(const Duration(milliseconds: 300));
-                  if (context.mounted) Navigator.of(context).pop();
+
+                  mapVM.stopLocationTracking();
+                  await navVM.stopNavigation();
+                  mapVM.clearDestination();
+                  mapVM.requestRecenter();
+
+                  navigator.pop();
                 },
                 child: Container(
                   width: 54,
@@ -106,8 +111,10 @@ class NavigationBottomBar extends StatelessWidget {
                   final mapVM = context.read<MapViewModel>();
                   mapVM.setSelectingRouteFromNav(true);
                   await mapVM.refreshPreviewRoute();
-                  await Future.delayed(const Duration(milliseconds: 100));
-                  if (context.mounted) Navigator.of(context).pop();
+                  if (context.mounted) Navigator.of(context).pushNamedAndRemoveUntil(
+                    '/home',
+                    (route) => route.isFirst,
+                  );
                 },
               ),
             ],
