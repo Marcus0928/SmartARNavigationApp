@@ -86,6 +86,10 @@ TurnDirection _parseManeuver(String maneuver) {
   const map = <String, TurnDirection>{
     'turn-left':        TurnDirection.left,
     'turn-right':       TurnDirection.right,
+    'turn-sharp-left':  TurnDirection.left,
+    'turn-sharp-right': TurnDirection.right,
+    'turn-slight-left': TurnDirection.keepLeft,
+    'turn-slight-right':TurnDirection.keepRight,
     'keep-left':        TurnDirection.keepLeft,
     'keep-right':       TurnDirection.keepRight,
     'straight':         TurnDirection.forward,
@@ -96,8 +100,8 @@ TurnDirection _parseManeuver(String maneuver) {
     'merge':            TurnDirection.forward,
     'fork-left':        TurnDirection.keepLeft,
     'fork-right':       TurnDirection.keepRight,
-    'ramp-left':        TurnDirection.left,
-    'ramp-right':       TurnDirection.right,
+    'ramp-left':        TurnDirection.keepLeft,
+    'ramp-right':       TurnDirection.keepRight,
   };
   return map[maneuver] ?? TurnDirection.forward;
 }
