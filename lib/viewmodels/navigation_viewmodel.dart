@@ -55,13 +55,13 @@ class NavigationViewModel extends ChangeNotifier {
     }
     _navigationStatus = NavigationStatus.loading;
     _currentDestination = destination;
-    _activeRouteIndex = routeIndex;
     _errorMessage = null;
     notifyListeners();
 
     try {
       if (route != null) {
         _currentRoute = route;
+        _activeRouteIndex = routeIndex;
       } else {
         final origin = await _locationService.getCurrentLocation();
         final routes = await _routeRepository.getRoute(
@@ -69,6 +69,7 @@ class NavigationViewModel extends ChangeNotifier {
           destination: destination.coordinates,
         );
         _currentRoute = routes.first;
+        _activeRouteIndex = 0; // fallback fetch always yields index 0
       }
       await _arViewModel.initializeOverlay(_currentRoute!);
       _remainingPolyline = List.from(_currentRoute!.polylinePoints);

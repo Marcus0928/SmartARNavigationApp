@@ -226,28 +226,14 @@ class _ArrowPainter extends CustomPainter {
         _paintRoundabout(canvas, size, scale);
         return;
       case TurnDirection.keepLeft: {
-        final cx = size.width / 2;
-        final cy = size.height / 2;
-        // Mirror keepRight horizontally — rotation reverses automatically
+        // Mirror keepRight: top chevron tilt reverses → points up-left
         canvas.translate(size.width, 0);
         canvas.scale(-1, 1);
-        canvas.translate(cx, cy);
-        canvas.rotate(-15 * math.pi / 180); // visually +15° after mirror
-        canvas.scale(0.8);
-        canvas.rotate(math.pi / 2);
-        canvas.translate(-cx, -cy);
-        _paintChevrons(canvas, size, scale, mainStroke: 12.0, count: 2);
+        _paintKeepChevrons(canvas, size, scale);
         return;
       }
       case TurnDirection.keepRight: {
-        final cx = size.width / 2;
-        final cy = size.height / 2;
-        canvas.translate(cx, cy);
-        canvas.rotate(-15 * math.pi / 180); // tilt upward → gentle merge feel
-        canvas.scale(0.8);                  // 80% of full right
-        canvas.rotate(math.pi / 2);         // same 90° CW rotation as right
-        canvas.translate(-cx, -cy);
-        _paintChevrons(canvas, size, scale, mainStroke: 12.0, count: 2);
+        _paintKeepChevrons(canvas, size, scale);
         return;
       }
       case TurnDirection.forward:
@@ -330,6 +316,67 @@ class _ArrowPainter extends CustomPainter {
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round,
       );
+    }
+  }
+
+  // 6 chevrons with gradual CW rotation and rightward drift — bottom 0°, top 58°.
+  // Each chevron centred in its own 1/6-height slot so none overlap.
+  // For keepLeft the caller mirrors the canvas, reversing drift and rotation.
+  void _paintKeepChevrons(Canvas canvas, Size size, double scale) {
+    final cx    = size.width / 2;
+    final h     = size.height;
+    const strokeW = 8.0;
+    final halfW = size.width * 0.38 * 0.4; // 40% of turn-arrow arm span
+    final armH  = h * 0.14;
+
+    // Both tables indexed by flowIdx (0 = bottom, 5 = top)
+    const rotations = [
+       0.0 * math.pi / 180,
+      12.0 * math.pi / 180,
+      25.0 * math.pi / 180,
+      40.0 * math.pi / 180,
+      55.0 * math.pi / 180,
+      68.0 * math.pi / 180,
+    ];
+    const xOffsets = [0.0, 10.0, 22.0, 38.0, 56.0, 76.0];
+
+    for (int canvasIdx = 0; canvasIdx < 6; canvasIdx++) {
+      // Centre of each equal slot: slot canvasIdx spans [canvasIdx/6 … (canvasIdx+1)/6] of h
+      final cy      = h / 6.0 * canvasIdx + h / 12.0;
+      final flowIdx = 5 - canvasIdx; // top→5, …, bottom→0
+
+      const halfN = 3.0; // count / 2.0
+      final peak  = flowT * 6.0;
+      double dist = (peak - flowIdx).abs();
+      if (dist > halfN) dist = 6.0 - dist;
+      final opacity = (1.0 - dist / halfN).clamp(0.25, 1.0);
+
+      canvas.save();
+      canvas.translate(cx + xOffsets[flowIdx] * scale, cy);
+      canvas.rotate(rotations[flowIdx]);
+      final path = Path()
+        ..moveTo(-halfW,  armH / 2)
+        ..lineTo(0,      -armH / 2)
+        ..lineTo( halfW,  armH / 2);
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color       = color.withValues(alpha: 0.3 * opacity)
+          ..style       = PaintingStyle.stroke
+          ..strokeWidth = strokeW * 2.0 * scale
+          ..strokeCap   = StrokeCap.round
+          ..strokeJoin  = StrokeJoin.round,
+      );
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color       = color.withValues(alpha: opacity)
+          ..style       = PaintingStyle.stroke
+          ..strokeWidth = strokeW * scale
+          ..strokeCap   = StrokeCap.round
+          ..strokeJoin  = StrokeJoin.round,
+      );
+      canvas.restore();
     }
   }
 
