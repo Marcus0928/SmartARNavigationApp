@@ -195,7 +195,6 @@ class MapViewModel extends ChangeNotifier {
     if (_selectedDestination == null) return;
     final int generation = ++_fetchGeneration;
     _isFetchingRoute = true;
-    _selectedRouteIndex = 0;
     notifyListeners();
 
     try {
@@ -206,7 +205,28 @@ class MapViewModel extends ChangeNotifier {
         destination: _selectedDestination!.coordinates,
       );
       if (generation != _fetchGeneration) return;
+
+      // Capture the route currently shown to the user before replacing the list.
+      final previousRoute = _previewRoutes.isNotEmpty &&
+              _selectedRouteIndex < _previewRoutes.length
+          ? _previewRoutes[_selectedRouteIndex]
+          : null;
+
       _previewRoutes = routes;
+
+      // Re-match the previously selected route by distance+duration so that
+      // API reordering (different origin, different alternatives order) does
+      // not silently switch the user to a different route.
+      if (previousRoute != null) {
+        final matchIndex = _previewRoutes.indexWhere(
+          (r) =>
+              (r.totalDistance - previousRoute.totalDistance).abs() < 500 &&
+              (r.estimatedDuration - previousRoute.estimatedDuration).abs() < 60,
+        );
+        _selectedRouteIndex = matchIndex >= 0 ? matchIndex : 0;
+      } else {
+        _selectedRouteIndex = 0;
+      }
     } catch (_) {
       // Route fetch failure is non-critical — destination stays selected.
     } finally {
