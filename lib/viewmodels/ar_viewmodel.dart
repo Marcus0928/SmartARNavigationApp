@@ -24,6 +24,7 @@ class ARViewModel extends ChangeNotifier {
   bool _isARInitialized = false;
   List<TurnInstruction> _remainingTurns = [];
   double? _lastDistanceToNextTurn;
+  TurnInstruction? _lastHeadTurn;
 
   TurnDirection? get nextTurnDirection => _nextTurnDirection;
   double? get distanceToNextTurn => _distanceToNextTurn;
@@ -80,14 +81,17 @@ class ARViewModel extends ChangeNotifier {
 
     // Drop turns one-at-a-time from the head only — bulk removeWhere would skip
     // multiple turns simultaneously when consecutive positions are close together.
-    while (_remainingTurns.isNotEmpty &&
-        calculateDistance(
-              currentLocation,
-              _remainingTurns.first.position,
-            ) <
-            10.0) {
-      _remainingTurns.removeAt(0);
-      _lastDistanceToNextTurn = null;
+    // U-turns get a wider threshold (20 m) because wide arcs may never bring the
+    // driver within 10 m of the theoretical turn start point.
+    while (_remainingTurns.isNotEmpty) {
+      final head = _remainingTurns.first;
+      final threshold = head.direction == TurnDirection.uTurn ? 20.0 : 10.0;
+      if (calculateDistance(currentLocation, head.position) < threshold) {
+        _remainingTurns.removeAt(0);
+        _lastDistanceToNextTurn = null;
+      } else {
+        break;
+      }
     }
 
     if (_remainingTurns.isEmpty) {
@@ -116,6 +120,14 @@ class ARViewModel extends ChangeNotifier {
         }
       }
     }
+
+    // Reset the distance clamp whenever the head turn changes — covers both the
+    // prune loop above and the stale-forward-step removal (which doesn't reset it).
+    final currentHead = _remainingTurns.first;
+    if (currentHead != _lastHeadTurn) {
+      _lastDistanceToNextTurn = null;
+    }
+    _lastHeadTurn = currentHead;
 
     final currentStep = _remainingTurns[0];
     final distanceToCurrentStep =
@@ -198,6 +210,7 @@ class ARViewModel extends ChangeNotifier {
     _roundaboutExit = null;
     _remainingTurns = [];
     _lastDistanceToNextTurn = null;
+    _lastHeadTurn = null;
     _arService.clearOverlays();
     notifyListeners();
   }
