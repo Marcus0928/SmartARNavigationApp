@@ -47,6 +47,7 @@ class MapViewModel extends ChangeNotifier {
   bool _pendingRecenter = false;
   int _routeVersion = 0;
   int _fetchGeneration = 0;
+  String? _routeError;
   StreamSubscription<LatLng>? _locationSubscription;
   Timer? _searchDebounce;
   Timer? _navRefreshTimer;
@@ -65,6 +66,7 @@ class MapViewModel extends ChangeNotifier {
   bool get isSelectingRouteFromNav => _isSelectingRouteFromNav;
   bool get pendingRecenter => _pendingRecenter;
   int get routeVersion => _routeVersion;
+  String? get routeError => _routeError;
 
   Future<void> startLocationTracking() async {
     if (_trackingStarted) return;
@@ -169,6 +171,7 @@ class MapViewModel extends ChangeNotifier {
 
   Future<void> selectDestination(PlaceModel place) async {
     _isFetchingRoute = true;
+    _previewRoutes = [];
     _searchResults = [];
     notifyListeners();
 
@@ -186,6 +189,7 @@ class MapViewModel extends ChangeNotifier {
   // Sets a fully-resolved place (coordinates already present) as destination.
   void setSelectedDestination(PlaceModel place) {
     _selectedDestination = place;
+    _previewRoutes = [];
     _searchResults = [];
     notifyListeners();
     _fetchPreviewRoute();
@@ -195,6 +199,7 @@ class MapViewModel extends ChangeNotifier {
     if (_selectedDestination == null) return;
     final int generation = ++_fetchGeneration;
     _isFetchingRoute = true;
+    _routeError = null;
     notifyListeners();
 
     try {
@@ -228,7 +233,24 @@ class MapViewModel extends ChangeNotifier {
         _selectedRouteIndex = 0;
       }
     } catch (_) {
-      // Route fetch failure is non-critical — destination stays selected.
+      if (generation != _fetchGeneration) return;
+      await Future.delayed(const Duration(seconds: 1));
+      if (generation != _fetchGeneration) return;
+      try {
+        final retryOrigin =
+            _currentLocation ?? await _locationService.getCurrentLocation();
+        final retryRoutes = await _routeRepository.getRoute(
+          origin: retryOrigin,
+          destination: _selectedDestination!.coordinates,
+        );
+        if (generation != _fetchGeneration) return;
+        _previewRoutes = retryRoutes;
+        _selectedRouteIndex = 0;
+      } catch (_) {
+        if (generation != _fetchGeneration) return;
+        _previewRoutes = [];
+        _routeError = 'Could not load route. Tap to retry.';
+      }
     } finally {
       if (generation == _fetchGeneration) {
         _isFetchingRoute = false;
@@ -271,6 +293,7 @@ class MapViewModel extends ChangeNotifier {
     _selectedRouteIndex = 0;
     _isFetchingRoute = false;
     _isSelectingRouteFromNav = false;
+    _routeError = null;
     _searchResults = [];
     notifyListeners();
   }

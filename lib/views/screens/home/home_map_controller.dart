@@ -212,7 +212,6 @@ class HomeMapController extends ChangeNotifier {
       _routeFitted = false;
     }
     if (!_routeFitted && mapVM.previewRoutes.isNotEmpty) {
-      _routeFitted = true;
       final sheetHeight = MediaQuery.of(context).size.height * 0.40;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final points = mapVM.previewRoutes[mapVM.selectedRouteIndex]
@@ -226,6 +225,7 @@ class HomeMapController extends ChangeNotifier {
             padding: EdgeInsets.fromLTRB(40, 80, 40, sheetHeight + 24),
           ),
         );
+        _routeFitted = true;
       });
     }
   }
