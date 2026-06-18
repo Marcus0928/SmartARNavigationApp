@@ -25,6 +25,7 @@ class ARViewModel extends ChangeNotifier {
   List<TurnInstruction> _remainingTurns = [];
   double? _lastDistanceToNextTurn;
   TurnInstruction? _lastHeadTurn;
+  bool _lookaheadActive = false;
 
   TurnDirection? get nextTurnDirection => _nextTurnDirection;
   double? get distanceToNextTurn => _distanceToNextTurn;
@@ -126,6 +127,7 @@ class ARViewModel extends ChangeNotifier {
     final currentHead = _remainingTurns.first;
     if (currentHead != _lastHeadTurn) {
       _lastDistanceToNextTurn = null;
+      _lookaheadActive = false;
     }
     _lastHeadTurn = currentHead;
 
@@ -169,9 +171,12 @@ class ARViewModel extends ChangeNotifier {
       _lastDistanceToNextTurn = newDistance;
       _distanceToNextTurn = newDistance;
 
-      if (distanceToUpcoming <= 1000.0 &&
+      final double lookaheadThreshold =
+          _lookaheadActive ? 1100.0 : 1000.0;
+
+      if (distanceToUpcoming <= lookaheadThreshold &&
           upcomingTurn.direction != TurnDirection.forward) {
-        // Within 1 km of a real turn — show it early so drivers can react.
+        _lookaheadActive = true;
         _nextTurnDirection = upcomingTurn.direction;
         _instructionText = InstructionBuilder.buildInstruction(
           upcomingTurn.maneuver,
@@ -181,7 +186,7 @@ class ARViewModel extends ChangeNotifier {
         _roundaboutExit = upcomingTurn.exitNumber;
         _arService.updateArrow(upcomingTurn.direction, distanceToUpcoming);
       } else {
-        // More than 1 km away — show the current forward step.
+        _lookaheadActive = false;
         _nextTurnDirection = currentStep.direction;
         _instructionText = InstructionBuilder.buildInstruction(
           currentStep.maneuver,
@@ -211,6 +216,7 @@ class ARViewModel extends ChangeNotifier {
     _remainingTurns = [];
     _lastDistanceToNextTurn = null;
     _lastHeadTurn = null;
+    _lookaheadActive = false;
     _arService.clearOverlays();
     notifyListeners();
   }
