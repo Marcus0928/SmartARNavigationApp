@@ -81,15 +81,16 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
     final mapVM = context.read<MapViewModel>();
     final navigator = Navigator.of(context);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('You have arrived!'),
-        backgroundColor: Colors.green,
-        duration: Duration(seconds: 3),
-      ),
-    );
-
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You have arrived!'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 3),
+        ),
+      );
+
       mapVM.stopLocationTracking();
       await navVM.stopNavigation();
       mapVM.clearDestination();
