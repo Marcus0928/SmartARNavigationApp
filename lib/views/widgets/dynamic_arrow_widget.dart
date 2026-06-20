@@ -331,14 +331,14 @@ class _ArrowPainter extends CustomPainter {
 
     // Both tables indexed by flowIdx (0 = bottom, 5 = top)
     const rotations = [
-       5.0 * math.pi / 180,
+       9.0 * math.pi / 180,
       12.0 * math.pi / 180,
       25.0 * math.pi / 180,
       40.0 * math.pi / 180,
       55.0 * math.pi / 180,
       68.0 * math.pi / 180,
     ];
-    const xOffsets = [0.0, 10.0, 22.0, 38.0, 56.0, 76.0];
+    const xOffsets = [4.0, 10.0, 22.0, 38.0, 56.0, 76.0];
 
     for (int canvasIdx = 0; canvasIdx < 6; canvasIdx++) {
       // Centre of each equal slot: slot canvasIdx spans [canvasIdx/6 … (canvasIdx+1)/6] of h
