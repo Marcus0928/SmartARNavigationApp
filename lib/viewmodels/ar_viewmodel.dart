@@ -86,7 +86,11 @@ class ARViewModel extends ChangeNotifier {
     // driver within 10 m of the theoretical turn start point.
     while (_remainingTurns.isNotEmpty) {
       final head = _remainingTurns.first;
-      final threshold = head.direction == TurnDirection.uTurn ? 20.0 : 10.0;
+      final threshold =
+          (head.direction == TurnDirection.uTurn ||
+           head.direction == TurnDirection.roundabout)
+              ? 20.0
+              : 10.0;
       if (calculateDistance(currentLocation, head.position) < threshold) {
         _remainingTurns.removeAt(0);
         _lastDistanceToNextTurn = null;
@@ -136,6 +140,19 @@ class ARViewModel extends ChangeNotifier {
         calculateDistance(currentLocation, currentStep.position);
 
     if (currentStep.direction != TurnDirection.forward) {
+      // Roundabout too far away — show forward until within lookahead range.
+      if (currentStep.direction == TurnDirection.roundabout &&
+          distanceToCurrentStep > 1000.0) {
+        _nextTurnDirection = TurnDirection.forward;
+        _distanceToNextTurn = distanceToCurrentStep;
+        _roundaboutExit = null;
+        _instructionText = 'Continue';
+        _currentStreetName = currentStep.streetName;
+        _arService.updateArrow(TurnDirection.forward, distanceToCurrentStep);
+        notifyListeners();
+        return;
+      }
+
       // Immediate next step is already a real turn — show it directly, no lookahead.
       double newDistance = distanceToCurrentStep;
       if (_lastDistanceToNextTurn != null &&
