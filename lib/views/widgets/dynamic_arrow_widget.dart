@@ -331,7 +331,7 @@ class _ArrowPainter extends CustomPainter {
 
     // Both tables indexed by flowIdx (0 = bottom, 5 = top)
     const rotations = [
-       0.0 * math.pi / 180,
+       5.0 * math.pi / 180,
       12.0 * math.pi / 180,
       25.0 * math.pi / 180,
       40.0 * math.pi / 180,
@@ -380,73 +380,111 @@ class _ArrowPainter extends CustomPainter {
     }
   }
 
-  // U-shaped arc: left stem up → semicircle over top → right stem down → arrowhead.
-  // Arc uses clockwise sweep so it curves UPWARD (over the top) between the two stems.
+  // Chevrons placed along a U-shaped path: left stem up → semicircular arc → right stem down.
+  // Each chevron oriented to the local tangent so the overall shape reads as a clean U/hook.
   void _paintUTurn(Canvas canvas, Size size, double scale) {
     final cx = size.width / 2;
     final h  = size.height;
-    final r  = size.width * 0.18; // arc radius → U width = 36% of widget
+    final r  = size.width * 0.18;
 
-    final topY       = h * 0.26;  // arc centre Y (upper quarter)
-    final stemBottom = h * 0.78;  // bottom of both stems
-    const mainStroke = 12.0;
-    const headLen    = 14.0;
-    const headW      =  9.0;
+    final topY       = h * 0.26;
+    final stemBottom = h * 0.78;
 
-    final stemEnd = stemBottom - headLen * scale; // right stem stops here
+    const strokeW = 8.0;
+    final halfW = size.width * 0.38 * 0.4;
+    final armH  = h * 0.14;
 
-    // ── U path ────────────────────────────────────────────────────────
-    final uPath = Path()
-      ..moveTo(cx - r, stemBottom)   // bottom of left stem
-      ..lineTo(cx - r, topY)         // up to arc start
-      ..arcTo(
-        Rect.fromCircle(center: Offset(cx, topY), radius: r),
-        math.pi,  // start at left  (9 o'clock)
-        math.pi,  // +180° clockwise → curves up over the top to right
-        false,
-      )
-      ..lineTo(cx + r, stemEnd);     // right stem down to arrow base
+    final stemLen  = stemBottom - topY;
+    final arcLen   = math.pi * r;
+    final totalLen = stemLen + arcLen + stemLen;
 
-    // Glow layer
+    const count = 10;
+
+    for (int i = 0; i < count; i++) {
+      final d = totalLen * (i + 0.5) / count;
+
+      double px, py, tangent;
+
+      if (d <= stemLen) {
+        px = cx - r;
+        py = stemBottom - d;
+        tangent = -math.pi / 2;
+      } else if (d <= stemLen + arcLen) {
+        final theta = math.pi + (d - stemLen) / arcLen * math.pi;
+        px = cx + r * math.cos(theta);
+        py = topY + r * math.sin(theta);
+        tangent = math.atan2(math.cos(theta), -math.sin(theta));
+      } else {
+        px = cx + r;
+        py = topY + (d - stemLen - arcLen);
+        tangent = math.pi / 2;
+      }
+
+      final rotation = tangent + math.pi / 2;
+
+      const halfN = count / 2.0;
+      final peak  = flowT * count;
+      double dist = (peak - i).abs();
+      if (dist > halfN) dist = count - dist;
+      final opacity = (1.0 - dist / halfN).clamp(0.25, 1.0);
+
+      canvas.save();
+      canvas.translate(px, py);
+      canvas.rotate(rotation);
+      final path = Path()
+        ..moveTo(-halfW,  armH / 2)
+        ..lineTo(0,      -armH / 2)
+        ..lineTo( halfW,  armH / 2);
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color       = color.withValues(alpha: 0.3 * opacity)
+          ..style       = PaintingStyle.stroke
+          ..strokeWidth = strokeW * 2.0 * scale
+          ..strokeCap   = StrokeCap.round
+          ..strokeJoin  = StrokeJoin.round,
+      );
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color       = color.withValues(alpha: opacity)
+          ..style       = PaintingStyle.stroke
+          ..strokeWidth = strokeW * scale
+          ..strokeCap   = StrokeCap.round
+          ..strokeJoin  = StrokeJoin.round,
+      );
+      canvas.restore();
+    }
+
+    // Arrowhead chevron at exit, pointing down
+    final headHalfW = halfW * 1.3;
+    final headArmH  = armH * 1.1;
+    canvas.save();
+    canvas.translate(cx + r, stemBottom);
+    canvas.rotate(math.pi);
+    final headPath = Path()
+      ..moveTo(-headHalfW,  headArmH / 2)
+      ..lineTo(0,          -headArmH / 2)
+      ..lineTo( headHalfW,  headArmH / 2);
     canvas.drawPath(
-      uPath,
+      headPath,
       Paint()
-        ..color = color.withValues(alpha: 0.3)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = mainStroke * 2.0 * scale
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round,
+        ..color       = color.withValues(alpha: 0.3)
+        ..style       = PaintingStyle.stroke
+        ..strokeWidth = strokeW * 2.0 * scale
+        ..strokeCap   = StrokeCap.round
+        ..strokeJoin  = StrokeJoin.round,
     );
-
-    // Main stroke
     canvas.drawPath(
-      uPath,
+      headPath,
       Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = mainStroke * scale
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round,
+        ..color       = color
+        ..style       = PaintingStyle.stroke
+        ..strokeWidth = strokeW * scale
+        ..strokeCap   = StrokeCap.round
+        ..strokeJoin  = StrokeJoin.round,
     );
-
-    // ── Arrowhead at bottom of right stem, pointing DOWN ──────────────
-    final arrowHead = Path()
-      ..moveTo(cx + r,                 stemBottom) // tip
-      ..lineTo(cx + r - headW * scale, stemEnd)   // base left
-      ..lineTo(cx + r + headW * scale, stemEnd)   // base right
-      ..close();
-
-    canvas.drawPath(
-      arrowHead,
-      Paint()
-        ..color = color.withValues(alpha: 0.3)
-        ..style = PaintingStyle.fill
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, 4.0 * scale),
-    );
-    canvas.drawPath(
-      arrowHead,
-      Paint()..color = color..style = PaintingStyle.fill,
-    );
+    canvas.restore();
   }
 
   // 3/4 circle CW: starts at lower-left (7:30 o'clock = 135° Flutter),
