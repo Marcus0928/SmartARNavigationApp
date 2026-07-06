@@ -9,7 +9,6 @@ import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
-import 'package:smart_ar_navigation/core/constants/app_strings.dart';
 import 'package:smart_ar_navigation/core/enums/navigation_approach_stage.dart';
 import 'package:smart_ar_navigation/core/enums/navigation_status.dart';
 import 'package:smart_ar_navigation/core/enums/turn_direction.dart';
@@ -32,7 +31,6 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
   bool _showAR = true;
   bool isExiting = false;
 
-  // TODO: remove — debug only
   TurnDirection? _debugDirection;
 
   @override
