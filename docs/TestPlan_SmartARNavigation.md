@@ -13,8 +13,8 @@
 | **Programme** | Bachelor of Software Engineering (Hons) |
 | **Testing Type** | Manual Black-Box Testing |
 | **Test Device** | OPPO Reno 7 5G (CPH2371) |
-| **Version** | 1.2 |
-| **Last Updated** | June 2026 |
+| **Version** | 1.3 |
+| **Last Updated** | July 2026 |
 
 ---
 
@@ -32,7 +32,8 @@
 10. [Test Cases — Route Selection & Toll Indicator](#10-test-cases--route-selection--toll-indicator)
 11. [Test Cases — Recent Search History](#11-test-cases--recent-search-history)
 12. [Test Cases — Early Turn Warning & Roundabout Exit Number](#12-test-cases--early-turn-warning--roundabout-exit-number)
-13. [Test Results Summary Table](#13-test-results-summary-table)
+13. [Test Cases — Navigation Improvements (v1.3)](#13-test-cases--navigation-improvements-v13)
+14. [Test Results Summary Table](#14-test-results-summary-table)
 
 ---
 
@@ -819,7 +820,80 @@ These tests verify the v1.3 early-warning and roundabout improvements.
 
 ---
 
-## 13. Test Results Summary Table
+---
+
+## 13. Test Cases — Navigation Improvements (v1.3)
+
+These tests cover the heading-biased route fetch, phantom U-turn guard, rerouting banner, faster route suggestion, and the improved off-route detection introduced in version 1.3.
+
+---
+
+### TC-044 — Rerouting Banner Appears During Recalculation
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-044 |
+| **Feature** | Rerouting Banner |
+| **Covers** | FR-81 |
+| **Description** | Verify the "Recalculating route…" banner appears on the AR screen when an off-route event triggers a reroute |
+| **Precondition** | Active AR navigation session |
+| **Steps** | 1. Deliberately deviate from the route by more than 50 m 2. Observe the AR Navigation Screen |
+| **Expected Result** | A dark banner with "Recalculating route…" text appears at the top of the AR screen. It disappears once the new route has loaded and arrows update. |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+### TC-045 — Faster Route Banner Appears and Switch Works
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-045 |
+| **Feature** | Faster Route Suggestion |
+| **Covers** | FR-82 |
+| **Description** | Verify that a faster-route banner appears during navigation when a significantly faster alternative is found, and that tapping Switch changes the active route |
+| **Precondition** | Active AR navigation session; traffic or road conditions have changed since the route was fetched |
+| **Steps** | 1. Navigate for at least 2 minutes 2. If a faster route is available (> 2 min savings), observe the AR screen 3. Tap **Switch** |
+| **Expected Result** | A "Faster route available — Save X min" banner appears. Tapping Switch updates the route and arrows; banner disappears. If not dismissed within 15 s, banner disappears automatically. |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+### TC-046 — No Phantom U-Turn at Route Start
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-046 |
+| **Feature** | Heading-Biased Route / Phantom U-Turn Guard |
+| **Covers** | FR-16b |
+| **Description** | Verify the app does not display a U-turn instruction as the first maneuver when starting navigation from a standing position |
+| **Precondition** | Device has a valid GPS heading (has been moving or has compass data); start navigation to a destination in the forward direction of travel |
+| **Steps** | 1. Drive or walk in a consistent direction for ≥ 5 seconds to establish heading 2. Set a destination ahead of the current direction 3. Tap Start 4. Observe the first AR arrow shown |
+| **Expected Result** | The first arrow matches the actual first turn required (straight, left, or right). A U-turn arrow is **not** shown as the first instruction. |
+| **Compare Against** | Google Maps shows the same first instruction |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+### TC-047 — Off-Route Detection on Highway (Segment-Based)
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-047 |
+| **Feature** | Off-Route Detection |
+| **Covers** | FR-11 |
+| **Description** | Verify the app does not false-trigger rerouting while driving on a straight highway section with sparse waypoints |
+| **Precondition** | Active AR navigation session on a route that includes a highway or dual carriageway with long straight segments (waypoints > 50 m apart) |
+| **Steps** | 1. Navigate on the highway 2. Stay on the correct lane for at least 2 minutes 3. Observe whether a rerouting banner appears |
+| **Expected Result** | No rerouting banner appears while the vehicle stays on the correct road — even if GPS position drifts up to 49 m from the nearest waypoint vertex. Off-route detection only triggers if the vehicle genuinely leaves the road. |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+## 14. Test Results Summary Table
 
 Fill in this table after completing all tests.
 
@@ -868,6 +942,10 @@ Fill in this table after completing all tests.
 | TC-041 | Recent History | Duplicate Moves to Top | ⏳ | |
 | TC-042 | Early Warning | Arrow Switches Before Turn (< 1 km) | ⏳ | |
 | TC-043 | Roundabout | Exit Number Displayed in Arc | ⏳ | |
+| TC-044 | Rerouting Banner | Banner Appears During Recalculation | ⏳ | |
+| TC-045 | Faster Route | Faster Route Banner and Switch | ⏳ | |
+| TC-046 | Phantom U-Turn Guard | No U-Turn at Route Start | ⏳ | |
+| TC-047 | Off-Route (Highway) | No False Reroute on Sparse Segments | ⏳ | |
 
 ---
 
@@ -879,8 +957,8 @@ Fill in this table after completing all tests.
 | ❌ FAIL | — |
 | ⚠️ PARTIAL | — |
 | ⏭️ SKIP | — |
-| ⏳ Not tested | 32 |
-| **Total** | **43** |
+| ⏳ Not tested | 36 |
+| **Total** | **47** |
 
 ---
 
@@ -891,6 +969,6 @@ Fill in this table after completing all tests.
 
 ---
 
-*End of Test Plan Document — Version 1.2*
+*End of Test Plan Document — Version 1.3*
 
 *Prepared by: Liew Sau Yang | Sunway University | Bachelor of Software Engineering (Hons)*

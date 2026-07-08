@@ -27,7 +27,9 @@ Think of it as **Google Maps or Waze, but with AR directions on your camera view
 - ⚡ **Early Turn Warning** — Arrow switches to the upcoming non-forward turn direction up to 1 km ahead (instead of at the last moment), giving drivers ample time to prepare; distance displayed always reflects that upcoming turn
 - 🏷️ **Road Name Display** — AR overlay shows only the upcoming street name, extracted from the bold text in Google Maps step instructions
 - 📍 **Real-Time GPS Tracking** — Continuous location with Waze-style directional arrow and accuracy ring
-- 🔄 **Auto Rerouting** — Recalculates route when you deviate more than 30 m from the planned path
+- 🔄 **Auto Rerouting** — Detects off-route deviation using perpendicular distance to the nearest route segment (50 m threshold, 30 s cooldown); displays a "Recalculating route…" banner on the AR screen during recalculation
+- 🚀 **Faster Route Suggestion** — Checks for a faster route every 2 minutes in the background; offers a "Faster route available — Save X min" banner with one-tap switch, auto-dismissed after 15 s
+- 🧭 **Heading-Biased Route Fetch** — Passes the device's compass heading to the Directions API so routes start in the correct direction, eliminating phantom U-turns at navigation start
 - ✅ **Arrival Detection** — Notifies when you reach your destination (within 20 m)
 - 📱 **Screen Wake Lock** — Display stays on automatically throughout the AR navigation session
 - 📋 **Waze-Style Side Menu** — Hamburger (≡) button opens a drawer with Profile, Plan a drive, Inbox, Settings, Help & Feedback, and Shutdown
@@ -251,13 +253,15 @@ All project documentation is located in the `/docs` folder:
 - [x] Street name extraction from Google Maps step instructions
 - [x] Real-time GPS tracking & AR overlay updates
 - [x] Arrival detection (20 m proximity threshold)
-- [x] Auto rerouting — deviations > 30 m trigger a new route fetch with 15 s cooldown
+- [x] Auto rerouting — segment-based perpendicular off-route detection (50 m threshold, 30 s cooldown); rerouting banner on AR screen
+- [x] Faster route suggestion — background check every 2 min; banner with Switch/Dismiss; auto-dismiss after 15 s
+- [x] Heading-biased route fetch — compass heading passed to Directions API; phantom U-turn guard in `initializeOverlay()`
 - [x] Screen wake lock — display stays on throughout AR navigation
 - [x] Transparent edge-to-edge status bar — no overlap with system UI
 - [x] AR camera feed restart on app resume — fixes black screen after backgrounding
 - [x] Route refresh from current location — Routes button re-fetches from GPS position
 - [x] Resume / Go / Start button labels — reflects in-progress navigation state
-- [x] Early turn warning — arrow preemptively shows upcoming non-forward turn (left/right/roundabout) within 1 km
+- [x] Early turn warning — arrow preemptively shows upcoming non-forward turn (all 6 types) within 1 km; 1000/1100 m hysteresis gate prevents oscillation
 - [x] GPS accuracy improvement — passed-turn threshold raised from 10 m to 25 m for Malaysian urban GPS conditions
 - [x] Roundabout exit number fallback — parses ordinal from `html_instructions` when structured `exit` field is absent
 - [ ] Voice guidance
