@@ -51,8 +51,18 @@ class ARViewModel extends ChangeNotifier {
   }
 
 
-  Future<void> initializeOverlay(RouteModel route) async {
+  Future<void> initializeOverlay(RouteModel route, {double? heading}) async {
     _remainingTurns = List.from(route.turns);
+
+    // Discard a phantom U-turn at step 1: Google may produce one when the
+    // origin snaps to the wrong road side because no heading was available.
+    // If we do have heading (driver is moving) and a subsequent step exists,
+    // the U-turn is almost certainly spurious.
+    if (_remainingTurns.length > 1 &&
+        _remainingTurns.first.direction == TurnDirection.uTurn &&
+        heading != null) {
+      _remainingTurns.removeAt(0);
+    }
 
     if (_remainingTurns.isNotEmpty) {
       final first = _remainingTurns.first;

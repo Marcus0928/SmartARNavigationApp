@@ -67,11 +67,15 @@ class NavigationViewModel extends ChangeNotifier {
         final routes = await _routeRepository.getRoute(
           origin: origin,
           destination: destination.coordinates,
+          heading: _locationService.currentHeading,
         );
         _currentRoute = routes.first;
         _activeRouteIndex = 0; // fallback fetch always yields index 0
       }
-      await _arViewModel.initializeOverlay(_currentRoute!);
+      await _arViewModel.initializeOverlay(
+        _currentRoute!,
+        heading: _locationService.currentHeading,
+      );
       _remainingPolyline = List.from(_currentRoute!.polylinePoints);
       NavigationForegroundService.startService(
         destination: _currentDestination?.name ?? '',
@@ -110,9 +114,13 @@ class NavigationViewModel extends ChangeNotifier {
       final routes = await _routeRepository.getRoute(
         origin: from,
         destination: _currentDestination!.coordinates,
+        heading: _locationService.currentHeading,
       );
       _currentRoute = routes.first;
-      await _arViewModel.initializeOverlay(_currentRoute!);
+      await _arViewModel.initializeOverlay(
+        _currentRoute!,
+        heading: _locationService.currentHeading,
+      );
       _remainingPolyline = List.from(_currentRoute!.polylinePoints);
       _navigationStatus = NavigationStatus.navigating;
     } catch (e) {
