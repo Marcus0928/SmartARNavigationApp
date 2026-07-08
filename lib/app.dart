@@ -135,7 +135,7 @@ class SmartARNavigationApp extends StatelessWidget {
           '/ar-navigation': (_) => const ARNavigationScreen(),
           '/settings': (_) => const SettingsScreen(),
           '/profile': (_) => const ProfileScreen(),
-          '/arrow-test': (_) => const ArrowTestScreen(), // TODO: remove after testing
+          '/arrow-test': (_) => const ArrowTestScreen(), 
           '/plan-drive': (ctx) => ChangeNotifierProvider(
                 create: (c) => PlanDriveViewModel(
                   placesRepository: c.read<PlacesRepository>(),

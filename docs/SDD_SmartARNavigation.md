@@ -11,8 +11,8 @@
 | **Supervisor** | Dr Javid Iqbal Thirupattur |
 | **Institution** | Sunway University — School of Computing and Artificial Intelligence |
 | **Programme** | Bachelor of Software Engineering (Hons) |
-| **Version** | 3.1 |
-| **Last Updated** | June 2026 |
+| **Version** | 3.2 |
+| **Last Updated** | July 2026 |
 
 ---
 
@@ -327,10 +327,14 @@ Check Location Permission
 | `currentRoute` | `RouteModel?` | Active route data from Google Maps API |
 | `navigationStatus` | `NavigationStatus` | Enum: idle / loading / navigating / rerouting / arrived |
 | `activeRouteIndex` | `int?` | Index of the route that is currently being navigated; `null` when not navigating |
+| `suggestedFasterRoute` | `RouteModel?` | A faster route found by the background check; shown in `_FasterRouteBanner`; `null` when no suggestion is pending |
 | `errorMessage` | `String?` | Last navigation error, if any |
-| `startNavigation(destination, {route, routeIndex})` | `Future<void>` | Fetches route (or uses pre-fetched route) and starts session; records `activeRouteIndex` |
-| `stopNavigation()` | `void` | Ends navigation session, clears state and `activeRouteIndex` |
+| `startNavigation(destination, {route, routeIndex})` | `Future<void>` | Fetches route (or uses pre-fetched route), passes current heading to `getRoute()` and `initializeOverlay()`, starts faster-route check timer, records `activeRouteIndex` |
+| `stopNavigation()` | `void` | Ends navigation session; cancels faster-route timers; clears `suggestedFasterRoute` and `activeRouteIndex` |
+| `recalculateRoute()` | `Future<void>` | Re-fetches route from current location with heading; sets status to `rerouting` (shows banner) then back to `navigating`; 30 s cooldown |
 | `checkIfArrived(location)` | `void` | Detects arrival (< 20 m from destination); on arrival calls `ProfileViewModel.incrementDriveCount()` and `ProfileViewModel.addDistance()` |
+| `acceptFasterRoute()` | `Future<void>` | Switches active navigation to `suggestedFasterRoute`; clears suggestion and dismiss timer |
+| `dismissFasterRoute()` | `void` | Dismisses the faster-route banner without switching; clears suggestion and dismiss timer |
 
 #### `ARViewModel`
 **Responsibility:** Manages AR overlay state and rendering instructions.
@@ -344,8 +348,8 @@ Check Location Permission
 | `roundaboutExit` | `int?` | Roundabout exit number (1–4); non-null only when `nextTurnDirection == roundabout` |
 | `isARInitialized` | `bool` | Whether ARCore session is ready |
 | `initializeAR(sessionManager, objectManager)` | `Future<void>` | Initialises the ARCore session via `ARService` |
-| `initializeOverlay(route)` | `Future<void>` | Seeds the turn queue from a `RouteModel` and sets initial overlay state |
-| `updateAROverlay(location)` | `void` | Drops passed turns (< 25 m); finds the first upcoming non-forward turn; within 1 km of that turn switches the arrow and instruction to it early; `distanceToNextTurn` always reflects the upcoming non-forward turn |
+| `initializeOverlay(route, {heading})` | `Future<void>` | Seeds the turn queue from a `RouteModel`; when `heading` is non-null and the first step is a U-turn, discards that step (phantom U-turn guard) |
+| `updateAROverlay(location)` | `void` | Drops passed turns (< 25 m); finds the first upcoming non-forward turn; applies a 1 000 m engage / 1 100 m disengage hysteresis gate for **all** non-forward turns (not just roundabout); within gate: shows upcoming turn early; outside gate: shows forward; `distanceToNextTurn` always reflects the upcoming non-forward turn |
 | `resetOverlay()` | `void` | Clears all overlay state (called on navigation stop or arrival) |
 
 #### `MapViewModel`
@@ -614,15 +618,23 @@ ar_flutter_plugin renders updated arrows/text on camera feed
 ### 6.3 Off-Route Recalculation Flow
 
 ```
-GPS position deviates from RouteModel waypoints
+GPS stream emits new position
             ↓
-NavigationViewModel detects deviation (> 30 metres threshold)
+MapViewModel._isOffRoute() checks perpendicular distance
+from current GPS position to every consecutive pair of
+RouteModel polyline waypoints (segment-based, not vertex-only)
+            ↓
+If min segment distance > 50 m AND 30 s cooldown has elapsed:
             ↓
 NavigationViewModel.recalculateRoute() called
             ↓
-RouteRepository fetches new route from current position
+Sets navigationStatus = rerouting → _ReroutingBanner shown on AR screen
             ↓
-RouteModel updated → ARViewModel resets overlay
+RouteRepository.getRoute(origin=currentLocation, heading=currentHeading)
+            ↓
+RouteModel updated → ARViewModel.initializeOverlay(route, heading=currentHeading)
+            ↓
+navigationStatus = navigating → banner disappears
             ↓
 User sees updated AR directions
 ```
@@ -759,15 +771,18 @@ smart_ar_navigation/
 - **Purpose:** Fetches turn-by-turn route from origin to destination
 - **Request Type:** HTTP GET
 - **Endpoint:** `https://maps.googleapis.com/maps/api/directions/json`
-- **Key Parameters:** `origin`, `destination`, `mode=walking`, `key`
-- **Response:** JSON with legs, steps, distance, duration
+- **Key Parameters:** `origin`, `destination`, `mode=driving`, `key`, `alternatives=true`, `departure_time=now`; optional: `heading`, `avoid`
+- **Response:** JSON with legs, steps, distance, duration (traffic-aware)
 
 **Sample Request:**
 ```
 GET https://maps.googleapis.com/maps/api/directions/json
   ?origin=-3.1319,101.6841
   &destination=Sunway+University
-  &mode=walking
+  &mode=driving
+  &alternatives=true
+  &departure_time=now
+  &heading=270
   &key=YOUR_API_KEY
 ```
 
@@ -1025,7 +1040,9 @@ These features are **out of scope for the current FYP phase** but the design has
 
 | Feature | Status | Design Note |
 |---|---|---|
-| **Auto Rerouting** | ✅ Implemented | `MapViewModel` GPS loop detects > 30 m deviation and calls `NavigationViewModel.recalculateRoute()` with a 15 s cooldown. `ARViewModel.resetOverlay()` + `initializeOverlay()` handle the re-seed. |
+| **Auto Rerouting** | ✅ Implemented | `MapViewModel._isOffRoute()` checks perpendicular distance to every route segment (> 50 m threshold, 30 s cooldown). `recalculateRoute()` sets status to `rerouting` (shows `_ReroutingBanner`), fetches with heading, then re-seeds `ARViewModel`. |
+| **Faster Route Suggestion** | ✅ Implemented | `NavigationViewModel._checkForFasterRoute()` runs via `Timer.periodic` every 2 min. If new route saves > 120 s, sets `suggestedFasterRoute` and shows `_FasterRouteBanner` with Switch/Dismiss; auto-dismisses after 15 s. |
+| **Heading-Biased Route Fetch** | ✅ Implemented | `RouteRepository.getRoute()` accepts optional `heading`; appended as `&heading=N` to the Directions API request. `startNavigation()` and `recalculateRoute()` pass `_locationService.currentHeading`. `initializeOverlay()` discards a phantom step-1 U-turn when heading is provided. |
 | **Screen Wake Lock** | ✅ Implemented | `WakelockPlus.enable()` in `ARNavigationScreen.initState()`; disabled on dispose. |
 | **Edge-to-Edge Status Bar** | ✅ Implemented | `SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge)` in `main()`; per-screen `AnnotatedRegion<SystemUiOverlayStyle>` for icon brightness. |
 | **AR Camera Fix on Resume** | ✅ Implemented | `ARNavigationScreen` uses `UniqueKey _arViewKey`; `didChangeAppLifecycleState` assigns a new `UniqueKey` on resume, forcing Flutter to fully dispose and recreate the `ARView` native widget. |
@@ -1037,6 +1054,6 @@ These features are **out of scope for the current FYP phase** but the design has
 
 ---
 
-*End of SDD Document — Version 3.1*
+*End of SDD Document — Version 3.2*
 
 *Prepared by: Liew Sau Yang | Sunway University | Bachelor of Software Engineering (Hons)*

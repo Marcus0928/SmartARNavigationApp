@@ -104,7 +104,7 @@ class MapViewModel extends ChangeNotifier {
         if (route != null && _isOffRoute(location, route)) {
           final now = DateTime.now();
           final cooldownElapsed = _lastRerouteTime == null ||
-              now.difference(_lastRerouteTime!) >= const Duration(seconds: 8);
+              now.difference(_lastRerouteTime!) >= const Duration(seconds: 30);
           if (cooldownElapsed) {
             _lastRerouteTime = now;
             _navigationViewModel.recalculateRoute(from: location);
@@ -299,13 +299,30 @@ class MapViewModel extends ChangeNotifier {
   }
 
   bool _isOffRoute(LatLng location, RouteModel route) {
-    for (final point in route.polylinePoints) {
-      if (calculateDistance(
-            location,
-            LatLng(point.latitude, point.longitude),
-          ) <=
-          30.0) return false;
+    final points = route.polylinePoints;
+    if (points.isEmpty) return false;
+    for (int i = 0; i < points.length - 1; i++) {
+      if (_distanceToSegment(location, points[i], points[i + 1]) <= 50.0) {
+        return false;
+      }
     }
     return true;
+  }
+
+  // Shortest distance from [p] to the finite line segment [a]→[b].
+  // Uses a flat-earth lat/lng projection — accurate enough for the short
+  // segment lengths (< ~200 m) that appear in navigation polylines.
+  double _distanceToSegment(LatLng p, LatLng a, LatLng b) {
+    final dx = b.latitude  - a.latitude;
+    final dy = b.longitude - a.longitude;
+    final lenSq = dx * dx + dy * dy;
+    if (lenSq == 0) return calculateDistance(p, a);
+    final t = (((p.latitude  - a.latitude)  * dx +
+                (p.longitude - a.longitude) * dy) / lenSq)
+        .clamp(0.0, 1.0);
+    return calculateDistance(
+      p,
+      LatLng(a.latitude + t * dx, a.longitude + t * dy),
+    );
   }
 }

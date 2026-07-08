@@ -76,7 +76,7 @@ class _DynamicArrowWidgetState extends State<DynamicArrowWidget>
 
     _flowController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1000),
+      duration: _flowDuration(widget.direction),
     )..repeat();
   }
 
@@ -88,6 +88,8 @@ class _DynamicArrowWidgetState extends State<DynamicArrowWidget>
     }
     if (widget.direction != oldWidget.direction) {
       _directionController.forward(from: 0.0);
+      _flowController.duration = _flowDuration(widget.direction);
+      _flowController.repeat();
     }
     final newColor = _colorForStage(widget.approachStage);
     if (newColor != _colorTo) {
@@ -106,6 +108,12 @@ class _DynamicArrowWidgetState extends State<DynamicArrowWidget>
     _flowController.dispose();
     super.dispose();
   }
+
+  // uTurn has count=15 vs count=3 for other directions; scale duration so each
+  // chevron blinks at the same rate (1000ms * 15/3 = 5000ms).
+  Duration _flowDuration(TurnDirection dir) => Duration(
+    milliseconds: dir == TurnDirection.uTurn ? 5000 : 1000,
+  );
 
   Color _colorForStage(NavigationApproachStage stage) => switch (stage) {
         NavigationApproachStage.far         => arArrowColor,
@@ -385,23 +393,23 @@ class _ArrowPainter extends CustomPainter {
   void _paintUTurn(Canvas canvas, Size size, double scale) {
     final cx = size.width / 2;
     final h  = size.height;
-    final r  = size.width * 0.18;
+    final r  = size.width * 0.225;   // wider: stems span 45% of widget width
 
-    final topY       = h * 0.26;
-    final stemBottom = h * 0.78;
+    final topY       = h * 0.10 + r; // arc top sits at ~10% from widget top
+    final stemBottom = h * 0.88;     // stems reach ~88% → total U height ~78%
 
-    const strokeW = 8.0;
-    final halfW = size.width * 0.38 * 0.4;
-    final armH  = h * 0.14;
+    const strokeW = 6.0;
+    final halfW = size.width * 0.38 * 0.2;  // 50% of previous size
+    final armH  = h * 0.07;                  // 50% of previous size
 
     final stemLen  = stemBottom - topY;
     final arcLen   = math.pi * r;
     final totalLen = stemLen + arcLen + stemLen;
 
-    const count = 10;
+    const count = 15;
 
     for (int i = 0; i < count; i++) {
-      final d = totalLen * (i + 0.5) / count;
+      final d = totalLen * i / (count - 1);
 
       double px, py, tangent;
 
@@ -456,35 +464,6 @@ class _ArrowPainter extends CustomPainter {
       canvas.restore();
     }
 
-    // Arrowhead chevron at exit, pointing down
-    final headHalfW = halfW * 1.3;
-    final headArmH  = armH * 1.1;
-    canvas.save();
-    canvas.translate(cx + r, stemBottom);
-    canvas.rotate(math.pi);
-    final headPath = Path()
-      ..moveTo(-headHalfW,  headArmH / 2)
-      ..lineTo(0,          -headArmH / 2)
-      ..lineTo( headHalfW,  headArmH / 2);
-    canvas.drawPath(
-      headPath,
-      Paint()
-        ..color       = color.withValues(alpha: 0.3)
-        ..style       = PaintingStyle.stroke
-        ..strokeWidth = strokeW * 2.0 * scale
-        ..strokeCap   = StrokeCap.round
-        ..strokeJoin  = StrokeJoin.round,
-    );
-    canvas.drawPath(
-      headPath,
-      Paint()
-        ..color       = color
-        ..style       = PaintingStyle.stroke
-        ..strokeWidth = strokeW * scale
-        ..strokeCap   = StrokeCap.round
-        ..strokeJoin  = StrokeJoin.round,
-    );
-    canvas.restore();
   }
 
   // 3/4 circle CW: starts at lower-left (7:30 o'clock = 135° Flutter),

@@ -25,6 +25,7 @@ class RouteRepository {
     required LatLng destination,
     bool avoidTolls = false,
     bool avoidHighways = false,
+    double? heading,
   }) async {
     final params = <String, String>{
       'origin': '${origin.latitude},${origin.longitude}',
@@ -33,6 +34,7 @@ class RouteRepository {
       'alternatives': 'true',
       'departure_time': 'now',
       'key': googleMapsApiKey,
+      if (heading != null) 'heading': heading.round().toString(),
     };
 
     final avoid = <String>[

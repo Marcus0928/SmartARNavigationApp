@@ -9,7 +9,6 @@ import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
-import 'package:smart_ar_navigation/core/constants/app_strings.dart';
 import 'package:smart_ar_navigation/core/enums/navigation_approach_stage.dart';
 import 'package:smart_ar_navigation/core/enums/navigation_status.dart';
 import 'package:smart_ar_navigation/core/enums/turn_direction.dart';
@@ -32,7 +31,6 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
   bool _showAR = true;
   bool isExiting = false;
 
-  // TODO: remove — debug only
   TurnDirection? _debugDirection;
 
   @override
@@ -140,16 +138,30 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
               ),
             ),
 
-          // ── Layer 3: Floating info card ───────────────────────────
+          // ── Layer 3: Floating info card + status banners ──────────
           Positioned(
             top: 0,
             left: 0,
             right: 0,
-            child: _NavInfoCard(
-              directionOverride: _debugDirection,
-              approachStageOverride: _debugDirection != null
-                  ? NavigationApproachStage.far
-                  : null,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _NavInfoCard(
+                  directionOverride: _debugDirection,
+                  approachStageOverride: _debugDirection != null
+                      ? NavigationApproachStage.far
+                      : null,
+                ),
+                if (navVM.navigationStatus == NavigationStatus.rerouting)
+                  const _ReroutingBanner(),
+                if (navVM.suggestedFasterRoute != null)
+                  _FasterRouteBanner(
+                    savedSeconds: ((navVM.currentRoute?.estimatedDuration ?? 0) -
+                        navVM.suggestedFasterRoute!.estimatedDuration).toDouble(),
+                    onSwitch: () => navVM.acceptFasterRoute(),
+                    onDismiss: navVM.dismissFasterRoute,
+                  ),
+              ],
             ),
           ),
 
@@ -270,6 +282,84 @@ class _NavInfoCard extends StatelessWidget {
     if (metres >= 1000) return '${(metres / 1000).toStringAsFixed(1)} km';
     final rounded = ((metres / 10).round() * 10).clamp(10, 990);
     return '$rounded m';
+  }
+}
+
+// ── Rerouting banner ──────────────────────────────────────────────────────────
+
+class _ReroutingBanner extends StatelessWidget {
+  const _ReroutingBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: const Color(0xCC000000),
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: const Text(
+        'Recalculating route...',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+}
+
+// ── Faster route banner ───────────────────────────────────────────────────────
+
+class _FasterRouteBanner extends StatelessWidget {
+  const _FasterRouteBanner({
+    required this.savedSeconds,
+    required this.onSwitch,
+    required this.onDismiss,
+  });
+
+  final double savedSeconds;
+  final VoidCallback onSwitch;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final savedMin = (savedSeconds / 60).round();
+    return Container(
+      width: double.infinity,
+      color: const Color(0xDD1A1A2E),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              'Faster route available — Save $savedMin min',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: onSwitch,
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF00E676),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            ),
+            child: const Text('Switch', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          TextButton(
+            onPressed: onDismiss,
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.white70,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            ),
+            child: const Text('Dismiss'),
+          ),
+        ],
+      ),
+    );
   }
 }
 

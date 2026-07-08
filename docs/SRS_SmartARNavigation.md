@@ -12,8 +12,8 @@
 | **Institution** | Sunway University — School of Computing and Artificial Intelligence |
 | **Programme** | Bachelor of Software Engineering (Hons) |
 | **Semester** | September 2025 |
-| **Version** | 2.2 |
-| **Last Updated** | June 2026 |
+| **Version** | 2.3 |
+| **Last Updated** | July 2026 |
 
 ---
 
@@ -179,7 +179,7 @@ Primary users are assumed to be comfortable with basic smartphone usage. No tech
 | FR-08 | The system shall allow the user to input a destination address or select a point on a map. |
 | FR-09 | The system shall call the Google Maps Directions API to retrieve turn-by-turn route data. |
 | FR-10 | The system shall parse route data including waypoints, turn types, distances, and — for roundabout steps — the exit number extracted from the step's HTML instruction text. |
-| FR-11 | The system shall recalculate the route automatically if the user deviates from the planned path. |
+| FR-11 | The system shall recalculate the route automatically if the user deviates from the planned path. Off-route is defined as the perpendicular distance from the current GPS position to the nearest route segment exceeding **50 metres**. A 30-second cooldown prevents repeated reroutes from GPS drift. |
 
 ---
 
@@ -196,7 +196,8 @@ Primary users are assumed to be comfortable with basic smartphone usage. No tech
 | FR-14 | The system shall update AR overlays in real-time as the user's GPS position changes. |
 | FR-15 | The system shall align AR overlays with the real-world environment using ARCore plane detection. |
 | FR-16 | The system shall remove or update AR cues after a turn is completed (within 25 m of the turn waypoint, to accommodate Malaysian urban GPS accuracy of 10–30 m). |
-| FR-16a | When the user is within 1 000 m of the next non-forward turn, the system shall pre-emptively switch the AR arrow and instruction to show that upcoming turn's direction — even if the current step is still straight — so the driver has sufficient warning time to prepare. |
+| FR-16a | When the user is within 1 000 m of the next non-forward turn, the system shall pre-emptively switch the AR arrow and instruction to show that upcoming turn's direction — even if the current step is still straight — so the driver has sufficient warning time to prepare. This gate applies to **all** non-forward turn types (left, right, keepLeft, keepRight, U-turn, and roundabout). A hysteresis mechanism (engage at 1 000 m, disengage at 1 100 m) prevents oscillation at the boundary. |
+| FR-16b | When fetching or recalculating a route, the system shall include the device's current compass heading (degrees, 0–360) as a parameter to the Google Maps Directions API request. This biases the returned route to start in the driver's actual direction of travel, reducing phantom U-turn steps at route start. |
 
 ---
 
@@ -216,6 +217,8 @@ Primary users are assumed to be comfortable with basic smartphone usage. No tech
 | FR-33 | The Home Screen map shall use CartoDB Voyager tiles to render a Waze-inspired style (blue water, green parks/forests, amber highways, white local roads) without Google Maps branding. |
 | FR-34 | The hamburger menu drawer shall contain the following items, in order: a Profile section (avatar + name) separated by a divider, then Plan a drive, Inbox, Settings, Help & Feedback, and Shutdown. |
 | FR-35 | The map shall animate to the user's location with a smooth eased transition (approximately 650 ms, ease-in-out curve) when the location button is tapped or on the first GPS fix after app launch. |
+| FR-81 | During active navigation, when the system is recalculating the route (i.e. `NavigationStatus.rerouting`), the AR Navigation Screen shall display a prominent "Recalculating route…" banner. The banner shall disappear automatically once the new route is loaded. |
+| FR-82 | During active navigation, the system shall check for a faster route in the background every 2 minutes using the Google Maps Directions API. If a new route is found that saves more than 120 seconds compared to the current route's remaining duration, the system shall display a "Faster route available — Save X min" banner on the AR Navigation Screen. The user may tap **Switch** to accept the new route or **Dismiss** to keep the current one. The banner shall auto-dismiss after 15 seconds if the user does not interact. |
 
 ---
 
@@ -505,6 +508,6 @@ dependencies:
 
 ---
 
-*End of SRS Document — Version 2.2*
+*End of SRS Document — Version 2.3*
 
 *Prepared by: Liew Sau Yang | Sunway University | Bachelor of Software Engineering (Hons)*

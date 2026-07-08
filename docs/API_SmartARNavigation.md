@@ -11,8 +11,8 @@
 | **Supervisor** | Dr Javid Iqbal Thirupattur |
 | **Institution** | Sunway University — School of Computing and Artificial Intelligence |
 | **Programme** | Bachelor of Software Engineering (Hons) |
-| **Version** | 1.3 |
-| **Last Updated** | June 2026 |
+| **Version** | 1.4 |
+| **Last Updated** | July 2026 |
 
 ---
 
@@ -149,6 +149,7 @@ Future<List<RouteModel>> getRoute({
   required LatLng destination,
   bool avoidTolls = false,
   bool avoidHighways = false,
+  double? heading,
 })
 ```
 
@@ -161,6 +162,7 @@ Future<List<RouteModel>> getRoute({
 | `destination` | `LatLng` | The user's chosen destination |
 | `avoidTolls` | `bool` | If `true`, adds `avoid=tolls` to the request (default `false`) |
 | `avoidHighways` | `bool` | If `true`, adds `avoid=highways` to the request (default `false`) |
+| `heading` | `double?` | The device's compass heading in degrees (0–360, 0 = North). When non-null, appended as `&heading=N` so the Directions API biases the route to match the driver's current direction of travel. Suppresses phantom U-turns at route start. |
 
 **Returns:** `List<RouteModel>` — up to 3 alternative routes ordered fastest-first; each entry includes `label`, `waypoints`, `polylinePoints`, `turns`, `totalDistance`, `estimatedDuration`, and `hasTolls`
 
@@ -356,8 +358,10 @@ Future<void> startNavigation(
 
 **Notes:**
 - If `route` is provided, uses it directly and skips `RouteRepository.getRoute()`
+- Passes `heading: _locationService.currentHeading` to both `getRoute()` and `initializeOverlay()` so route direction matches the driver's travel direction
 - Sets `navigationStatus` to `NavigationStatus.navigating`
 - Records `activeRouteIndex` so the route selection UI can show Resume vs Go labels
+- Starts the background faster-route check timer (`Timer.periodic` every 2 min) after a successful route fetch
 - Notifies listeners so the UI navigates to the AR screen
 
 ---
@@ -376,6 +380,8 @@ void stopNavigation()
 
 **Notes:**
 - Sets `navigationStatus` to `NavigationStatus.idle`
+- Cancels the faster-route check timer and the faster-route auto-dismiss timer
+- Clears `_suggestedFasterRoute`
 - Calls `LocationService.stopLocationStream()`
 - Calls `ARService.clearOverlays()`
 - Notifies listeners so the UI returns to the Home Screen
@@ -395,8 +401,10 @@ Future<void> recalculateRoute()
 **Returns:** Nothing
 
 **Notes:**
-- Triggered automatically when GPS position deviates more than 30 metres from the route
-- Uses the current GPS location as the new origin
+- Triggered automatically by `MapViewModel` when GPS position deviates more than **50 metres** from the nearest route segment (perpendicular distance, not vertex distance)
+- A 30-second cooldown prevents repeated reroutes caused by GPS drift
+- Sets `navigationStatus` to `NavigationStatus.rerouting` before the API call (triggers the `_ReroutingBanner` on the AR screen), then back to `navigating` on success
+- Passes `heading: _locationService.currentHeading` to `getRoute()` and `initializeOverlay()`
 - Updates `currentRoute` and notifies listeners
 
 ---
@@ -420,6 +428,57 @@ void checkIfArrived(LatLng currentLocation)
 - Called on every GPS update during navigation
 - If distance to destination is less than 20 metres, sets status to `NavigationStatus.arrived`
 - Triggers the arrival UI state
+
+---
+
+### `suggestedFasterRoute`
+
+```dart
+RouteModel? get suggestedFasterRoute
+```
+
+**Purpose:** Exposes the most recently found faster route candidate for the AR screen to show the `_FasterRouteBanner`.
+
+**Notes:**
+- Set by `_checkForFasterRoute()` when a new route saves more than 120 seconds vs the current route
+- Cleared after 15 seconds (auto-dismiss timer), when the user taps **Switch**, or when navigation stops
+
+---
+
+### `acceptFasterRoute()`
+
+```dart
+Future<void> acceptFasterRoute()
+```
+
+**Purpose:** Switches the active navigation route to the suggested faster route.
+
+**Parameters:** None
+
+**Returns:** Nothing
+
+**Notes:**
+- Calls `initializeOverlay()` with the faster route and heading
+- Clears `_suggestedFasterRoute` and cancels the auto-dismiss timer
+- Notifies listeners so the AR screen rebuilds with the new route
+
+---
+
+### `dismissFasterRoute()`
+
+```dart
+void dismissFasterRoute()
+```
+
+**Purpose:** Dismisses the faster-route banner without switching routes.
+
+**Parameters:** None
+
+**Returns:** Nothing
+
+**Notes:**
+- Clears `_suggestedFasterRoute` and cancels the auto-dismiss timer
+- The next `_checkForFasterRoute()` tick may surface another suggestion if savings remain > 120 s
 
 ---
 
@@ -448,9 +507,10 @@ void updateAROverlay(LatLng currentLocation)
 **Notes:**
 - Called on every GPS stream update
 - Drops any turn whose position is within **25 m** of `currentLocation` (threshold raised from 10 m to account for Malaysian urban GPS accuracy of 10–30 m)
-- Finds the first **non-forward** turn in `_remainingTurns` (i.e. the next real maneuver — left, right, keep, U-turn, or roundabout) and calculates the distance to it; this distance is always assigned to `distanceToNextTurn`
-- **If within 1 000 m** of that upcoming non-forward turn: sets `nextTurnDirection`, `instructionText`, `currentStreetName`, and `roundaboutExit` from that upcoming turn so the driver gets early warning
-- **If more than 1 000 m** away: shows the current step direction (forward/straight) while `distanceToNextTurn` still reflects the upcoming non-forward turn
+- Finds the first **non-forward** turn in `_remainingTurns` (i.e. the next real maneuver — left, right, keepLeft, keepRight, U-turn, or roundabout) and calculates the distance to it; this distance is always assigned to `distanceToNextTurn`
+- **Distance gate (all non-forward turns):** A `_lookaheadActive` flag implements hysteresis — engages when `distanceToCurrentStep ≤ 1 000 m`, disengages when `distanceToCurrentStep > 1 100 m`. While the gate is inactive the overlay shows the forward/straight direction; once active it shows the upcoming turn early. This prevents flickering at the 1 km boundary and applies to **all** non-forward turn types (not just roundabouts).
+- **If within 1 000 m** of that upcoming non-forward turn (gate active): sets `nextTurnDirection`, `instructionText`, `currentStreetName`, and `roundaboutExit` from that upcoming turn so the driver gets early warning
+- **If more than 1 100 m** away (gate inactive): shows the current step direction (forward/straight) while `distanceToNextTurn` still reflects the upcoming non-forward turn
 - Notifies listeners so the AR overlay widget rebuilds
 
 ---
@@ -458,7 +518,7 @@ void updateAROverlay(LatLng currentLocation)
 ### `initializeOverlay()`
 
 ```dart
-Future<void> initializeOverlay(RouteModel route)
+Future<void> initializeOverlay(RouteModel route, {double? heading})
 ```
 
 **Purpose:** Sets up the AR overlay when navigation first starts.
@@ -467,12 +527,14 @@ Future<void> initializeOverlay(RouteModel route)
 | Parameter | Type | Description |
 |---|---|---|
 | `route` | `RouteModel` | The route fetched from `RouteRepository` |
+| `heading` | `double?` | The device's compass heading at navigation start. When non-null and the first step is a U-turn, that step is removed (phantom U-turn guard). |
 
 **Returns:** Nothing
 
 **Notes:**
-- Stores the route and places the first AR arrow for the first turn
-- Called once when the AR Navigation Screen first loads
+- Stores the route's `turns` list as `_remainingTurns` and sets the initial overlay state
+- Phantom U-turn guard: if `heading != null` and `_remainingTurns.length > 1` and the first turn is a U-turn, the U-turn step is discarded — it was produced by the Directions API because it had no heading context
+- Called once when the AR Navigation Screen first loads, and again after each reroute
 
 ---
 
@@ -1074,6 +1136,31 @@ double calculateDistance(LatLng point1, LatLng point2)
 
 ---
 
+### `_distanceToSegment()`
+
+```dart
+double _distanceToSegment(LatLng p, LatLng a, LatLng b)
+```
+
+**File:** `lib/viewmodels/map_viewmodel.dart` (private helper)
+
+**Purpose:** Returns the shortest distance in metres from point `p` to the line segment `a → b` using a flat-earth lat/lng projection.
+
+**Parameters:**
+| Parameter | Type | Description |
+|---|---|---|
+| `p` | `LatLng` | The point to measure from (current GPS position) |
+| `a` | `LatLng` | Start of the segment |
+| `b` | `LatLng` | End of the segment |
+
+**Returns:** `double` — perpendicular distance in metres (or distance to the nearer endpoint if the perpendicular falls outside the segment)
+
+**Notes:**
+- Used by `_isOffRoute()` in `MapViewModel` to check against every consecutive pair of polyline waypoints, taking the minimum — this handles sparse polylines where vertices are 50–100 m apart on highways
+- Replaced the previous vertex-only check that was causing false reroutes from GPS drift on dual carriageways
+
+---
+
 ### `findNextTurn()`
 
 ```dart
@@ -1220,6 +1307,6 @@ All shapes use a 24 px glow layer (alpha 0.3) beneath the 12 px main stroke and 
 
 ---
 
-*End of API & Function Documentation — Version 1.3*
+*End of API & Function Documentation — Version 1.4*
 
 *Prepared by: Liew Sau Yang | Sunway University | Bachelor of Software Engineering (Hons)*

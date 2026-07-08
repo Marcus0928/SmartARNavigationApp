@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
@@ -37,6 +39,9 @@ class NavigationViewModel extends ChangeNotifier {
   String? _errorMessage;
   int? _activeRouteIndex;
   List<LatLng> _remainingPolyline = const [];
+  RouteModel? _suggestedFasterRoute;
+  Timer? _fasterRouteTimer;
+  Timer? _fasterRouteDismissTimer;
 
   PlaceModel? get currentDestination => _currentDestination;
   RouteModel? get currentRoute => _currentRoute;
@@ -44,6 +49,7 @@ class NavigationViewModel extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   int? get activeRouteIndex => _activeRouteIndex;
   List<LatLng> get remainingPolyline => _remainingPolyline;
+  RouteModel? get suggestedFasterRoute => _suggestedFasterRoute;
 
   Future<void> startNavigation(
     PlaceModel destination, {
@@ -67,17 +73,26 @@ class NavigationViewModel extends ChangeNotifier {
         final routes = await _routeRepository.getRoute(
           origin: origin,
           destination: destination.coordinates,
+          heading: _locationService.currentHeading,
         );
         _currentRoute = routes.first;
         _activeRouteIndex = 0; // fallback fetch always yields index 0
       }
-      await _arViewModel.initializeOverlay(_currentRoute!);
+      await _arViewModel.initializeOverlay(
+        _currentRoute!,
+        heading: _locationService.currentHeading,
+      );
       _remainingPolyline = List.from(_currentRoute!.polylinePoints);
       NavigationForegroundService.startService(
         destination: _currentDestination?.name ?? '',
         eta: '${(_currentRoute!.estimatedDuration / 60).ceil()} min',
       );
       _navigationStatus = NavigationStatus.navigating;
+      _fasterRouteTimer?.cancel();
+      _fasterRouteTimer = Timer.periodic(
+        const Duration(minutes: 2),
+        (_) => _checkForFasterRoute(),
+      );
     } catch (e) {
       _errorMessage = e.toString();
       _navigationStatus = NavigationStatus.idle;
@@ -86,6 +101,11 @@ class NavigationViewModel extends ChangeNotifier {
   }
 
   Future<void> stopNavigation({bool stopService = true}) async {
+    _fasterRouteTimer?.cancel();
+    _fasterRouteTimer = null;
+    _fasterRouteDismissTimer?.cancel();
+    _fasterRouteDismissTimer = null;
+    _suggestedFasterRoute = null;
     _arService.clearOverlays();
     _arViewModel.resetOverlay();
     _currentRoute = null;
@@ -110,9 +130,13 @@ class NavigationViewModel extends ChangeNotifier {
       final routes = await _routeRepository.getRoute(
         origin: from,
         destination: _currentDestination!.coordinates,
+        heading: _locationService.currentHeading,
       );
       _currentRoute = routes.first;
-      await _arViewModel.initializeOverlay(_currentRoute!);
+      await _arViewModel.initializeOverlay(
+        _currentRoute!,
+        heading: _locationService.currentHeading,
+      );
       _remainingPolyline = List.from(_currentRoute!.polylinePoints);
       _navigationStatus = NavigationStatus.navigating;
     } catch (e) {
@@ -138,6 +162,57 @@ class NavigationViewModel extends ChangeNotifier {
 
     _remainingPolyline = points.sublist(closestIndex);
     notifyListeners();
+  }
+
+  Future<void> acceptFasterRoute() async {
+    if (_suggestedFasterRoute == null) return;
+    _fasterRouteDismissTimer?.cancel();
+    _fasterRouteDismissTimer = null;
+    _currentRoute = _suggestedFasterRoute;
+    _suggestedFasterRoute = null;
+    await _arViewModel.initializeOverlay(
+      _currentRoute!,
+      heading: _locationService.currentHeading,
+    );
+    _remainingPolyline = List.from(_currentRoute!.polylinePoints);
+    notifyListeners();
+  }
+
+  void dismissFasterRoute() {
+    _fasterRouteDismissTimer?.cancel();
+    _fasterRouteDismissTimer = null;
+    _suggestedFasterRoute = null;
+    notifyListeners();
+  }
+
+  Future<void> _checkForFasterRoute() async {
+    if (_currentDestination == null ||
+        _navigationStatus != NavigationStatus.navigating ||
+        _currentRoute == null) return;
+    try {
+      final origin = await _locationService.getLastKnownLocation();
+      if (origin == null) return;
+      final routes = await _routeRepository.getRoute(
+        origin: origin,
+        destination: _currentDestination!.coordinates,
+        heading: _locationService.currentHeading,
+      );
+      if (routes.isEmpty) return;
+      final fastest = routes.reduce(
+        (a, b) => a.estimatedDuration < b.estimatedDuration ? a : b,
+      );
+      if (_currentRoute!.estimatedDuration - fastest.estimatedDuration > 120) {
+        _suggestedFasterRoute = fastest;
+        _fasterRouteDismissTimer?.cancel();
+        _fasterRouteDismissTimer = Timer(
+          const Duration(seconds: 15),
+          dismissFasterRoute,
+        );
+        notifyListeners();
+      }
+    } catch (_) {
+      // Best-effort — silently ignore network/API errors
+    }
   }
 
   void checkIfArrived(LatLng currentLocation) {

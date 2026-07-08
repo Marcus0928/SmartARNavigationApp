@@ -51,8 +51,18 @@ class ARViewModel extends ChangeNotifier {
   }
 
 
-  Future<void> initializeOverlay(RouteModel route) async {
+  Future<void> initializeOverlay(RouteModel route, {double? heading}) async {
     _remainingTurns = List.from(route.turns);
+
+    // Discard a phantom U-turn at step 1: Google may produce one when the
+    // origin snaps to the wrong road side because no heading was available.
+    // If we do have heading (driver is moving) and a subsequent step exists,
+    // the U-turn is almost certainly spurious.
+    if (_remainingTurns.length > 1 &&
+        _remainingTurns.first.direction == TurnDirection.uTurn &&
+        heading != null) {
+      _remainingTurns.removeAt(0);
+    }
 
     if (_remainingTurns.isNotEmpty) {
       final first = _remainingTurns.first;
@@ -140,9 +150,9 @@ class ARViewModel extends ChangeNotifier {
         calculateDistance(currentLocation, currentStep.position);
 
     if (currentStep.direction != TurnDirection.forward) {
-      // Roundabout too far away — show forward until within lookahead range.
-      if (currentStep.direction == TurnDirection.roundabout &&
-          distanceToCurrentStep > 1000.0) {
+      // Unified distance gate for ALL non-forward turns (replaces the
+      // roundabout-only check). Engage at 1000 m, disengage at 1100 m.
+      if (!_lookaheadActive && distanceToCurrentStep > 1000.0) {
         _nextTurnDirection = TurnDirection.forward;
         _distanceToNextTurn = distanceToCurrentStep;
         _roundaboutExit = null;
@@ -153,7 +163,20 @@ class ARViewModel extends ChangeNotifier {
         return;
       }
 
-      // Immediate next step is already a real turn — show it directly, no lookahead.
+      if (_lookaheadActive && distanceToCurrentStep > 1100.0) {
+        _lookaheadActive = false;
+        _nextTurnDirection = TurnDirection.forward;
+        _distanceToNextTurn = distanceToCurrentStep;
+        _roundaboutExit = null;
+        _instructionText = 'Continue';
+        _currentStreetName = currentStep.streetName;
+        _arService.updateArrow(TurnDirection.forward, distanceToCurrentStep);
+        notifyListeners();
+        return;
+      }
+
+      // Within lookahead range — show the turn directly.
+      _lookaheadActive = true;
       double newDistance = distanceToCurrentStep;
       if (_lastDistanceToNextTurn != null &&
           newDistance < 500.0 &&

@@ -11,8 +11,8 @@
 | **Supervisor** | Dr Javid Iqbal Thirupattur |
 | **Institution** | Sunway University — School of Computing and Artificial Intelligence |
 | **Programme** | Bachelor of Software Engineering (Hons) |
-| **App Version** | 1.3 |
-| **Last Updated** | June 2026 |
+| **App Version** | 1.4 |
+| **Last Updated** | July 2026 |
 
 ---
 
@@ -279,6 +279,9 @@ While navigating, you will see the following on screen:
 ┌─────────────────────────────────────┐
 │  Turn Left        50m         [↑]   │  ← Top info card (semi-transparent black)
 │  Jalan Universiti                   │    instruction · distance · mini arrow · street name
+│  Recalculating route...             │  ← Rerouting banner (appears when off-route)
+│  Faster route available—Save 4 min  │  ← Faster route banner (appears when found)
+│  [Switch]               [Dismiss]   │
 ├─────────────────────────────────────┤
 │                                     │
 │         [ LIVE CAMERA FEED ]        │  ← Full-screen AR camera view
@@ -294,6 +297,8 @@ While navigating, you will see the following on screen:
 | Element | What it means |
 |---|---|
 | **Top info card** | Shows the instruction, distance to next turn, mini direction arrow, and street name |
+| **Rerouting banner** | Dark strip reading "Recalculating route…" — appears when the app detects you have left the route and is fetching a new one; disappears automatically when done |
+| **Faster route banner** | Appears when a route saving more than 2 minutes is found; tap **Switch** to use it or **Dismiss** to keep the current route; auto-disappears after 15 seconds |
 | **Large centre arrow** | The direction you need to go — colour changes as you approach the turn |
 | **✕ Stop button** | Tap to end navigation and return to the map |
 | **ETA / Distance** | Estimated minutes remaining and total distance left |
@@ -330,11 +335,30 @@ Navigation also stops automatically when you **arrive at your destination**, and
 
 If you drive off the planned route, the app will automatically recalculate:
 
-1. You will see the message: **"Recalculating route..."**
-2. Wait a few seconds for the new route to load
-3. New AR arrows will appear for the updated route
+1. The app detects that you are more than **50 metres** from the planned road (measured as the shortest distance to any segment of the route)
+2. A **"Recalculating route…"** banner appears at the top of the AR screen
+3. Wait a few seconds for the new route to load
+4. New AR arrows will appear for the updated route and the banner disappears
 
-> 💡 **Tip:** If rerouting takes too long, stop navigation and start again with the same destination.
+> 💡 **Tip:** A 30-second cooldown prevents repeated reroutes from GPS jitter on highways. If you make a wrong turn and the reroute doesn't trigger immediately, stay calm — it will detect the deviation within 30 seconds.
+
+---
+
+### 5.9 Faster Route Suggestion
+
+While navigating, the app checks for a faster route every **2 minutes** in the background. If real-time traffic or road conditions have changed and a significantly faster route is found, you will see:
+
+```
+│  Faster route available — Save 4 min   │
+│  [Switch]                  [Dismiss]   │
+```
+
+| Action | Result |
+|---|---|
+| **Switch** | The app immediately switches to the faster route and updates the AR arrows |
+| **Dismiss** | The banner disappears; the app continues on the current route |
+
+If you do not tap either button, the banner disappears automatically after **15 seconds** and the app continues on the current route.
 
 ---
 
@@ -447,7 +471,7 @@ When you are within **1 km** of an upcoming turn (left, right, keep, U-turn, or 
 
 ## 9. Known Limitations
 
-These are known limitations of the current Version 1.0 of the app. They are documented for transparency and may be addressed in future versions.
+These are known limitations of the current Version 1.4 of the app. They are documented for transparency and may be addressed in future versions.
 
 | Limitation | Detail |
 |---|---|
@@ -539,6 +563,6 @@ build/app/outputs/flutter-apk/app-release.apk
 
 ---
 
-*End of User Manual — Version 1.3*
+*End of User Manual — Version 1.4*
 
 *Prepared by: Liew Sau Yang | Sunway University | Bachelor of Software Engineering (Hons)*
