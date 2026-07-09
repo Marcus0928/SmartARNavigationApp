@@ -26,6 +26,7 @@ class ARViewModel extends ChangeNotifier {
   double? _lastDistanceToNextTurn;
   TurnInstruction? _lastHeadTurn;
   bool _lookaheadActive = false;
+  double? _closestApproachToHead;
 
   TurnDirection? get nextTurnDirection => _nextTurnDirection;
   double? get distanceToNextTurn => _distanceToNextTurn;
@@ -104,8 +105,29 @@ class ARViewModel extends ChangeNotifier {
       if (calculateDistance(currentLocation, head.position) < threshold) {
         _remainingTurns.removeAt(0);
         _lastDistanceToNextTurn = null;
+        _closestApproachToHead = null;
       } else {
         break;
+      }
+    }
+
+    // Missed turn detection: if the user got close to a turn but is now
+    // moving away, consider it missed and pop it.
+    if (_remainingTurns.isNotEmpty) {
+      final head = _remainingTurns.first;
+      final distToHead = calculateDistance(currentLocation, head.position);
+
+      if (_closestApproachToHead != null &&
+          distToHead > _closestApproachToHead! + 80.0 &&
+          _closestApproachToHead! < 200.0) {
+        _remainingTurns.removeAt(0);
+        _closestApproachToHead = null;
+        _lastDistanceToNextTurn = null;
+      } else {
+        if (_closestApproachToHead == null ||
+            distToHead < _closestApproachToHead!) {
+          _closestApproachToHead = distToHead;
+        }
       }
     }
 
@@ -142,6 +164,7 @@ class ARViewModel extends ChangeNotifier {
     if (currentHead != _lastHeadTurn) {
       _lastDistanceToNextTurn = null;
       _lookaheadActive = false;
+      _closestApproachToHead = null;
     }
     _lastHeadTurn = currentHead;
 
@@ -180,7 +203,9 @@ class ARViewModel extends ChangeNotifier {
       double newDistance = distanceToCurrentStep;
       if (_lastDistanceToNextTurn != null &&
           newDistance < 500.0 &&
-          newDistance > _lastDistanceToNextTurn! + 20.0) {
+          newDistance > _lastDistanceToNextTurn! + 20.0 &&
+          _closestApproachToHead != null &&
+          newDistance <= _closestApproachToHead! + 30.0) {
         newDistance = _lastDistanceToNextTurn!;
       }
       _lastDistanceToNextTurn = newDistance;
@@ -205,7 +230,9 @@ class ARViewModel extends ChangeNotifier {
       double newDistance = distanceToUpcoming;
       if (_lastDistanceToNextTurn != null &&
           newDistance < 500.0 &&
-          newDistance > _lastDistanceToNextTurn! + 20.0) {
+          newDistance > _lastDistanceToNextTurn! + 20.0 &&
+          _closestApproachToHead != null &&
+          newDistance <= _closestApproachToHead! + 30.0) {
         newDistance = _lastDistanceToNextTurn!;
       }
       _lastDistanceToNextTurn = newDistance;
@@ -257,6 +284,7 @@ class ARViewModel extends ChangeNotifier {
     _lastDistanceToNextTurn = null;
     _lastHeadTurn = null;
     _lookaheadActive = false;
+    _closestApproachToHead = null;
     _arService.clearOverlays();
     notifyListeners();
   }
