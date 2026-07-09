@@ -41,7 +41,8 @@ class NavigationViewModel extends ChangeNotifier {
   List<LatLng> _remainingPolyline = const [];
   RouteModel? _suggestedFasterRoute;
   Timer? _fasterRouteTimer;
-  Timer? _fasterRouteDismissTimer;
+  bool _showFasterRouteMap = false;
+  int? _dismissedRouteDuration;
 
   PlaceModel? get currentDestination => _currentDestination;
   RouteModel? get currentRoute => _currentRoute;
@@ -50,6 +51,7 @@ class NavigationViewModel extends ChangeNotifier {
   int? get activeRouteIndex => _activeRouteIndex;
   List<LatLng> get remainingPolyline => _remainingPolyline;
   RouteModel? get suggestedFasterRoute => _suggestedFasterRoute;
+  bool get showFasterRouteMap => _showFasterRouteMap;
 
   Future<void> startNavigation(
     PlaceModel destination, {
@@ -90,7 +92,7 @@ class NavigationViewModel extends ChangeNotifier {
       _navigationStatus = NavigationStatus.navigating;
       _fasterRouteTimer?.cancel();
       _fasterRouteTimer = Timer.periodic(
-        const Duration(minutes: 2),
+        const Duration(minutes: 5),
         (_) => _checkForFasterRoute(),
       );
     } catch (e) {
@@ -103,9 +105,9 @@ class NavigationViewModel extends ChangeNotifier {
   Future<void> stopNavigation({bool stopService = true}) async {
     _fasterRouteTimer?.cancel();
     _fasterRouteTimer = null;
-    _fasterRouteDismissTimer?.cancel();
-    _fasterRouteDismissTimer = null;
     _suggestedFasterRoute = null;
+    _showFasterRouteMap = false;
+    _dismissedRouteDuration = null;
     _arService.clearOverlays();
     _arViewModel.resetOverlay();
     _currentRoute = null;
@@ -124,6 +126,7 @@ class NavigationViewModel extends ChangeNotifier {
   Future<void> recalculateRoute({required LatLng from}) async {
     if (_currentDestination == null) return;
     _navigationStatus = NavigationStatus.rerouting;
+    _dismissedRouteDuration = null;
     notifyListeners();
 
     try {
@@ -166,8 +169,8 @@ class NavigationViewModel extends ChangeNotifier {
 
   Future<void> acceptFasterRoute() async {
     if (_suggestedFasterRoute == null) return;
-    _fasterRouteDismissTimer?.cancel();
-    _fasterRouteDismissTimer = null;
+    _showFasterRouteMap = false;
+    _dismissedRouteDuration = null;
     _currentRoute = _suggestedFasterRoute;
     _suggestedFasterRoute = null;
     await _arViewModel.initializeOverlay(
@@ -179,8 +182,8 @@ class NavigationViewModel extends ChangeNotifier {
   }
 
   void dismissFasterRoute() {
-    _fasterRouteDismissTimer?.cancel();
-    _fasterRouteDismissTimer = null;
+    _dismissedRouteDuration = _suggestedFasterRoute?.estimatedDuration;
+    _showFasterRouteMap = false;
     _suggestedFasterRoute = null;
     notifyListeners();
   }
@@ -188,7 +191,14 @@ class NavigationViewModel extends ChangeNotifier {
   Future<void> _checkForFasterRoute() async {
     if (_currentDestination == null ||
         _navigationStatus != NavigationStatus.navigating ||
-        _currentRoute == null) return;
+        _currentRoute == null) {
+      return;
+    }
+
+    // Don't interrupt when a turn is imminent
+    final distToTurn = _arViewModel.distanceToNextTurn;
+    if (distToTurn != null && distToTurn < 500) return;
+
     try {
       final origin = await _locationService.getLastKnownLocation();
       if (origin == null) return;
@@ -201,13 +211,17 @@ class NavigationViewModel extends ChangeNotifier {
       final fastest = routes.reduce(
         (a, b) => a.estimatedDuration < b.estimatedDuration ? a : b,
       );
-      if (_currentRoute!.estimatedDuration - fastest.estimatedDuration > 120) {
+      final timeSaved =
+          _currentRoute!.estimatedDuration - fastest.estimatedDuration;
+      // Skip if this is the same route the user already dismissed
+      if (_dismissedRouteDuration != null &&
+          fastest.estimatedDuration >= _dismissedRouteDuration!) {
+        return;
+      }
+      if (timeSaved >= 300 &&
+          timeSaved / _currentRoute!.estimatedDuration >= 0.10) {
         _suggestedFasterRoute = fastest;
-        _fasterRouteDismissTimer?.cancel();
-        _fasterRouteDismissTimer = Timer(
-          const Duration(seconds: 15),
-          dismissFasterRoute,
-        );
+        _showFasterRouteMap = true;
         notifyListeners();
       }
     } catch (_) {
