@@ -43,6 +43,7 @@ class NavigationViewModel extends ChangeNotifier {
   Timer? _fasterRouteTimer;
   bool _showFasterRouteMap = false;
   int? _dismissedRouteDuration;
+  bool _isStartingNavigation = false;
 
   PlaceModel? get currentDestination => _currentDestination;
   RouteModel? get currentRoute => _currentRoute;
@@ -52,12 +53,15 @@ class NavigationViewModel extends ChangeNotifier {
   List<LatLng> get remainingPolyline => _remainingPolyline;
   RouteModel? get suggestedFasterRoute => _suggestedFasterRoute;
   bool get showFasterRouteMap => _showFasterRouteMap;
+  bool get isStartingNavigation => _isStartingNavigation;
 
   Future<void> startNavigation(
     PlaceModel destination, {
     RouteModel? route,
     int? routeIndex,
   }) async {
+    if (_isStartingNavigation) return;
+    _isStartingNavigation = true;
     if (_navigationStatus == NavigationStatus.navigating) {
       await stopNavigation(stopService: false);
     }
@@ -86,7 +90,7 @@ class NavigationViewModel extends ChangeNotifier {
       );
       _arViewModel.setDestination(_currentDestination?.coordinates);
       _remainingPolyline = List.from(_currentRoute!.polylinePoints);
-      await NavigationForegroundService.startService(
+      NavigationForegroundService.startService(
         destination: _currentDestination?.name ?? '',
         eta: '${(_currentRoute!.estimatedDuration / 60).ceil()} min',
       );
@@ -99,13 +103,16 @@ class NavigationViewModel extends ChangeNotifier {
     } catch (e) {
       _errorMessage = e.toString();
       _navigationStatus = NavigationStatus.idle;
+    } finally {
+      _isStartingNavigation = false;
+      notifyListeners();
     }
-    notifyListeners();
   }
 
   Future<void> stopNavigation({bool stopService = true}) async {
     _fasterRouteTimer?.cancel();
     _fasterRouteTimer = null;
+    _isStartingNavigation = false;
     _suggestedFasterRoute = null;
     _showFasterRouteMap = false;
     _dismissedRouteDuration = null;

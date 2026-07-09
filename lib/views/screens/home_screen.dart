@@ -196,7 +196,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   messenger.showSnackBar(
                     SnackBar(content: Text(navVM.errorMessage!)),
                   );
-                } else {
+                } else if (navVM.navigationStatus == NavigationStatus.navigating &&
+                    mounted) {
                   await mapVM.restartLocationTracking();
                   navigator.pushNamed('/ar-navigation');
                 }

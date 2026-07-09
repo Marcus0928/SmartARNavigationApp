@@ -91,7 +91,7 @@ Since GPS and AR have natural limitations, the following tolerances are acceptab
 | **Operating System** | Android 11 / 12 |
 | **Operating System** | Android 16 |
 | **ARCore Version** | Pre-installed (Google Play Services for AR) |
-| **Internet Connection** | Mobile data (4G/LTE) |
+| **Internet Connection** | Mobile data (5G/LTE) |
 | **GPS** | Device built-in GPS |
 | **Test Location** | Sunway University campus and surrounding outdoor areas |
 | **Test Conditions** | Daytime, outdoor, clear sky (for best GPS accuracy) |
