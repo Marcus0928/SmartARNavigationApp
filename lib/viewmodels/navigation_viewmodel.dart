@@ -85,7 +85,7 @@ class NavigationViewModel extends ChangeNotifier {
         heading: _locationService.currentHeading,
       );
       _remainingPolyline = List.from(_currentRoute!.polylinePoints);
-      NavigationForegroundService.startService(
+      await NavigationForegroundService.startService(
         destination: _currentDestination?.name ?? '',
         eta: '${(_currentRoute!.estimatedDuration / 60).ceil()} min',
       );

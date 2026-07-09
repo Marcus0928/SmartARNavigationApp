@@ -29,7 +29,7 @@ class NavigationForegroundService {
   static void initialize() {
     FlutterForegroundTask.init(
       androidNotificationOptions: AndroidNotificationOptions(
-        channelId: 'smart_ar_navigation',
+        channelId: 'smart_ar_nav_v2',
         channelName: 'Smart AR Navigation',
         channelDescription: 'Navigation is running',
         channelImportance: NotificationChannelImportance.LOW,
