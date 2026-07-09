@@ -84,6 +84,7 @@ class NavigationViewModel extends ChangeNotifier {
         _currentRoute!,
         heading: _locationService.currentHeading,
       );
+      _arViewModel.setDestination(_currentDestination?.coordinates);
       _remainingPolyline = List.from(_currentRoute!.polylinePoints);
       await NavigationForegroundService.startService(
         destination: _currentDestination?.name ?? '',
@@ -140,6 +141,7 @@ class NavigationViewModel extends ChangeNotifier {
         _currentRoute!,
         heading: _locationService.currentHeading,
       );
+      _arViewModel.setDestination(_currentDestination?.coordinates);
       _remainingPolyline = List.from(_currentRoute!.polylinePoints);
       _navigationStatus = NavigationStatus.navigating;
     } catch (e) {

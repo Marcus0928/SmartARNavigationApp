@@ -27,6 +27,7 @@ class ARViewModel extends ChangeNotifier {
   TurnInstruction? _lastHeadTurn;
   bool _lookaheadActive = false;
   double? _closestApproachToHead;
+  LatLng? _destinationCoordinates;
 
   TurnDirection? get nextTurnDirection => _nextTurnDirection;
   double? get distanceToNextTurn => _distanceToNextTurn;
@@ -263,10 +264,10 @@ class ARViewModel extends ChangeNotifier {
         _roundaboutExit = currentStep.exitNumber;
         _arService.updateArrow(currentStep.direction, distanceToUpcoming);
         if (upcomingTurn == currentStep && _remainingTurns.isNotEmpty) {
-          _distanceToNextTurn = calculateDistance(
-            currentLocation,
-            _remainingTurns.last.position,
-          );
+          final targetPoint =
+              _destinationCoordinates ?? _remainingTurns.last.position;
+          _distanceToNextTurn =
+              calculateDistance(currentLocation, targetPoint);
         }
       }
     }
@@ -285,7 +286,12 @@ class ARViewModel extends ChangeNotifier {
     _lastHeadTurn = null;
     _lookaheadActive = false;
     _closestApproachToHead = null;
+    _destinationCoordinates = null;
     _arService.clearOverlays();
     notifyListeners();
+  }
+
+  void setDestination(LatLng? destination) {
+    _destinationCoordinates = destination;
   }
 }
