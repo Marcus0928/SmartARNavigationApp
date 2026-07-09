@@ -72,6 +72,7 @@ Before installing, make sure your device meets the following requirements:
 4. If it shows **"Not compatible"** → ❌ This app will not work on your device
 
 > ✅ **Confirmed compatible device:** OPPO Reno 7 5G (CPH2371)
+> ✅ **Confirmed compatible device:** OPPO Reno 15 5G (CPH2825)
 
 ---
 

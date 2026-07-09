@@ -111,11 +111,25 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
 
     final arVM = context.watch<ARViewModel>();
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light.copyWith(
-        statusBarColor: Colors.transparent,
-      ),
-      child: Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final navigator = Navigator.of(context);
+        final mapVM = context.read<MapViewModel>();
+        final navVM = context.read<NavigationViewModel>();
+        mapVM.stopLocationTracking();
+        await navVM.stopNavigation();
+        mapVM.clearDestination();
+        if (navigator.canPop()) {
+          navigator.pop();
+        }
+      },
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle.light.copyWith(
+          statusBarColor: Colors.transparent,
+        ),
+        child: Scaffold(
       body: Stack(
         children: [
           // ── Layer 1: Full-screen AR camera feed ───────────────────
@@ -203,6 +217,7 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
               ),
             ),
         ],
+      ),
       ),
       ),
     );

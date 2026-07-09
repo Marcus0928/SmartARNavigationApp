@@ -13,6 +13,7 @@
 | **Programme** | Bachelor of Software Engineering (Hons) |
 | **Testing Type** | Manual Black-Box Testing |
 | **Test Device** | OPPO Reno 7 5G (CPH2371) |
+| **Test Device** | OPPO Reno 15 5G (CPH2825) |
 | **Version** | 1.3 |
 | **Last Updated** | July 2026 |
 
@@ -86,7 +87,9 @@ Since GPS and AR have natural limitations, the following tolerances are acceptab
 | Item | Details |
 |---|---|
 | **Test Device** | OPPO Reno 7 5G (CPH2371) |
+| **Test Device** | OPPO Reno 15 5G (CPH2825) |
 | **Operating System** | Android 11 / 12 |
+| **Operating System** | Android 16 |
 | **ARCore Version** | Pre-installed (Google Play Services for AR) |
 | **Internet Connection** | Mobile data (4G/LTE) |
 | **GPS** | Device built-in GPS |
