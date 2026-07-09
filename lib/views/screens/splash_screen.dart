@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 
@@ -49,6 +50,9 @@ class _SplashScreenState extends State<SplashScreen>
     } catch (_) {}
     if (!mounted) return;
 
+    await _requestForegroundTaskPermissions();
+    if (!mounted) return;
+
     // Await the first location fix (last-known cache, < 100 ms) so that
     // HomeScreen's initialCenter is already set when the map first builds.
     // The idempotency guard in MapViewModel makes the HomeScreen call a no-op.
@@ -56,6 +60,21 @@ class _SplashScreenState extends State<SplashScreen>
 
     if (!mounted) return;
     Navigator.of(context).pushReplacementNamed('/home');
+  }
+
+  Future<void> _requestForegroundTaskPermissions() async {
+    final notifGranted =
+        await FlutterForegroundTask.checkNotificationPermission() ==
+            NotificationPermission.granted;
+    if (!notifGranted) {
+      await FlutterForegroundTask.requestNotificationPermission();
+    }
+
+    final batteryGranted =
+        await FlutterForegroundTask.isIgnoringBatteryOptimizations;
+    if (!batteryGranted) {
+      await FlutterForegroundTask.requestIgnoreBatteryOptimization();
+    }
   }
 
   Future<void> _handleLocationPermission() async {

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
 // Top-level entry point for the foreground task isolate.
@@ -46,11 +47,11 @@ class NavigationForegroundService {
     );
   }
 
-  static Future<void> startService({
+  static Future<bool> startService({
     required String destination,
     required String eta,
   }) async {
-    await FlutterForegroundTask.startService(
+    final result = await FlutterForegroundTask.startService(
       notificationTitle: 'Smart AR Navigate',
       notificationText: 'Running. Tap to open.',
       notificationInitialRoute: '/ar-navigation',
@@ -59,6 +60,11 @@ class NavigationForegroundService {
       ],
       callback: _startCallback,
     );
+    if (result is ServiceRequestFailure) {
+      debugPrint('Foreground service failed to start: ${result.error}');
+      return false;
+    }
+    return true;
   }
 
   static Future<void> stopService() async {

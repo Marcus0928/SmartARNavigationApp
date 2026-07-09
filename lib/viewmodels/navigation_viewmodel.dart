@@ -90,10 +90,16 @@ class NavigationViewModel extends ChangeNotifier {
       );
       _arViewModel.setDestination(_currentDestination?.coordinates);
       _remainingPolyline = List.from(_currentRoute!.polylinePoints);
-      NavigationForegroundService.startService(
+      final started = await NavigationForegroundService.startService(
         destination: _currentDestination?.name ?? '',
         eta: '${(_currentRoute!.estimatedDuration / 60).ceil()} min',
       );
+      if (!started) {
+        debugPrint(
+          'Warning: foreground service did not start — '
+          'app may be killed in background',
+        );
+      }
       _navigationStatus = NavigationStatus.navigating;
       _fasterRouteTimer?.cancel();
       _fasterRouteTimer = Timer.periodic(
