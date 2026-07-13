@@ -176,7 +176,7 @@ class _ForegroundTaskListenerState extends State<_ForegroundTaskListener> {
   }
 
   void _onTaskData(Object data) {
-    if (data == 'stop_navigation') {
+    if (data == 'service_stopped') {
       _navVM.stopNavigation();
     }
   }

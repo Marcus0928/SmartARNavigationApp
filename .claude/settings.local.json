@@ -22,7 +22,8 @@
       "Bash(git push *)",
       "Bash(git fetch *)",
       "Bash(git *)",
-      "PowerShell($cfg = Get-Content \"C:\\\\Sunway\\\\Bachelor in Software Engineering\\\\Semester 9\\\\Capstone 2\\\\SmartARNavigationApp\\\\.dart_tool\\\\package_config.json\" | ConvertFrom-Json; \\($cfg.packages | Where-Object { $_.name -eq 'flutter_foreground_task' }\\).rootUri)"
+      "PowerShell($cfg = Get-Content \"C:\\\\Sunway\\\\Bachelor in Software Engineering\\\\Semester 9\\\\Capstone 2\\\\SmartARNavigationApp\\\\.dart_tool\\\\package_config.json\" | ConvertFrom-Json; \\($cfg.packages | Where-Object { $_.name -eq 'flutter_foreground_task' }\\).rootUri)",
+      "Bash(xargs grep -l \"class ARView\")"
     ]
   }
 }

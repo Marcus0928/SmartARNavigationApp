@@ -21,7 +21,8 @@ class _NavigationTaskHandler extends TaskHandler {
   @override
   void onNotificationButtonPressed(String id) {
     if (id == 'switch_off') {
-      FlutterForegroundTask.sendDataToMain('stop_navigation');
+      FlutterForegroundTask.stopService();
+      FlutterForegroundTask.sendDataToMain('service_stopped');
     }
   }
 }
@@ -30,11 +31,11 @@ class NavigationForegroundService {
   static void initialize() {
     FlutterForegroundTask.init(
       androidNotificationOptions: AndroidNotificationOptions(
-        channelId: 'smart_ar_nav_v2',
+        channelId: 'smart_ar_nav_v3',
         channelName: 'Smart AR Navigation',
         channelDescription: 'Navigation is running',
-        channelImportance: NotificationChannelImportance.LOW,
-        priority: NotificationPriority.LOW,
+        channelImportance: NotificationChannelImportance.DEFAULT,
+        priority: NotificationPriority.DEFAULT,
         enableVibration: false,
         playSound: false,
       ),

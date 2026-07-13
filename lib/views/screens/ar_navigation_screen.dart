@@ -111,6 +111,12 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
 
     final arVM = context.watch<ARViewModel>();
 
+    // The faster-route map preview replaces the camera feed, so the AR
+    // platform view is hidden while it's shown — otherwise the native
+    // platform view can intercept touches meant for the preview's buttons.
+    final hideArForFasterRoute =
+        navVM.showFasterRouteMap && navVM.suggestedFasterRoute != null;
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
@@ -133,7 +139,7 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
       body: Stack(
         children: [
           // ── Layer 1: Full-screen AR camera feed ───────────────────
-          if (_showAR)
+          if (_showAR && !hideArForFasterRoute)
             ARView(onARViewCreated: _onARViewCreated)
           else
             Container(color: Colors.black),
@@ -203,7 +209,10 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
             Positioned.fill(
               child: _FasterRouteMapWidget(
                 currentRoute: navVM.currentRoute!,
-                fasterRoute: navVM.suggestedFasterRoute!,
+                remainingPolyline: navVM.remainingPolyline
+                    .map((p) => ll.LatLng(p.latitude, p.longitude))
+                    .toList(),
+                suggestedRoute: navVM.suggestedFasterRoute!,
                 userLat: context
                     .read<MapViewModel>()
                     .currentLocation
@@ -346,7 +355,8 @@ class _ReroutingBanner extends StatelessWidget {
 class _FasterRouteMapWidget extends StatefulWidget {
   const _FasterRouteMapWidget({
     required this.currentRoute,
-    required this.fasterRoute,
+    required this.remainingPolyline,
+    required this.suggestedRoute,
     this.userLat,
     this.userLng,
     required this.onAccept,
@@ -354,7 +364,8 @@ class _FasterRouteMapWidget extends StatefulWidget {
   });
 
   final RouteModel currentRoute;
-  final RouteModel fasterRoute;
+  final List<ll.LatLng> remainingPolyline;
+  final RouteModel suggestedRoute;
   final double? userLat;
   final double? userLng;
   final VoidCallback onAccept;
@@ -384,20 +395,24 @@ class _FasterRouteMapWidgetState extends State<_FasterRouteMapWidget>
   }
 
   void _fitBounds() {
+    if (!mounted) return;
     final allPoints = [
-      ...widget.currentRoute.polylinePoints
-          .map((p) => ll.LatLng(p.latitude, p.longitude)),
-      ...widget.fasterRoute.polylinePoints
+      ...widget.remainingPolyline,
+      ...widget.suggestedRoute.polylinePoints
           .map((p) => ll.LatLng(p.latitude, p.longitude)),
     ];
     if (allPoints.isEmpty) return;
-    _mapController.fitCamera(
-      CameraFit.bounds(
-        bounds: LatLngBounds.fromPoints(allPoints),
-        padding: const EdgeInsets.all(60),
-        maxZoom: 16,
-      ),
-    );
+    try {
+      _mapController.fitCamera(
+        CameraFit.bounds(
+          bounds: LatLngBounds.fromPoints(allPoints),
+          padding: const EdgeInsets.all(60),
+          maxZoom: 16,
+        ),
+      );
+    } catch (e) {
+      debugPrint('fitBounds error: $e');
+    }
   }
 
   @override
@@ -409,14 +424,12 @@ class _FasterRouteMapWidgetState extends State<_FasterRouteMapWidget>
 
   @override
   Widget build(BuildContext context) {
-    final currentPolyline = widget.currentRoute.polylinePoints
-        .map((p) => ll.LatLng(p.latitude, p.longitude))
-        .toList();
-    final fasterPolyline = widget.fasterRoute.polylinePoints
+    final currentPolyline = widget.remainingPolyline;
+    final fasterPolyline = widget.suggestedRoute.polylinePoints
         .map((p) => ll.LatLng(p.latitude, p.longitude))
         .toList();
     final timeSaved = widget.currentRoute.estimatedDuration -
-        widget.fasterRoute.estimatedDuration;
+        widget.suggestedRoute.estimatedDuration;
     final timeSavedMin = (timeSaved / 60).round();
     final percentSaved =
         (timeSaved / widget.currentRoute.estimatedDuration * 100).round();

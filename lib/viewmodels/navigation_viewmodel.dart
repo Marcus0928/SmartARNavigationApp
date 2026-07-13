@@ -51,6 +51,19 @@ class NavigationViewModel extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   int? get activeRouteIndex => _activeRouteIndex;
   List<LatLng> get remainingPolyline => _remainingPolyline;
+
+  /// Estimates the remaining travel time on the current route by scaling
+  /// the original estimated duration by how much of the polyline is left,
+  /// so faster-route comparisons aren't made against the full trip duration.
+  int get remainingDuration {
+    if (_currentRoute == null) return 0;
+    final fullLen = _currentRoute!.polylinePoints.length;
+    if (fullLen == 0) return 0;
+    final remainLen = _remainingPolyline.length;
+    final ratio = remainLen / fullLen;
+    return (_currentRoute!.estimatedDuration * ratio).round();
+  }
+
   RouteModel? get suggestedFasterRoute => _suggestedFasterRoute;
   bool get showFasterRouteMap => _showFasterRouteMap;
   bool get isStartingNavigation => _isStartingNavigation;
@@ -84,22 +97,25 @@ class NavigationViewModel extends ChangeNotifier {
         _currentRoute = routes.first;
         _activeRouteIndex = 0; // fallback fetch always yields index 0
       }
-      await _arViewModel.initializeOverlay(
-        _currentRoute!,
-        heading: _locationService.currentHeading,
-      );
       _arViewModel.setDestination(_currentDestination?.coordinates);
       _remainingPolyline = List.from(_currentRoute!.polylinePoints);
-      final started = await NavigationForegroundService.startService(
-        destination: _currentDestination?.name ?? '',
-        eta: '${(_currentRoute!.estimatedDuration / 60).ceil()} min',
-      );
-      if (!started) {
-        debugPrint(
-          'Warning: foreground service did not start — '
-          'app may be killed in background',
-        );
-      }
+      await Future.wait<void>([
+        _arViewModel.initializeOverlay(
+          _currentRoute!,
+          heading: _locationService.currentHeading,
+        ),
+        NavigationForegroundService.startService(
+          destination: _currentDestination?.name ?? '',
+          eta: '${(_currentRoute!.estimatedDuration / 60).ceil()} min',
+        ).then((ok) {
+          if (!ok) {
+            debugPrint(
+              'Warning: foreground service did not start — '
+              'app may be killed in background',
+            );
+          }
+        }),
+      ]);
       _navigationStatus = NavigationStatus.navigating;
       _fasterRouteTimer?.cancel();
       _fasterRouteTimer = Timer.periodic(
@@ -226,15 +242,16 @@ class NavigationViewModel extends ChangeNotifier {
       final fastest = routes.reduce(
         (a, b) => a.estimatedDuration < b.estimatedDuration ? a : b,
       );
-      final timeSaved =
-          _currentRoute!.estimatedDuration - fastest.estimatedDuration;
+      final remaining = remainingDuration;
+      final timeSaved = remaining - fastest.estimatedDuration;
       // Skip if this is the same route the user already dismissed
       if (_dismissedRouteDuration != null &&
           fastest.estimatedDuration >= _dismissedRouteDuration!) {
         return;
       }
       if (timeSaved >= 300 &&
-          timeSaved / _currentRoute!.estimatedDuration >= 0.10) {
+          remaining > 0 &&
+          timeSaved / remaining >= 0.10) {
         _suggestedFasterRoute = fastest;
         _showFasterRouteMap = true;
         notifyListeners();
