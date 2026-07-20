@@ -4,11 +4,13 @@ class NavigationForegroundService {
   static void initialize() {
     FlutterForegroundTask.init(
       androidNotificationOptions: AndroidNotificationOptions(
-        channelId: 'smart_ar_navigation',
+        channelId: 'smart_ar_nav_v3',
         channelName: 'Smart AR Navigation',
         channelDescription: 'Navigation is running',
-        channelImportance: NotificationChannelImportance.LOW,
-        priority: NotificationPriority.LOW,
+        channelImportance: NotificationChannelImportance.DEFAULT,
+        priority: NotificationPriority.DEFAULT,
+        enableVibration: false,
+        playSound: false,
       ),
       iosNotificationOptions: const IOSNotificationOptions(),
       foregroundTaskOptions: ForegroundTaskOptions(
@@ -24,8 +26,15 @@ class NavigationForegroundService {
     required String eta,
   }) async {
     await FlutterForegroundTask.startService(
-      notificationTitle: 'Navigating to $destination',
-      notificationText: 'ETA: $eta',
+      notificationTitle: 'Navigation Active',
+      notificationText: 'Smart AR Navigate is running',
+      notificationButtons: [
+        const NotificationButton(
+          id: 'switch_off',
+          text: 'Switch off',
+        ),
+      ],
+      callback: _startCallback,
     );
   }
 
@@ -41,5 +50,38 @@ class NavigationForegroundService {
       notificationTitle: 'Navigating to $destination',
       notificationText: 'ETA: $eta',
     );
+  }
+}
+
+@pragma('vm:entry-point')
+void _startCallback() {
+  FlutterForegroundTask.setTaskHandler(_NavigationTaskHandler());
+}
+
+class _NavigationTaskHandler extends TaskHandler {
+  @override
+  Future<void> onStart(DateTime timestamp, TaskStarter starter) async {}
+
+  @override
+  void onRepeatEvent(DateTime timestamp) {}
+
+  @override
+  Future<void> onDestroy(DateTime timestamp) async {}
+
+  @override
+  void onNotificationButtonPressed(String id) {
+    if (id == 'switch_off') {
+      // Stop the foreground service directly from the task isolate — does
+      // not need the main isolate event loop.
+      FlutterForegroundTask.stopService();
+      // Notify main isolate to clean up navigation state.
+      FlutterForegroundTask.sendDataToMain('stop_navigation');
+    }
+  }
+
+  @override
+  void onNotificationPressed() {
+    // Bring app to foreground when notification body is tapped.
+    FlutterForegroundTask.launchApp('/ar-navigation');
   }
 }

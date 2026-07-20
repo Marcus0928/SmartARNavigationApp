@@ -19,6 +19,9 @@ class NavigationViewModel extends ChangeNotifier {
   final ARViewModel _arViewModel;
   final ProfileViewModel _profileViewModel;
 
+  static NavigationViewModel? _instance;
+  static NavigationViewModel? get instance => _instance;
+
   NavigationViewModel({
     required RouteRepository routeRepository,
     required LocationService locationService,
@@ -29,7 +32,15 @@ class NavigationViewModel extends ChangeNotifier {
         _locationService = locationService,
         _arService = arService,
         _arViewModel = arViewModel,
-        _profileViewModel = profileViewModel;
+        _profileViewModel = profileViewModel {
+    _instance = this;
+  }
+
+  @override
+  void dispose() {
+    _instance = null;
+    super.dispose();
+  }
 
   PlaceModel? _currentDestination;
   RouteModel? _currentRoute;
