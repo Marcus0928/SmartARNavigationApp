@@ -36,6 +36,7 @@ Think of it as **Google Maps or Waze, but with AR directions on your camera view
 - 🎬 **Animated Map Transitions** — Smooth eased fly-to animation (650 ms, `easeInOut`) when centering on location
 - 🏠 **Quick-Access Saved Places** — Home, Work, and Favourite one-tap buttons persist destinations via `shared_preferences`
 - 🔖 **Bookmarked Locations** — Bookmark any search result; a SQLite-backed list of saved places is accessible via the "Saved Places" button in the bottom sheet
+- 💡 **Auto Brightness (Ambient Light Sensor)** — The AR arrow's opacity and colour automatically adapt to real-world lighting (bright / normal / dark) via the device's ambient light sensor, with a 2-second debounce to prevent flicker; can be toggled off in Settings to use a manual opacity slider instead
 
 ---
 
@@ -54,6 +55,7 @@ Think of it as **Google Maps or Waze, but with AR directions on your camera view
 | [sqflite](https://pub.dev/packages/sqflite) | SQLite database for saved locations list |
 | [shared_preferences](https://pub.dev/packages/shared_preferences) | Persistent key-value storage for Home / Work / Favourite places and settings |
 | [wakelock_plus](https://pub.dev/packages/wakelock_plus) | Keeps the screen on during AR navigation |
+| [light](https://pub.dev/packages/light) | Ambient light sensor stream — drives AR arrow auto-brightness |
 
 ---
 
@@ -206,6 +208,7 @@ dependencies:
   sqflite: ^2.3.3                  # SQLite database for bookmarked saved locations list
   path: ^1.9.0                     # File path utilities (required by sqflite)
   wakelock_plus: ^1.2.8            # Keeps screen on during AR navigation
+  light: ^5.0.0                    # Ambient light sensor for AR arrow auto-brightness
 ```
 
 ---
@@ -264,6 +267,7 @@ All project documentation is located in the `/docs` folder:
 - [x] Early turn warning — arrow preemptively shows upcoming non-forward turn (all 6 types) within 1 km; 1000/1100 m hysteresis gate prevents oscillation
 - [x] GPS accuracy improvement — passed-turn threshold raised from 10 m to 25 m for Malaysian urban GPS conditions
 - [x] Roundabout exit number fallback — parses ordinal from `html_instructions` when structured `exit` field is absent
+- [x] Auto Brightness — ambient light sensor (`light` package) adjusts AR arrow opacity/colour (bright/normal/dark), 2 s debounce, toggle + fallback manual opacity slider in Settings
 - [ ] Voice guidance
 - [ ] Manual testing & bug fixes
 - [ ] Final APK build & submission

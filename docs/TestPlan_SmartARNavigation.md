@@ -14,7 +14,7 @@
 | **Testing Type** | Manual Black-Box Testing |
 | **Test Device** | OPPO Reno 7 5G (CPH2371) |
 | **Test Device** | OPPO Reno 15 5G (CPH2825) |
-| **Version** | 1.3 |
+| **Version** | 1.4 |
 | **Last Updated** | July 2026 |
 
 ---
@@ -34,7 +34,8 @@
 11. [Test Cases — Recent Search History](#11-test-cases--recent-search-history)
 12. [Test Cases — Early Turn Warning & Roundabout Exit Number](#12-test-cases--early-turn-warning--roundabout-exit-number)
 13. [Test Cases — Navigation Improvements (v1.3)](#13-test-cases--navigation-improvements-v13)
-14. [Test Results Summary Table](#14-test-results-summary-table)
+14. [Test Cases — Ambient Light Auto-Brightness (v1.4)](#14-test-cases--ambient-light-auto-brightness-v14)
+15. [Test Results Summary Table](#15-test-results-summary-table)
 
 ---
 
@@ -896,7 +897,141 @@ These tests cover the heading-biased route fetch, phantom U-turn guard, reroutin
 
 ---
 
-## 14. Test Results Summary Table
+## 14. Test Cases — Ambient Light Auto-Brightness (v1.4)
+
+These tests cover the ambient light sensor integration that automatically adjusts the AR arrow's opacity and colour, introduced in version 1.4.
+
+---
+
+### TC-048 — Auto Brightness Toggle Visible and On by Default
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-048 |
+| **Feature** | Auto Brightness Setting |
+| **Covers** | FR-83 |
+| **Description** | Verify the Settings screen shows an "Auto Brightness" toggle under AR Appearance, enabled by default |
+| **Precondition** | Fresh app install, Settings screen open |
+| **Steps** | 1. Open Settings from the hamburger menu 2. Locate the AR Appearance section |
+| **Expected Result** | An "Auto Brightness" switch appears above the "AR Overlay Opacity" slider, in the ON state by default |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+### TC-049 — Arrow Brightens in Bright Light
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-049 |
+| **Feature** | Auto Brightness |
+| **Covers** | FR-83 |
+| **Description** | Verify the AR arrow becomes fully opaque and shifts to a brighter green when ambient light is high |
+| **Precondition** | Active AR navigation, Auto Brightness is ON, device sensor available |
+| **Steps** | 1. Start AR navigation outdoors in direct sunlight 2. Hold for at least 2–3 seconds 3. Observe the AR arrow |
+| **Expected Result** | Within ~2 seconds of sustained bright ambient light, the arrow opacity reaches 100% and the colour shifts to a brighter green (`#00FF87`) while the turn is still `far` |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+### TC-050 — Arrow Adapts in Low Light
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-050 |
+| **Feature** | Auto Brightness |
+| **Covers** | FR-83 |
+| **Description** | Verify the AR arrow adjusts opacity/colour when ambient light is low (e.g. dusk, shaded area, indoors) |
+| **Precondition** | Active AR navigation, Auto Brightness is ON |
+| **Steps** | 1. Start AR navigation in a dim/shaded area or at dusk 2. Hold for at least 2–3 seconds 3. Observe the AR arrow |
+| **Expected Result** | Within ~2 seconds of sustained low ambient light, the arrow opacity reaches 95% and the colour shifts to a darker green (`#00C853`) while the turn is still `far` |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+### TC-051 — Debounce Prevents Flicker
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-051 |
+| **Feature** | Auto Brightness — Debounce |
+| **Covers** | FR-83 |
+| **Description** | Verify brief, momentary light changes (e.g. a hand passing over the camera, a passing shadow) do not cause the arrow to flicker between brightness levels |
+| **Precondition** | Active AR navigation, Auto Brightness is ON |
+| **Steps** | 1. While navigating in normal light, briefly cover and uncover the sensor/camera area for under 1 second, repeated a few times |
+| **Expected Result** | The arrow's opacity/colour does **not** visibly flicker or rapidly toggle — a level change is only applied after the new level has been sustained for approximately 2 seconds |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+### TC-052 — Manual Opacity Slider Disabled While Auto Brightness Is On
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-052 |
+| **Feature** | Auto Brightness — Manual Override |
+| **Covers** | FR-83, FR-31 |
+| **Description** | Verify the "AR Overlay Opacity" slider is greyed out and non-interactive while Auto Brightness is enabled |
+| **Precondition** | Settings screen open, Auto Brightness is ON |
+| **Steps** | 1. Observe the "AR Overlay Opacity" slider 2. Attempt to drag it |
+| **Expected Result** | The slider row appears dimmed (~40% opacity) and does not respond to touch/drag while Auto Brightness is ON |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+### TC-053 — Manual Opacity Slider Works When Auto Brightness Is Off
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-053 |
+| **Feature** | Auto Brightness — Manual Override |
+| **Covers** | FR-83, FR-31 |
+| **Description** | Verify turning off Auto Brightness re-enables the manual opacity slider and its value is applied to the AR arrow |
+| **Precondition** | Settings screen open |
+| **Steps** | 1. Turn OFF the "Auto Brightness" toggle 2. Drag the "AR Overlay Opacity" slider to 70% 3. Start AR navigation 4. Observe the AR arrow's opacity |
+| **Expected Result** | The slider becomes interactive once Auto Brightness is OFF; the AR arrow during navigation reflects the manually set 70% opacity regardless of ambient light, and uses the default arrow colour (not an ambient-light colour) |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+### TC-054 — Graceful Fallback When Sensor Is Unavailable
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-054 |
+| **Feature** | Auto Brightness — Error Handling |
+| **Covers** | FR-83a |
+| **Description** | Verify the app does not crash and continues navigation normally on a device without an ambient light sensor, or if the sensor stream errors |
+| **Precondition** | Auto Brightness is ON; test device without a light sensor, or simulate stream failure |
+| **Steps** | 1. Start AR navigation with Auto Brightness ON on a device lacking the sensor |
+| **Expected Result** | App does not crash; the AR arrow remains visible at its default appearance (`normal` level: 85% opacity, default green); no error is shown to the user (logged via `debugPrint` only) |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+### TC-055 — Toggling Auto Brightness Mid-Navigation
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-055 |
+| **Feature** | Auto Brightness — Live Toggle |
+| **Covers** | FR-83 |
+| **Description** | Verify switching Auto Brightness off while actively navigating stops the sensor and immediately applies the manual opacity value, without requiring a navigation restart |
+| **Precondition** | Active AR navigation session with Auto Brightness ON |
+| **Steps** | 1. While navigating, open Settings 2. Turn OFF Auto Brightness 3. Return to the AR Navigation Screen |
+| **Expected Result** | The AR arrow immediately switches to using the manual "AR Overlay Opacity" slider value; no crash or navigation interruption occurs |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+## 15. Test Results Summary Table
 
 Fill in this table after completing all tests.
 
@@ -949,6 +1084,14 @@ Fill in this table after completing all tests.
 | TC-045 | Faster Route | Faster Route Banner and Switch | ⏳ | |
 | TC-046 | Phantom U-Turn Guard | No U-Turn at Route Start | ⏳ | |
 | TC-047 | Off-Route (Highway) | No False Reroute on Sparse Segments | ⏳ | |
+| TC-048 | Auto Brightness | Toggle Visible, On by Default | ⏳ | |
+| TC-049 | Auto Brightness | Arrow Brightens in Bright Light | ⏳ | |
+| TC-050 | Auto Brightness | Arrow Adapts in Low Light | ⏳ | |
+| TC-051 | Auto Brightness | Debounce Prevents Flicker | ⏳ | |
+| TC-052 | Auto Brightness | Manual Slider Disabled When Auto On | ⏳ | |
+| TC-053 | Auto Brightness | Manual Slider Works When Auto Off | ⏳ | |
+| TC-054 | Auto Brightness | Graceful Fallback — No Sensor | ⏳ | |
+| TC-055 | Auto Brightness | Toggling Mid-Navigation | ⏳ | |
 
 ---
 
@@ -960,8 +1103,8 @@ Fill in this table after completing all tests.
 | ❌ FAIL | — |
 | ⚠️ PARTIAL | 3 |
 | ⏭️ SKIP | — |
-| ⏳ Not tested | 11 |
-| **Total** | **47** |
+| ⏳ Not tested | 19 |
+| **Total** | **55** |
 
 ---
 
@@ -972,6 +1115,6 @@ Fill in this table after completing all tests.
 
 ---
 
-*End of Test Plan Document — Version 1.3*
+*End of Test Plan Document — Version 1.4*
 
 *Prepared by: Liew Sau Yang | Sunway University | Bachelor of Software Engineering (Hons)*

@@ -11,7 +11,7 @@
 | **Supervisor** | Dr Javid Iqbal Thirupattur |
 | **Institution** | Sunway University — School of Computing and Artificial Intelligence |
 | **Programme** | Bachelor of Software Engineering (Hons) |
-| **Version** | 3.2 |
+| **Version** | 3.3 |
 | **Last Updated** | July 2026 |
 
 ---
@@ -258,7 +258,8 @@ View rebuilds AR overlays based on new ViewModel state
                                   │            • Show / hide speed display
                                   │            • Show / hide ETA display
                                   │            • AR arrow size (S/M/L)
-                                  │            • AR overlay opacity (50–100%)
+                                  │            • Auto Brightness toggle (ambient light sensor)
+                                  │            • AR overlay opacity (50–100%, disabled when Auto Brightness is on)
                                   │            • About (version + developer)
                                   │                    │ user taps Back
                                   │                    ▼
@@ -407,6 +408,7 @@ Check Location Permission
 | `arrowSize` | `String` | AR arrow size: `'Small'`, `'Medium'`, or `'Large'` |
 | `overlayOpacity` | `double` | AR overlay opacity between `0.5` and `1.0` |
 | `avoidTolls` | `bool` | Whether toll roads should be avoided when routing |
+| `autoBrightness` | `bool` | Whether the AR arrow's opacity/colour is driven automatically by `AmbientLightService` (default `true`); when `false`, `overlayOpacity` is used instead |
 | `setNavigationMode(mode)` | `Future<void>` | Saves navigation mode preference |
 | `setDistanceUnit(unit)` | `Future<void>` | Saves distance unit preference |
 | `setShowSpeed(value)` | `Future<void>` | Saves show-speed toggle state |
@@ -414,6 +416,7 @@ Check Location Permission
 | `setArrowSize(size)` | `Future<void>` | Saves AR arrow size preference |
 | `setOverlayOpacity(opacity)` | `Future<void>` | Saves AR overlay opacity value (clamped to 0.5–1.0) |
 | `setAvoidTolls(value)` | `Future<void>` | Saves avoid-tolls toggle state |
+| `setAutoBrightness(value)` | `Future<void>` | Saves auto-brightness toggle state |
 
 #### `ProfileViewModel`
 **Responsibility:** Manages the user's profile data (name, email) and driving statistics, persisted via `shared_preferences`.
@@ -563,6 +566,13 @@ class PlaceModel {
 - Manages ARCore session lifecycle (initialize, dispose)
 - Arrow overlays are rendered as Flutter widget overlays driven by `ARViewModel` state; `placeArrow`, `updateArrow`, and `clearOverlays` are intentional no-ops that notify the widget layer via `ARViewModel` rather than placing 3D ARCore nodes directly
 
+#### `AmbientLightService`
+- Wraps the `light` package's `Light().lightSensorStream` (`Stream<int>` of lux readings)
+- Classifies each lux reading into a `LightLevel` (`bright` > 1000 lux, `dark` < 100 lux, otherwise `normal`) and exposes it via a `ValueNotifier<LightLevel> levelNotifier`
+- Applies a 2-second debounce timer before committing a level change, so transient lux fluctuations (e.g. a passing shadow) don't cause flicker; the timer only (re)starts when the *pending* target level changes, not on every reading, so a steadily-held new level still commits after 2 s even under a fast sensor sample rate
+- `start()`/`stop()` are idempotent; `start()` wraps `.listen()` in both a `try/catch` (synchronous setup failures) and an `onError` callback (async stream errors) so a missing or unauthorized sensor fails gracefully rather than crashing, leaving `levelNotifier` at its default `normal` value
+- Instantiated and owned by `ARNavigationScreenState`; started/stopped based on `SettingsViewModel.autoBrightness`, disposed in the screen's `dispose()`
+
 ---
 
 ## 6. Data Flow Design
@@ -673,6 +683,7 @@ smart_ar_navigation/
 │   ├── services/                    # External service wrappers (Model layer)
 │   │   ├── location_service.dart        # GPS / geolocator wrapper
 │   │   ├── ar_service.dart              # ARCore / ar_flutter_plugin wrapper
+│   │   ├── ambient_light_service.dart   # Ambient light sensor (light package) — drives AR arrow auto-brightness
 │   │   └── saved_locations_database.dart # SQLite database helper (sqflite)
 │   │
 │   ├── repositories/                # API & DB communication (Model layer)
@@ -685,7 +696,7 @@ smart_ar_navigation/
 │   │   ├── navigation_viewmodel.dart     # Session state; updates ProfileViewModel on arrival
 │   │   ├── ar_viewmodel.dart             # Tracks nextTurnDirection, exitNumber, streetName
 │   │   ├── map_viewmodel.dart            # GPS stream, heading, accuracy, place search
-│   │   ├── settings_viewmodel.dart       # Preferences: unit, speed, ETA, arrow size, opacity, avoidTolls
+│   │   ├── settings_viewmodel.dart       # Preferences: unit, speed, ETA, arrow size, opacity, avoidTolls, autoBrightness
 │   │   ├── profile_viewmodel.dart        # Name, email, drive stats (SharedPreferences)
 │   │   ├── plan_drive_viewmodel.dart     # Plan Drive screen: search, routes, options
 │   │   ├── saved_places_viewmodel.dart   # Home / Work / Favourite slots (SharedPreferences)
@@ -739,7 +750,7 @@ smart_ar_navigation/
 │   │   │       └── saved_places_section.dart  # Home / Work / Favourite place rows
 │   │   │
 │   │   └── widgets/                 # Reusable UI components (shared across screens)
-│   │       ├── dynamic_arrow_widget.dart   # CustomPainter: chevron arrows for all 7 TurnDirection values with animated glow, colour pulse, and flow wave
+│   │       ├── dynamic_arrow_widget.dart   # CustomPainter: chevron arrows for all 7 TurnDirection values with animated glow, colour pulse, and flow wave; opacityOverride/colorOverride params feed ambient auto-brightness
 │   │       ├── search_bar_widget.dart      # Destination search input
 │   │       └── navigation_bottom_bar.dart  # ETA / distance bottom panel
 │   │
@@ -1047,6 +1058,7 @@ These features are **out of scope for the current FYP phase** but the design has
 | **Edge-to-Edge Status Bar** | ✅ Implemented | `SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge)` in `main()`; per-screen `AnnotatedRegion<SystemUiOverlayStyle>` for icon brightness. |
 | **AR Camera Fix on Resume** | ✅ Implemented | `ARNavigationScreen` uses `UniqueKey _arViewKey`; `didChangeAppLifecycleState` assigns a new `UniqueKey` on resume, forcing Flutter to fully dispose and recreate the `ARView` native widget. |
 | **Route Refresh from Current Location** | ✅ Implemented | `MapViewModel.refreshPreviewRoute()` re-fetches from current GPS; `routeVersion` counter triggers camera re-fit in `HomeMapController`. |
+| **Ambient Light Auto-Brightness** | ✅ Implemented | `AmbientLightService` streams lux via the `light` package, classifies into `LightLevel` (bright/normal/dark) with a 2 s debounce, and exposes it via `ValueNotifier`. `ARNavigationScreen` wraps the main AR arrow in a `ValueListenableBuilder` that maps the level to an opacity/colour pair (or falls back to `SettingsViewModel.overlayOpacity` when the "Auto Brightness" toggle is off), passed to `DynamicArrowWidget`'s `opacityOverride`/`colorOverride` parameters. |
 | **Voice Instructions** | 🔮 Planned | Add a `VoiceService` in the services layer. `ARViewModel` already exposes `nextTurnDirection`, `distanceToNextTurn`, and `currentStreetName` — pass these to a `flutter_tts` call at appropriate distance thresholds. |
 | **2D Map Toggle** | 🔮 Planned | Add `map_screen.dart` as a new View. `NavigationViewModel` already holds the `RouteModel` — pass it to a `GoogleMap` widget. A toggle button on `ARNavigationScreen` can push/pop between screens. |
 | **Offline Navigation** | 🔮 Planned | Replace `RouteRepository` with a cached route strategy. No changes needed in ViewModels or Views. |
@@ -1054,6 +1066,6 @@ These features are **out of scope for the current FYP phase** but the design has
 
 ---
 
-*End of SDD Document — Version 3.2*
+*End of SDD Document — Version 3.3*
 
 *Prepared by: Liew Sau Yang | Sunway University | Bachelor of Software Engineering (Hons)*

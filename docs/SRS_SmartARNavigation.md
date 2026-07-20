@@ -12,7 +12,7 @@
 | **Institution** | Sunway University — School of Computing and Artificial Intelligence |
 | **Programme** | Bachelor of Software Engineering (Hons) |
 | **Semester** | September 2025 |
-| **Version** | 2.3 |
+| **Version** | 2.4 |
 | **Last Updated** | July 2026 |
 
 ---
@@ -249,6 +249,8 @@ Primary users are assumed to be comfortable with basic smartphone usage. No tech
 | FR-31 | The Settings screen shall include an AR overlay opacity slider adjustable between 50% and 100%. |
 | FR-32 | The Settings screen shall display an About section showing the current app version and developer information. |
 | FR-49 | The Settings screen shall include a toggle to avoid toll roads when routing; the preference shall be persisted via `shared_preferences`. |
+| FR-83 | The Settings screen shall include an "Auto Brightness" toggle. When enabled (default), the system shall read the device's ambient light sensor and automatically adjust the AR arrow's opacity and colour to one of three levels — bright, normal, or dark — based on the measured lux value, applying a 2-second debounce before switching levels to prevent flicker. When disabled, the AR arrow shall use the manual "AR Overlay Opacity" slider value (FR-31) instead. |
+| FR-83a | If the device has no ambient light sensor or the sensor stream is unavailable, the system shall fail gracefully and continue to display the AR arrow at its default appearance, without crashing or blocking navigation. |
 
 ---
 
@@ -416,6 +418,7 @@ Primary users are assumed to be comfortable with basic smartphone usage. No tech
 | Rear Camera | Live camera feed for AR background |
 | GPS/Location Sensor | Real-time location tracking |
 | Accelerometer / Gyroscope | Device orientation for AR plane detection |
+| Ambient Light Sensor | Measures lux to drive AR arrow auto-brightness (via the `light` package); feature degrades gracefully if absent |
 | Internet (Wi-Fi / Mobile Data) | Google Maps API calls |
 
 ### 5.3 Software Interfaces
@@ -468,6 +471,7 @@ dependencies:
   shared_preferences: ^2.2.0       # Persistent key-value storage (settings, Home/Work/Favourite)
   sqflite: ^2.3.3                  # SQLite database for bookmarked saved locations
   path: ^1.9.0                     # File path utilities (required by sqflite)
+  light: ^5.0.0                    # Ambient light sensor for AR arrow auto-brightness
 ```
 
 ---
@@ -508,6 +512,6 @@ dependencies:
 
 ---
 
-*End of SRS Document — Version 2.3*
+*End of SRS Document — Version 2.4*
 
 *Prepared by: Liew Sau Yang | Sunway University | Bachelor of Software Engineering (Hons)*

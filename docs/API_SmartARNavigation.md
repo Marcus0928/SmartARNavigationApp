@@ -11,7 +11,7 @@
 | **Supervisor** | Dr Javid Iqbal Thirupattur |
 | **Institution** | Sunway University — School of Computing and Artificial Intelligence |
 | **Programme** | Bachelor of Software Engineering (Hons) |
-| **Version** | 1.4 |
+| **Version** | 1.5 |
 | **Last Updated** | July 2026 |
 
 ---
@@ -31,6 +31,8 @@
 11. [SettingsViewModel](#11-settingsviewmodel)
 12. [Utility Functions](#12-utility-functions)
 13. [Enums & Constants](#13-enums--constants)
+14. [DynamicArrowWidget](#14-dynamicarrowwidget)
+15. [AmbientLightService](#15-ambientlightservice)
 
 ---
 
@@ -1107,6 +1109,45 @@ Future<void> setOverlayOpacity(double opacity)
 
 ---
 
+### `getAutoBrightness()`
+
+```dart
+Future<bool> getAutoBrightness()
+```
+
+**Purpose:** Reads whether the AR arrow's opacity/colour should be driven automatically by the ambient light sensor.
+
+**Parameters:** None
+
+**Returns:** `bool` — `true` (default, auto brightness on) or `false`
+
+**Notes:**
+- Key: `'auto_brightness'`
+- When `true`, `ARNavigationScreen` starts `AmbientLightService` and ignores `overlayOpacity` for the main AR arrow; when `false`, the sensor is stopped and `overlayOpacity` is used instead
+
+---
+
+### `setAutoBrightness()`
+
+```dart
+Future<void> setAutoBrightness(bool value)
+```
+
+**Purpose:** Saves the auto-brightness toggle state.
+
+**Parameters:**
+| Parameter | Type | Description |
+|---|---|---|
+| `value` | `bool` | `true` to enable ambient-light-driven brightness, `false` to use the manual opacity slider |
+
+**Returns:** Nothing
+
+**Notes:**
+- Key: `'auto_brightness'`
+- `ARNavigationScreenState._syncAmbientLight()` starts/stops `AmbientLightService` in response to this value changing, without restarting the sensor on every rebuild
+
+---
+
 ## 12. Utility Functions
 
 **File:** `lib/core/utils/location_utils.dart`  
@@ -1279,6 +1320,8 @@ DynamicArrowWidget({
   double? size,          // canvas side length in logical pixels (default: fills parent)
   bool showLabel = true, // whether to draw the direction label below the arrow
   int? exitNumber,       // roundabout exit number (1–4); only shown when direction == roundabout
+  double opacityOverride = 0.85, // overall widget opacity; driven by ambient light level or the manual opacity slider
+  Color? colorOverride,  // overrides the 'far' stage colour only; null = default arArrowColor
 })
 ```
 
@@ -1288,8 +1331,10 @@ DynamicArrowWidget({
 |---|---|
 | `direction` | Selects which arrow shape is drawn (chevrons, U-arc, or roundabout arc) |
 | `distance` | Passed to `approachStage` for colour; also drives pulse speed |
-| `approachStage` | `far` → cyan / slow pulse; `approaching` → amber / medium pulse; `imminent` → red / fast pulse |
+| `approachStage` | `far` → cyan (or `colorOverride`) / slow pulse; `approaching` → amber / medium pulse; `imminent` → red / fast pulse |
 | `exitNumber` | When non-null and `direction == roundabout`, the number is rendered in bold white at the arc centre |
+| `opacityOverride` | Replaces the widget's outer `Opacity` value (previously hardcoded to `0.85`); set from `AmbientLightService.levelNotifier` or `SettingsViewModel.overlayOpacity` by `ARNavigationScreen` |
+| `colorOverride` | When non-null, replaces `arArrowColor` for the `far` approach stage only — `approaching` (amber) and `imminent` (red) are left untouched so the urgency colours are never masked |
 
 ### Arrow shapes
 
@@ -1307,6 +1352,80 @@ All shapes use a 24 px glow layer (alpha 0.3) beneath the 12 px main stroke and 
 
 ---
 
-*End of API & Function Documentation — Version 1.4*
+## 15. AmbientLightService
+
+**File:** `lib/services/ambient_light_service.dart`
+**Purpose:** Wraps the `light` package's ambient light sensor stream and exposes a debounced `LightLevel` for driving AR arrow auto-brightness.
+
+```dart
+enum LightLevel { bright, normal, dark }
+```
+
+---
+
+### `start()`
+
+```dart
+void start()
+```
+
+**Purpose:** Begins listening to `Light().lightSensorStream`.
+
+**Parameters:** None
+
+**Returns:** Nothing
+
+**Notes:**
+- Idempotent — calling `start()` while already subscribed is a no-op
+- Wraps `.listen()` in a `try/catch` (synchronous setup failures, e.g. platform channel unavailable) **and** passes an `onError` callback to `.listen()` (asynchronous stream errors, e.g. sensor missing or unauthorized) — either failure path logs via `debugPrint` and leaves `levelNotifier` at its default `LightLevel.normal`
+- Called by `ARNavigationScreenState` when `SettingsViewModel.autoBrightness` is `true`
+
+---
+
+### `stop()`
+
+```dart
+void stop()
+```
+
+**Purpose:** Cancels the sensor stream subscription and any pending debounce timer.
+
+**Parameters:** None
+
+**Returns:** Nothing
+
+**Notes:**
+- Idempotent — safe to call when not started
+- Called when the user turns off the "Auto Brightness" setting, or from `dispose()`
+
+---
+
+### `dispose()`
+
+```dart
+void dispose()
+```
+
+**Purpose:** Stops the sensor and disposes `levelNotifier`.
+
+**Notes:** Always call this in the owning widget's `dispose()` — `ARNavigationScreenState` does so.
+
+---
+
+### `levelNotifier`
+
+```dart
+ValueNotifier<LightLevel> levelNotifier
+```
+
+**Purpose:** The current debounced ambient light level; consumed via `ValueListenableBuilder<LightLevel>` in `ARNavigationScreen`.
+
+**Notes:**
+- Thresholds: lux > 1000 → `bright`; lux < 100 → `dark`; otherwise → `normal`
+- A level change is only committed after the new *pending* level has been the latest reading continuously for 2 seconds — the debounce timer restarts only when the pending target level itself changes, not on every sensor reading, so it reliably fires even under a fast sensor sample rate
+
+---
+
+*End of API & Function Documentation — Version 1.5*
 
 *Prepared by: Liew Sau Yang | Sunway University | Bachelor of Software Engineering (Hons)*

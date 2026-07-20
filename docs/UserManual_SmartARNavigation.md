@@ -11,7 +11,7 @@
 | **Supervisor** | Dr Javid Iqbal Thirupattur |
 | **Institution** | Sunway University — School of Computing and Artificial Intelligence |
 | **Programme** | Bachelor of Software Engineering (Hons) |
-| **App Version** | 1.4 |
+| **App Version** | 1.5 |
 | **Last Updated** | July 2026 |
 
 ---
@@ -363,6 +363,42 @@ If you do not tap either button, the banner disappears automatically after **15 
 
 ---
 
+### 5.10 Auto Brightness (AR Arrow Appearance)
+
+The AR arrow automatically adapts to how bright or dark your surroundings are, so it stays easy to see whether you're driving in direct sunlight or at dusk.
+
+**To view or change this setting:**
+
+**Step 1** — Tap the **≡ Menu** button, then tap **Settings**
+
+**Step 2** — Scroll to the **AR Appearance** section
+
+```
+┌──────────────────────────────┐
+│ AR APPEARANCE                │
+│ Arrow Size        [S][M][L]  │
+│ ─────────────────────────── │
+│ Auto Brightness         ⬤──○│  ← ON by default
+│ Adjust arrow brightness based│
+│ on ambient light              │
+│ ─────────────────────────── │
+│ AR Overlay Opacity      85% │  ← Dimmed/locked while Auto Brightness is ON
+│ ●───────────────────────    │
+│ 50%                    100% │
+└──────────────────────────────┘
+```
+
+| Setting | What it does |
+|---|---|
+| **Auto Brightness (ON, default)** | The app reads your device's ambient light sensor and automatically brightens the arrow in strong light or adjusts it in low light. The manual opacity slider below is greyed out and locked while this is on. |
+| **Auto Brightness (OFF)** | The app stops reading the light sensor. The arrow uses whatever value you set on the **AR Overlay Opacity** slider instead, at all times. |
+
+> 💡 **Tip:** Leave Auto Brightness ON for the most hands-off experience — the arrow will brighten automatically in strong sunlight and soften slightly in low light, with a short (~2 second) delay to avoid flickering as lighting conditions change. Turn it OFF only if you prefer a fixed opacity regardless of surroundings.
+
+> ℹ️ If your device doesn't have an ambient light sensor, Auto Brightness has no visible effect — the arrow simply stays at its default appearance, and nothing else in the app is affected.
+
+---
+
 ## 6. Understanding the AR Overlays
 
 ### 6.1 Arrow Types
@@ -399,6 +435,8 @@ The arrow colour changes automatically as you get closer to the next turn. No ac
 | 🟢 Cyan / Green | More than 200 m | Normal navigation — follow the arrow, plenty of time |
 | 🟡 Amber / Yellow | 50 – 200 m | Approaching the turn — start preparing to turn |
 | 🔴 Red | Less than 50 m | Turn now — the turn is immediately ahead |
+
+> ℹ️ When **Auto Brightness** is on (see [5.10](#510-auto-brightness-ar-arrow-appearance)) and you're more than 200 m from a turn, the exact shade of green may shift slightly brighter or darker based on ambient light — this is separate from the amber/red warning colours above, which always appear as you approach a turn regardless of the Auto Brightness setting.
 
 ### 6.4 Early Turn Warning
 
@@ -468,11 +506,16 @@ When you are within **1 km** of an upcoming turn (left, right, keep, U-turn, or 
 - This is a known limitation of GPS technology and is within the acceptable tolerance of the app
 - For best distance accuracy, use the app in open outdoor areas
 
+### ❌ "The arrow doesn't seem to change brightness"
+- Check **Settings → AR Appearance → Auto Brightness** is turned ON
+- Some devices do not have an ambient light sensor — if yours doesn't, the arrow will stay at its default appearance regardless of the toggle; turn Auto Brightness OFF and use the manual **AR Overlay Opacity** slider instead
+- Brightness changes are intentionally delayed by about 2 seconds to avoid flicker — brief light changes (e.g. walking under a tree for a second) will not trigger a visible change
+
 ---
 
 ## 9. Known Limitations
 
-These are known limitations of the current Version 1.4 of the app. They are documented for transparency and may be addressed in future versions.
+These are known limitations of the current Version 1.5 of the app. They are documented for transparency and may be addressed in future versions.
 
 | Limitation | Detail |
 |---|---|
@@ -483,7 +526,8 @@ These are known limitations of the current Version 1.4 of the app. They are docu
 | **No 2D map view** | Only AR camera view is available in this version |
 | **GPS accuracy** | Distance accuracy is ± 10 metres — dependent on device GPS quality |
 | **Tunnel / underpass** | AR and GPS performance degrades in tunnels or underpasses |
-| **Lighting sensitivity** | AR overlays may be harder to see in very bright sunlight or at night |
+| **Lighting sensitivity** | The AR arrow's opacity/colour adapts automatically to ambient light (see [5.10](#510-auto-brightness-ar-arrow-appearance)), but this only adjusts the overlay — it does not improve the underlying camera feed or ARCore tracking quality in very bright sunlight or at night |
+| **No ambient light sensor** | On devices without an ambient light sensor, Auto Brightness has no effect and the arrow stays at its default fixed appearance; turn Auto Brightness off and use the manual opacity slider instead |
 | **No traffic data** | The app does not account for real-time traffic conditions |
 | **Camera after backgrounding** | If the app is sent to the background and returned, the AR camera feed restarts automatically — there may be a brief black flash during the restart |
 
@@ -564,6 +608,6 @@ build/app/outputs/flutter-apk/app-release.apk
 
 ---
 
-*End of User Manual — Version 1.4*
+*End of User Manual — Version 1.5*
 
 *Prepared by: Liew Sau Yang | Sunway University | Bachelor of Software Engineering (Hons)*
