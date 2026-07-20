@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import 'package:smart_ar_navigation/core/constants/app_colors.dart';
 import 'package:smart_ar_navigation/models/place_model.dart';
 import 'package:smart_ar_navigation/models/route_model.dart';
+import 'package:smart_ar_navigation/viewmodels/navigation_viewmodel.dart';
 
 class RoutePreviewCard extends StatelessWidget {
   const RoutePreviewCard({
@@ -30,6 +32,8 @@ class RoutePreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isStarting =
+        context.watch<NavigationViewModel>().isStartingNavigation;
     return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -204,7 +208,7 @@ class RoutePreviewCard extends StatelessWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   flex: 2,
-                  child: ElevatedButton.icon(
+                  child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primaryColor,
                       foregroundColor: Colors.white,
@@ -213,13 +217,29 @@ class RoutePreviewCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    icon: Icon(icon, size: 18),
-                    label: Text(
-                      label,
-                      style: const TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.w600),
-                    ),
-                    onPressed: routes.isEmpty ? null : onStart,
+                    onPressed: (routes.isEmpty || isStarting) ? null : onStart,
+                    child: isStarting
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(icon, size: 18),
+                              const SizedBox(width: 8),
+                              Text(
+                                label,
+                                style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
                   ),
                 ),
               ],

@@ -112,8 +112,9 @@ class MapViewModel extends ChangeNotifier {
         }
       }
 
-      // Always update AR overlay and polyline — including during rerouting so
-      // the display keeps refreshing while the new route API call is in flight.
+      if (_navigationViewModel.navigationStatus == NavigationStatus.rerouting) {
+        return;
+      }
       _arViewModel.updateAROverlay(location);
       _navigationViewModel.updateRemainingPolyline(location);
       _navigationViewModel.checkIfArrived(location);
@@ -301,12 +302,14 @@ class MapViewModel extends ChangeNotifier {
   bool _isOffRoute(LatLng location, RouteModel route) {
     final points = route.polylinePoints;
     if (points.isEmpty) return false;
+
+    double closestDist = double.infinity;
     for (int i = 0; i < points.length - 1; i++) {
-      if (_distanceToSegment(location, points[i], points[i + 1]) <= 50.0) {
-        return false;
-      }
+      final d = _distanceToSegment(location, points[i], points[i + 1]);
+      if (d < closestDist) closestDist = d;
     }
-    return true;
+
+    return closestDist > 50.0;
   }
 
   // Shortest distance from [p] to the finite line segment [a]→[b].

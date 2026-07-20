@@ -5,6 +5,10 @@ class InstructionBuilder {
         return 'Turn Left';
       case 'turn-right':
         return 'Turn Right';
+      case 'turn-sharp-left':
+        return 'Turn Left';
+      case 'turn-sharp-right':
+        return 'Turn Right';
       case 'keep-left':
       case 'fork-left':
         return 'Keep Left';
@@ -20,11 +24,11 @@ class InstructionBuilder {
       case 'roundabout-right':
         return exitNumber != null ? 'Take Exit $exitNumber' : 'Take the Exit';
       case 'merge':
-        return 'Merge';
+        return 'Continue';
       case 'ramp-left':
-        return 'Take Left Ramp';
+        return 'Keep Left';
       case 'ramp-right':
-        return 'Take Right Ramp';
+        return 'Keep Right';
       default:
         return 'Continue';
     }

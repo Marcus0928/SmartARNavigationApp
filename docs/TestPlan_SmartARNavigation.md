@@ -13,6 +13,7 @@
 | **Programme** | Bachelor of Software Engineering (Hons) |
 | **Testing Type** | Manual Black-Box Testing |
 | **Test Device** | OPPO Reno 7 5G (CPH2371) |
+| **Test Device** | OPPO Reno 15 5G (CPH2825) |
 | **Version** | 1.3 |
 | **Last Updated** | July 2026 |
 
@@ -86,9 +87,11 @@ Since GPS and AR have natural limitations, the following tolerances are acceptab
 | Item | Details |
 |---|---|
 | **Test Device** | OPPO Reno 7 5G (CPH2371) |
+| **Test Device** | OPPO Reno 15 5G (CPH2825) |
 | **Operating System** | Android 11 / 12 |
+| **Operating System** | Android 16 |
 | **ARCore Version** | Pre-installed (Google Play Services for AR) |
-| **Internet Connection** | Mobile data (4G/LTE) |
+| **Internet Connection** | Mobile data (5G/LTE) |
 | **GPS** | Device built-in GPS |
 | **Test Location** | Sunway University campus and surrounding outdoor areas |
 | **Test Conditions** | Daytime, outdoor, clear sky (for best GPS accuracy) |
@@ -906,41 +909,41 @@ Fill in this table after completing all tests.
 | TC-005 | Search | Search Bar Visible | ✅ PASS | |
 | TC-006 | Search | Autocomplete Results | ✅ PASS | |
 | TC-007 | Search | Select Destination | ✅ PASS | |
-| TC-008 | Error | Search No Internet | ⏳ | |
+| TC-008 | Error | Search No Internet | ✅ PASS | |
 | TC-009 | AR Nav | AR Screen Opens | ✅ PASS | |
 | TC-010 | AR Nav | AR Overlay Appears | ✅ PASS | |
 | TC-011 | AR Nav | Distance Displays | ✅ PASS | |
 | TC-012 | AR Nav | Stop Navigation | ✅ PASS | |
-| TC-013 | AR Nav | Arrival Detection | ⏳ | |
-| TC-014 | Direction | Forward Arrow | ⏳ | |
-| TC-015 | Direction | Left Arrow | ⏳ | |
-| TC-016 | Direction | Right Arrow | ⏳ | |
-| TC-017 | Direction | Keep Left Arrow | ⏳ | |
-| TC-018 | Direction | Keep Right Arrow | ⏳ | |
-| TC-019 | Direction | U-Turn Arrow | ⏳ | |
-| TC-020 | Direction | Arrow Updates After Turn | ⏳ | |
-| TC-021 | Direction | Full Route End-to-End | ⏳ | |
-| TC-022 | Distance | Distance Counts Down | ⏳ | |
-| TC-023 | Distance | Distance at Known Location | ⏳ | |
-| TC-024 | Distance | Distance Resets After Turn | ⏳ | |
+| TC-013 | AR Nav | Arrival Detection | ✅ PASS | |
+| TC-014 | Direction | Forward Arrow | ✅ PASS | |
+| TC-015 | Direction | Left Arrow | ✅ PASS | |
+| TC-016 | Direction | Right Arrow | ✅ PASS | |
+| TC-017 | Direction | Keep Left Arrow | ✅ PASS | |
+| TC-018 | Direction | Keep Right Arrow | ✅ PASS | |
+| TC-019 | Direction | U-Turn Arrow | ✅ PASS | |
+| TC-020 | Direction | Arrow Updates After Turn | ✅ PASS | |
+| TC-021 | Direction | Full Route End-to-End | ⚠️ PARTIAL | |
+| TC-022 | Distance | Distance Counts Down | ✅ PASS | |
+| TC-023 | Distance | Distance at Known Location | ✅ PASS | |
+| TC-024 | Distance | Distance Resets After Turn | ✅ PASS | |
 | TC-025 | Error | GPS Signal Lost | ⏳ | |
 | TC-026 | Error | Internet Lost During Nav | ⏳ | |
-| TC-027 | Rerouting | Off-Route Detection | ⏳ | |
+| TC-027 | Rerouting | Off-Route Detection | ⚠️ PARTIAL | |
 | TC-028 | Lifecycle | App Backgrounded | ⏳ | |
-| TC-029 | Route Selection | Route Preview Panel Appears | ⏳ | |
-| TC-030 | Route Selection | Route List Shows Label/Duration/Distance | ⏳ | |
-| TC-031 | Route Selection | Selected Route Blue Accent Bar | ⏳ | |
-| TC-032 | Route Selection | Cancel Resets Home Screen | ⏳ | |
-| TC-033 | Route Selection | Start Launches AR Navigation | ⏳ | |
-| TC-034 | Toll Indicator | Toll Badge on Home Screen (Toll Route) | ⏳ | |
-| TC-035 | Toll Indicator | No Badge on Toll-Free Route | ⏳ | |
+| TC-029 | Route Selection | Route Preview Panel Appears | ✅ PASS | |
+| TC-030 | Route Selection | Route List Shows Label/Duration/Distance | ✅ PASS | |
+| TC-031 | Route Selection | Selected Route Blue Accent Bar | ✅ PASS | |
+| TC-032 | Route Selection | Cancel Resets Home Screen | ✅ PASS | |
+| TC-033 | Route Selection | Start Launches AR Navigation | ✅ PASS | |
+| TC-034 | Toll Indicator | Toll Badge on Home Screen (Toll Route) | ✅ PASS | |
+| TC-035 | Toll Indicator | No Badge on Toll-Free Route | ✅ PASS | |
 | TC-036 | Toll Indicator | Toll Badge on Plan a Drive Card | ⏳ | |
-| TC-037 | Recent History | Appears After First Search | ⏳ | |
+| TC-037 | Recent History | Appears After First Search | ✅ PASS | |
 | TC-038 | Recent History | Tap Item Sets Destination | ⏳ | |
 | TC-039 | Recent History | Persists After App Restart | ⏳ | |
-| TC-040 | Recent History | Max 8 Items Enforced | ⏳ | |
-| TC-041 | Recent History | Duplicate Moves to Top | ⏳ | |
-| TC-042 | Early Warning | Arrow Switches Before Turn (< 1 km) | ⏳ | |
+| TC-040 | Recent History | Max 8 Items Enforced | ✅ PASS | |
+| TC-041 | Recent History | Duplicate Moves to Top | ✅ PASS | |
+| TC-042 | Early Warning | Arrow Switches Before Turn (< 1 km) | ⚠️ PARTIAL | |
 | TC-043 | Roundabout | Exit Number Displayed in Arc | ⏳ | |
 | TC-044 | Rerouting Banner | Banner Appears During Recalculation | ⏳ | |
 | TC-045 | Faster Route | Faster Route Banner and Switch | ⏳ | |
@@ -953,11 +956,11 @@ Fill in this table after completing all tests.
 
 | Result | Count |
 |---|---|
-| ✅ PASS | 11 |
+| ✅ PASS | 33 |
 | ❌ FAIL | — |
-| ⚠️ PARTIAL | — |
+| ⚠️ PARTIAL | 3 |
 | ⏭️ SKIP | — |
-| ⏳ Not tested | 36 |
+| ⏳ Not tested | 11 |
 | **Total** | **47** |
 
 ---

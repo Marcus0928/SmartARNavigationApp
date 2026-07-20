@@ -41,7 +41,9 @@ class NavigationViewModel extends ChangeNotifier {
   List<LatLng> _remainingPolyline = const [];
   RouteModel? _suggestedFasterRoute;
   Timer? _fasterRouteTimer;
-  Timer? _fasterRouteDismissTimer;
+  bool _showFasterRouteMap = false;
+  int? _dismissedRouteDuration;
+  bool _isStartingNavigation = false;
 
   PlaceModel? get currentDestination => _currentDestination;
   RouteModel? get currentRoute => _currentRoute;
@@ -49,13 +51,30 @@ class NavigationViewModel extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   int? get activeRouteIndex => _activeRouteIndex;
   List<LatLng> get remainingPolyline => _remainingPolyline;
+
+  /// Estimates the remaining travel time on the current route by scaling
+  /// the original estimated duration by how much of the polyline is left,
+  /// so faster-route comparisons aren't made against the full trip duration.
+  int get remainingDuration {
+    if (_currentRoute == null) return 0;
+    final fullLen = _currentRoute!.polylinePoints.length;
+    if (fullLen == 0) return 0;
+    final remainLen = _remainingPolyline.length;
+    final ratio = remainLen / fullLen;
+    return (_currentRoute!.estimatedDuration * ratio).round();
+  }
+
   RouteModel? get suggestedFasterRoute => _suggestedFasterRoute;
+  bool get showFasterRouteMap => _showFasterRouteMap;
+  bool get isStartingNavigation => _isStartingNavigation;
 
   Future<void> startNavigation(
     PlaceModel destination, {
     RouteModel? route,
     int? routeIndex,
   }) async {
+    if (_isStartingNavigation) return;
+    _isStartingNavigation = true;
     if (_navigationStatus == NavigationStatus.navigating) {
       await stopNavigation(stopService: false);
     }
@@ -78,34 +97,47 @@ class NavigationViewModel extends ChangeNotifier {
         _currentRoute = routes.first;
         _activeRouteIndex = 0; // fallback fetch always yields index 0
       }
-      await _arViewModel.initializeOverlay(
-        _currentRoute!,
-        heading: _locationService.currentHeading,
-      );
+      _arViewModel.setDestination(_currentDestination?.coordinates);
       _remainingPolyline = List.from(_currentRoute!.polylinePoints);
-      NavigationForegroundService.startService(
-        destination: _currentDestination?.name ?? '',
-        eta: '${(_currentRoute!.estimatedDuration / 60).ceil()} min',
-      );
+      await Future.wait<void>([
+        _arViewModel.initializeOverlay(
+          _currentRoute!,
+          heading: _locationService.currentHeading,
+        ),
+        NavigationForegroundService.startService(
+          destination: _currentDestination?.name ?? '',
+          eta: '${(_currentRoute!.estimatedDuration / 60).ceil()} min',
+        ).then((ok) {
+          if (!ok) {
+            debugPrint(
+              'Warning: foreground service did not start — '
+              'app may be killed in background',
+            );
+          }
+        }),
+      ]);
       _navigationStatus = NavigationStatus.navigating;
       _fasterRouteTimer?.cancel();
       _fasterRouteTimer = Timer.periodic(
-        const Duration(minutes: 2),
+        const Duration(minutes: 5),
         (_) => _checkForFasterRoute(),
       );
     } catch (e) {
       _errorMessage = e.toString();
       _navigationStatus = NavigationStatus.idle;
+    } finally {
+      _isStartingNavigation = false;
+      notifyListeners();
     }
-    notifyListeners();
   }
 
   Future<void> stopNavigation({bool stopService = true}) async {
     _fasterRouteTimer?.cancel();
     _fasterRouteTimer = null;
-    _fasterRouteDismissTimer?.cancel();
-    _fasterRouteDismissTimer = null;
+    _isStartingNavigation = false;
     _suggestedFasterRoute = null;
+    _showFasterRouteMap = false;
+    _dismissedRouteDuration = null;
     _arService.clearOverlays();
     _arViewModel.resetOverlay();
     _currentRoute = null;
@@ -124,6 +156,7 @@ class NavigationViewModel extends ChangeNotifier {
   Future<void> recalculateRoute({required LatLng from}) async {
     if (_currentDestination == null) return;
     _navigationStatus = NavigationStatus.rerouting;
+    _dismissedRouteDuration = null;
     notifyListeners();
 
     try {
@@ -137,6 +170,7 @@ class NavigationViewModel extends ChangeNotifier {
         _currentRoute!,
         heading: _locationService.currentHeading,
       );
+      _arViewModel.setDestination(_currentDestination?.coordinates);
       _remainingPolyline = List.from(_currentRoute!.polylinePoints);
       _navigationStatus = NavigationStatus.navigating;
     } catch (e) {
@@ -166,8 +200,8 @@ class NavigationViewModel extends ChangeNotifier {
 
   Future<void> acceptFasterRoute() async {
     if (_suggestedFasterRoute == null) return;
-    _fasterRouteDismissTimer?.cancel();
-    _fasterRouteDismissTimer = null;
+    _showFasterRouteMap = false;
+    _dismissedRouteDuration = null;
     _currentRoute = _suggestedFasterRoute;
     _suggestedFasterRoute = null;
     await _arViewModel.initializeOverlay(
@@ -179,8 +213,8 @@ class NavigationViewModel extends ChangeNotifier {
   }
 
   void dismissFasterRoute() {
-    _fasterRouteDismissTimer?.cancel();
-    _fasterRouteDismissTimer = null;
+    _dismissedRouteDuration = _suggestedFasterRoute?.estimatedDuration;
+    _showFasterRouteMap = false;
     _suggestedFasterRoute = null;
     notifyListeners();
   }
@@ -188,7 +222,14 @@ class NavigationViewModel extends ChangeNotifier {
   Future<void> _checkForFasterRoute() async {
     if (_currentDestination == null ||
         _navigationStatus != NavigationStatus.navigating ||
-        _currentRoute == null) return;
+        _currentRoute == null) {
+      return;
+    }
+
+    // Don't interrupt when a turn is imminent
+    final distToTurn = _arViewModel.distanceToNextTurn;
+    if (distToTurn != null && distToTurn < 500) return;
+
     try {
       final origin = await _locationService.getLastKnownLocation();
       if (origin == null) return;
@@ -201,13 +242,18 @@ class NavigationViewModel extends ChangeNotifier {
       final fastest = routes.reduce(
         (a, b) => a.estimatedDuration < b.estimatedDuration ? a : b,
       );
-      if (_currentRoute!.estimatedDuration - fastest.estimatedDuration > 120) {
+      final remaining = remainingDuration;
+      final timeSaved = remaining - fastest.estimatedDuration;
+      // Skip if this is the same route the user already dismissed
+      if (_dismissedRouteDuration != null &&
+          fastest.estimatedDuration >= _dismissedRouteDuration!) {
+        return;
+      }
+      if (timeSaved >= 300 &&
+          remaining > 0 &&
+          timeSaved / remaining >= 0.10) {
         _suggestedFasterRoute = fastest;
-        _fasterRouteDismissTimer?.cancel();
-        _fasterRouteDismissTimer = Timer(
-          const Duration(seconds: 15),
-          dismissFasterRoute,
-        );
+        _showFasterRouteMap = true;
         notifyListeners();
       }
     } catch (_) {

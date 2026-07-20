@@ -1,14 +1,43 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+
+// Top-level entry point for the foreground task isolate.
+@pragma('vm:entry-point')
+void _startCallback() {
+  FlutterForegroundTask.setTaskHandler(_NavigationTaskHandler());
+}
+
+class _NavigationTaskHandler extends TaskHandler {
+  @override
+  Future<void> onStart(DateTime timestamp, TaskStarter starter) async {}
+
+  @override
+  void onRepeatEvent(DateTime timestamp) {}
+
+  @override
+  Future<void> onDestroy(DateTime timestamp) async {}
+
+  // 'Switch off' button tapped — tell the main isolate to stop navigation.
+  @override
+  void onNotificationButtonPressed(String id) {
+    if (id == 'switch_off') {
+      FlutterForegroundTask.stopService();
+      FlutterForegroundTask.sendDataToMain('service_stopped');
+    }
+  }
+}
 
 class NavigationForegroundService {
   static void initialize() {
     FlutterForegroundTask.init(
       androidNotificationOptions: AndroidNotificationOptions(
-        channelId: 'smart_ar_navigation',
+        channelId: 'smart_ar_nav_v3',
         channelName: 'Smart AR Navigation',
         channelDescription: 'Navigation is running',
-        channelImportance: NotificationChannelImportance.LOW,
-        priority: NotificationPriority.LOW,
+        channelImportance: NotificationChannelImportance.DEFAULT,
+        priority: NotificationPriority.DEFAULT,
+        enableVibration: false,
+        playSound: false,
       ),
       iosNotificationOptions: const IOSNotificationOptions(),
       foregroundTaskOptions: ForegroundTaskOptions(
@@ -19,14 +48,24 @@ class NavigationForegroundService {
     );
   }
 
-  static Future<void> startService({
+  static Future<bool> startService({
     required String destination,
     required String eta,
   }) async {
-    await FlutterForegroundTask.startService(
-      notificationTitle: 'Navigating to $destination',
-      notificationText: 'ETA: $eta',
+    final result = await FlutterForegroundTask.startService(
+      notificationTitle: 'Smart AR Navigate',
+      notificationText: 'Running. Tap to open.',
+      notificationInitialRoute: '/ar-navigation',
+      notificationButtons: [
+        NotificationButton(id: 'switch_off', text: 'Switch off'),
+      ],
+      callback: _startCallback,
     );
+    if (result is ServiceRequestFailure) {
+      debugPrint('Foreground service failed to start: ${result.error}');
+      return false;
+    }
+    return true;
   }
 
   static Future<void> stopService() async {
@@ -38,8 +77,8 @@ class NavigationForegroundService {
     required String eta,
   }) async {
     await FlutterForegroundTask.updateService(
-      notificationTitle: 'Navigating to $destination',
-      notificationText: 'ETA: $eta',
+      notificationTitle: 'Smart AR Navigate',
+      notificationText: 'Running. Tap to open.',
     );
   }
 }

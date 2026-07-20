@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:provider/provider.dart';
 
 import 'package:smart_ar_navigation/core/constants/app_colors.dart';
@@ -128,6 +129,9 @@ class SmartARNavigationApp extends StatelessWidget {
           colorScheme: ColorScheme.fromSeed(seedColor: primaryColor),
           useMaterial3: true,
         ),
+        // Wraps every screen so NavigationViewModel is reachable when the
+        // foreground service sends 'stop_navigation' from its isolate.
+        builder: (context, child) => _ForegroundTaskListener(child: child!),
         initialRoute: '/',
         routes: {
           '/': (_) => const SplashScreen(),
@@ -135,7 +139,7 @@ class SmartARNavigationApp extends StatelessWidget {
           '/ar-navigation': (_) => const ARNavigationScreen(),
           '/settings': (_) => const SettingsScreen(),
           '/profile': (_) => const ProfileScreen(),
-          '/arrow-test': (_) => const ArrowTestScreen(), 
+          '/arrow-test': (_) => const ArrowTestScreen(),
           '/plan-drive': (ctx) => ChangeNotifierProvider(
                 create: (c) => PlanDriveViewModel(
                   placesRepository: c.read<PlacesRepository>(),
@@ -148,4 +152,41 @@ class SmartARNavigationApp extends StatelessWidget {
       ),
     );
   }
+}
+
+// Listens for messages from the foreground task isolate and forwards
+// 'stop_navigation' to NavigationViewModel.
+class _ForegroundTaskListener extends StatefulWidget {
+  const _ForegroundTaskListener({required this.child});
+  final Widget child;
+
+  @override
+  State<_ForegroundTaskListener> createState() =>
+      _ForegroundTaskListenerState();
+}
+
+class _ForegroundTaskListenerState extends State<_ForegroundTaskListener> {
+  late final NavigationViewModel _navVM;
+
+  @override
+  void initState() {
+    super.initState();
+    _navVM = context.read<NavigationViewModel>();
+    FlutterForegroundTask.addTaskDataCallback(_onTaskData);
+  }
+
+  void _onTaskData(Object data) {
+    if (data == 'service_stopped') {
+      _navVM.stopNavigation();
+    }
+  }
+
+  @override
+  void dispose() {
+    FlutterForegroundTask.removeTaskDataCallback(_onTaskData);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

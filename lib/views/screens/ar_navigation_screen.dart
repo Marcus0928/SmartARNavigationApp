@@ -7,9 +7,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:flutter/services.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart' as ll;
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'package:smart_ar_navigation/core/enums/navigation_approach_stage.dart';
+import 'package:smart_ar_navigation/models/route_model.dart';
 import 'package:smart_ar_navigation/core/enums/navigation_status.dart';
 import 'package:smart_ar_navigation/core/enums/turn_direction.dart';
 import 'package:smart_ar_navigation/viewmodels/ar_viewmodel.dart';
@@ -108,15 +111,35 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
 
     final arVM = context.watch<ARViewModel>();
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light.copyWith(
-        statusBarColor: Colors.transparent,
-      ),
-      child: Scaffold(
+    // The faster-route map preview replaces the camera feed, so the AR
+    // platform view is hidden while it's shown — otherwise the native
+    // platform view can intercept touches meant for the preview's buttons.
+    final hideArForFasterRoute =
+        navVM.showFasterRouteMap && navVM.suggestedFasterRoute != null;
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final navigator = Navigator.of(context);
+        final mapVM = context.read<MapViewModel>();
+        final navVM = context.read<NavigationViewModel>();
+        mapVM.stopLocationTracking();
+        await navVM.stopNavigation();
+        mapVM.clearDestination();
+        if (navigator.canPop()) {
+          navigator.pop();
+        }
+      },
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle.light.copyWith(
+          statusBarColor: Colors.transparent,
+        ),
+        child: Scaffold(
       body: Stack(
         children: [
           // ── Layer 1: Full-screen AR camera feed ───────────────────
-          if (_showAR)
+          if (_showAR && !hideArForFasterRoute)
             ARView(onARViewCreated: _onARViewCreated)
           else
             Container(color: Colors.black),
@@ -154,13 +177,6 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
                 ),
                 if (navVM.navigationStatus == NavigationStatus.rerouting)
                   const _ReroutingBanner(),
-                if (navVM.suggestedFasterRoute != null)
-                  _FasterRouteBanner(
-                    savedSeconds: ((navVM.currentRoute?.estimatedDuration ?? 0) -
-                        navVM.suggestedFasterRoute!.estimatedDuration).toDouble(),
-                    onSwitch: () => navVM.acceptFasterRoute(),
-                    onDismiss: navVM.dismissFasterRoute,
-                  ),
               ],
             ),
           ),
@@ -185,7 +201,32 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
             right: 0,
             child: NavigationBottomBar(),
           ),
+
+          // ── Layer 6: Faster route full-screen map preview ─────────
+          if (navVM.showFasterRouteMap &&
+              navVM.currentRoute != null &&
+              navVM.suggestedFasterRoute != null)
+            Positioned.fill(
+              child: _FasterRouteMapWidget(
+                currentRoute: navVM.currentRoute!,
+                remainingPolyline: navVM.remainingPolyline
+                    .map((p) => ll.LatLng(p.latitude, p.longitude))
+                    .toList(),
+                suggestedRoute: navVM.suggestedFasterRoute!,
+                userLat: context
+                    .read<MapViewModel>()
+                    .currentLocation
+                    ?.latitude,
+                userLng: context
+                    .read<MapViewModel>()
+                    .currentLocation
+                    ?.longitude,
+                onAccept: navVM.acceptFasterRoute,
+                onDismiss: navVM.dismissFasterRoute,
+              ),
+            ),
         ],
+      ),
       ),
       ),
     );
@@ -309,55 +350,274 @@ class _ReroutingBanner extends StatelessWidget {
   }
 }
 
-// ── Faster route banner ───────────────────────────────────────────────────────
+// ── Faster route full-screen map preview ─────────────────────────────────────
 
-class _FasterRouteBanner extends StatelessWidget {
-  const _FasterRouteBanner({
-    required this.savedSeconds,
-    required this.onSwitch,
+class _FasterRouteMapWidget extends StatefulWidget {
+  const _FasterRouteMapWidget({
+    required this.currentRoute,
+    required this.remainingPolyline,
+    required this.suggestedRoute,
+    this.userLat,
+    this.userLng,
+    required this.onAccept,
     required this.onDismiss,
   });
 
-  final double savedSeconds;
-  final VoidCallback onSwitch;
+  final RouteModel currentRoute;
+  final List<ll.LatLng> remainingPolyline;
+  final RouteModel suggestedRoute;
+  final double? userLat;
+  final double? userLng;
+  final VoidCallback onAccept;
   final VoidCallback onDismiss;
 
   @override
+  State<_FasterRouteMapWidget> createState() => _FasterRouteMapWidgetState();
+}
+
+class _FasterRouteMapWidgetState extends State<_FasterRouteMapWidget>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _cancelController;
+  late final MapController _mapController;
+
+  @override
+  void initState() {
+    super.initState();
+    _mapController = MapController();
+    _cancelController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 8),
+    )..addStatusListener((status) {
+        if (status == AnimationStatus.completed) widget.onDismiss();
+      });
+    _cancelController.forward();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _fitBounds());
+  }
+
+  void _fitBounds() {
+    if (!mounted) return;
+    final allPoints = [
+      ...widget.remainingPolyline,
+      ...widget.suggestedRoute.polylinePoints
+          .map((p) => ll.LatLng(p.latitude, p.longitude)),
+    ];
+    if (allPoints.isEmpty) return;
+    try {
+      _mapController.fitCamera(
+        CameraFit.bounds(
+          bounds: LatLngBounds.fromPoints(allPoints),
+          padding: const EdgeInsets.all(60),
+          maxZoom: 16,
+        ),
+      );
+    } catch (e) {
+      debugPrint('fitBounds error: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _cancelController.dispose();
+    _mapController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final savedMin = (savedSeconds / 60).round();
-    return Container(
-      width: double.infinity,
-      color: const Color(0xDD1A1A2E),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
+    final currentPolyline = widget.remainingPolyline;
+    final fasterPolyline = widget.suggestedRoute.polylinePoints
+        .map((p) => ll.LatLng(p.latitude, p.longitude))
+        .toList();
+    final timeSaved = widget.currentRoute.estimatedDuration -
+        widget.suggestedRoute.estimatedDuration;
+    final timeSavedMin = (timeSaved / 60).round();
+    final percentSaved =
+        (timeSaved / widget.currentRoute.estimatedDuration * 100).round();
+
+    return Material(
+      color: Colors.black,
+      child: Stack(
         children: [
-          Expanded(
-            child: Text(
-              'Faster route available — Save $savedMin min',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
+          FlutterMap(
+            mapController: _mapController,
+            options: const MapOptions(
+              initialCenter: ll.LatLng(3.0738, 101.5077),
+              initialZoom: 13,
+            ),
+            children: [
+              TileLayer(
+                urlTemplate:
+                    'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
+                subdomains: const ['a', 'b', 'c', 'd'],
+                userAgentPackageName: 'com.sunway.smart_ar_navigation',
+              ),
+              PolylineLayer(
+                polylines: [
+                  Polyline(
+                    points: currentPolyline,
+                    color: Colors.blue,
+                    strokeWidth: 5.0,
+                  ),
+                  Polyline(
+                    points: fasterPolyline,
+                    color: const Color(0xFF00E676),
+                    strokeWidth: 5.0,
+                  ),
+                ],
+              ),
+              if (widget.userLat != null && widget.userLng != null)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: ll.LatLng(widget.userLat!, widget.userLng!),
+                      width: 20,
+                      height: 20,
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          color: Colors.blue,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.white,
+                              blurRadius: 4,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              color: const Color(0xDD000000),
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Faster route available',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Save $timeSavedMin min ($percentSaved% faster)',
+                        style: const TextStyle(
+                          color: Color(0xFF00E676),
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
-          TextButton(
-            onPressed: onSwitch,
-            style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFF00E676),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              color: Colors.white,
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: SafeArea(
+                top: false,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _AnimatedCancelButton(
+                        controller: _cancelController,
+                        onCancel: widget.onDismiss,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: widget.onAccept,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text(
+                          'Change Route',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            child: const Text('Switch', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-          TextButton(
-            onPressed: onDismiss,
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.white70,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            ),
-            child: const Text('Dismiss'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _AnimatedCancelButton extends StatelessWidget {
+  const _AnimatedCancelButton({
+    required this.controller,
+    required this.onCancel,
+  });
+
+  final AnimationController controller;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onCancel,
+      child: AnimatedBuilder(
+        animation: controller,
+        builder: (context, _) {
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: SizedBox(
+              height: 52,
+              child: Stack(
+                children: [
+                  Container(color: const Color(0xFFEEEEEE)),
+                  FractionallySizedBox(
+                    widthFactor: controller.value,
+                    child: Container(color: const Color(0xFFBDBDBD)),
+                  ),
+                  const Center(
+                    child: Text(
+                      'Cancel',
+                      style: TextStyle(
+                        color: Colors.black87,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
