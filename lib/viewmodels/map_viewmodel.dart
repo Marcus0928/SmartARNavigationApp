@@ -44,6 +44,7 @@ class MapViewModel extends ChangeNotifier {
   int _selectedRouteIndex = 0;
   bool _isFetchingRoute = false;
   bool _isSelectingRouteFromNav = false;
+  bool _isRefreshingPreviewRoute = false;
   bool _pendingRecenter = false;
   int _routeVersion = 0;
   int _fetchGeneration = 0;
@@ -261,10 +262,17 @@ class MapViewModel extends ChangeNotifier {
 
   Future<void> refreshPreviewRoute() async {
     if (_selectedDestination == null) return;
+    if (_isRefreshingPreviewRoute) return;
+    _isRefreshingPreviewRoute = true;
     _isSelectingRouteFromNav = true;
     _routeVersion++;
-    await _fetchPreviewRoute();
-    notifyListeners();
+    try {
+      await _fetchPreviewRoute();
+      notifyListeners();
+    } finally {
+      _isRefreshingPreviewRoute = false;
+      notifyListeners();
+    }
   }
 
   void setSelectingRouteFromNav(bool value) {
