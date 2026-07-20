@@ -29,7 +29,8 @@
       "Bash(timeout 170 tail -f \"C:\\\\Users\\\\MARCUS~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Sunway-Bachelor-in-Software-Engineering-Semester-9-Capstone-2-SmartARNavigationApp\\\\6d041131-cbbd-49c7-8c9c-0372a39bc90a\\\\tasks\\\\bukorbyet.output\")",
       "Bash(echo \"markers exit: $?\")",
       "Bash(echo \"exit: $?\")",
-      "Bash(timeout 170 tail -f \"C:\\\\Users\\\\MARCUS~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Sunway-Bachelor-in-Software-Engineering-Semester-9-Capstone-2-SmartARNavigationApp\\\\6d041131-cbbd-49c7-8c9c-0372a39bc90a\\\\tasks\\\\b9wcxambo.output\")"
+      "Bash(timeout 170 tail -f \"C:\\\\Users\\\\MARCUS~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Sunway-Bachelor-in-Software-Engineering-Semester-9-Capstone-2-SmartARNavigationApp\\\\6d041131-cbbd-49c7-8c9c-0372a39bc90a\\\\tasks\\\\b9wcxambo.output\")",
+      "WebFetch(domain:pub.dev)"
     ]
   }
 }
