@@ -5,6 +5,7 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
 import 'package:smart_ar_navigation/app.dart';
 import 'package:smart_ar_navigation/services/navigation_foreground_service.dart';
+import 'package:smart_ar_navigation/viewmodels/navigation_viewmodel.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,5 +25,16 @@ Future<void> main() async {
   // Register the IsolateNameServer port so sendDataToMain() messages
   // are received by addTaskDataCallback listeners in the main isolate.
   FlutterForegroundTask.initCommunicationPort();
+  FlutterForegroundTask.addTaskDataCallback(_onForegroundTaskData);
   runApp(const SmartARNavigationApp());
+}
+
+@pragma('vm:entry-point')
+void _onForegroundTaskData(Object data) {
+  if (data == 'stop_navigation') {
+    // Post to next frame so Provider context is available.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      NavigationViewModel.instance?.stopNavigation();
+    });
+  }
 }

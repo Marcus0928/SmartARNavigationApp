@@ -1,10 +1,10 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'package:smart_ar_navigation/core/enums/navigation_status.dart';
-import 'package:smart_ar_navigation/core/utils/location_utils.dart';
 import 'package:smart_ar_navigation/models/place_model.dart';
 import 'package:smart_ar_navigation/models/route_model.dart';
 import 'package:smart_ar_navigation/repositories/places_repository.dart';
@@ -44,6 +44,7 @@ class MapViewModel extends ChangeNotifier {
   int _selectedRouteIndex = 0;
   bool _isFetchingRoute = false;
   bool _isSelectingRouteFromNav = false;
+  bool _isRefreshingPreviewRoute = false;
   bool _pendingRecenter = false;
   int _routeVersion = 0;
   int _fetchGeneration = 0;
@@ -51,6 +52,8 @@ class MapViewModel extends ChangeNotifier {
   StreamSubscription<LatLng>? _locationSubscription;
   Timer? _searchDebounce;
   Timer? _navRefreshTimer;
+  int _lastClosestSegmentIndex = 0;
+  bool _isAppInForeground = true;
 
   LatLng? get currentLocation => _currentLocation;
   double? get currentHeading => _currentHeading;
@@ -107,6 +110,7 @@ class MapViewModel extends ChangeNotifier {
               now.difference(_lastRerouteTime!) >= const Duration(seconds: 30);
           if (cooldownElapsed) {
             _lastRerouteTime = now;
+            _lastClosestSegmentIndex = 0;
             _navigationViewModel.recalculateRoute(from: location);
           }
         }
@@ -124,6 +128,7 @@ class MapViewModel extends ChangeNotifier {
     // current after the app returns from background (GPS stream may stall
     // briefly after resume).
     _navRefreshTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (!_isAppInForeground) return;
       final loc = _currentLocation;
       if (loc != null &&
           _navigationViewModel.navigationStatus == NavigationStatus.navigating) {
@@ -138,7 +143,12 @@ class MapViewModel extends ChangeNotifier {
     _navRefreshTimer?.cancel();
     _navRefreshTimer = null;
     _trackingStarted = false;
+    _lastClosestSegmentIndex = 0;
     _locationService.stopLocationStream();
+  }
+
+  void setAppForegroundState(bool inForeground) {
+    _isAppInForeground = inForeground;
   }
 
   Future<void> restartLocationTracking() async {
@@ -262,10 +272,17 @@ class MapViewModel extends ChangeNotifier {
 
   Future<void> refreshPreviewRoute() async {
     if (_selectedDestination == null) return;
+    if (_isRefreshingPreviewRoute) return;
+    _isRefreshingPreviewRoute = true;
     _isSelectingRouteFromNav = true;
     _routeVersion++;
-    await _fetchPreviewRoute();
-    notifyListeners();
+    try {
+      await _fetchPreviewRoute();
+      notifyListeners();
+    } finally {
+      _isRefreshingPreviewRoute = false;
+      notifyListeners();
+    }
   }
 
   void setSelectingRouteFromNav(bool value) {
@@ -301,31 +318,56 @@ class MapViewModel extends ChangeNotifier {
 
   bool _isOffRoute(LatLng location, RouteModel route) {
     final points = route.polylinePoints;
-    if (points.isEmpty) return false;
+    if (points.length < 2) return false;
+
+    // Only scan a window of segments around the last known position — not
+    // the full route. Look 20 segments behind and 50 segments ahead of the
+    // last known index, since the driver only progresses forward along it.
+    final start = (_lastClosestSegmentIndex - 20).clamp(0, points.length - 2);
+    final end = (_lastClosestSegmentIndex + 50).clamp(0, points.length - 2);
 
     double closestDist = double.infinity;
-    for (int i = 0; i < points.length - 1; i++) {
-      final d = _distanceToSegment(location, points[i], points[i + 1]);
-      if (d < closestDist) closestDist = d;
+    int closestIdx = _lastClosestSegmentIndex;
+
+    for (int i = start; i <= end; i++) {
+      final d = _distanceToSegment(
+        location,
+        LatLng(points[i].latitude, points[i].longitude),
+        LatLng(points[i + 1].latitude, points[i + 1].longitude),
+      );
+      if (d < closestDist) {
+        closestDist = d;
+        closestIdx = i;
+      }
     }
+
+    _lastClosestSegmentIndex = closestIdx;
 
     return closestDist > 50.0;
   }
 
-  // Shortest distance from [p] to the finite line segment [a]→[b].
-  // Uses a flat-earth lat/lng projection — accurate enough for the short
-  // segment lengths (< ~200 m) that appear in navigation polylines.
-  double _distanceToSegment(LatLng p, LatLng a, LatLng b) {
-    final dx = b.latitude  - a.latitude;
-    final dy = b.longitude - a.longitude;
-    final lenSq = dx * dx + dy * dy;
-    if (lenSq == 0) return calculateDistance(p, a);
-    final t = (((p.latitude  - a.latitude)  * dx +
-                (p.longitude - a.longitude) * dy) / lenSq)
-        .clamp(0.0, 1.0);
-    return calculateDistance(
-      p,
-      LatLng(a.latitude + t * dx, a.longitude + t * dy),
-    );
+  // Perpendicular distance in metres from [location] to the segment
+  // [segStart]→[segEnd], via a local flat-earth projection (accurate enough
+  // for segments a few metres to tens of metres long).
+  double _distanceToSegment(LatLng location, LatLng segStart, LatLng segEnd) {
+    const metersPerDegLat = 111320.0;
+    final avgLatRad = (segStart.latitude + segEnd.latitude) / 2 * (pi / 180);
+    final metersPerDegLng = metersPerDegLat * cos(avgLatRad);
+
+    final bx = (segEnd.longitude - segStart.longitude) * metersPerDegLng;
+    final by = (segEnd.latitude - segStart.latitude) * metersPerDegLat;
+    final px = (location.longitude - segStart.longitude) * metersPerDegLng;
+    final py = (location.latitude - segStart.latitude) * metersPerDegLat;
+
+    final lengthSquared = bx * bx + by * by;
+    final t = lengthSquared == 0
+        ? 0.0
+        : ((px * bx + py * by) / lengthSquared).clamp(0.0, 1.0);
+
+    final closestX = t * bx;
+    final closestY = t * by;
+    final dx = px - closestX;
+    final dy = py - closestY;
+    return sqrt(dx * dx + dy * dy);
   }
 }

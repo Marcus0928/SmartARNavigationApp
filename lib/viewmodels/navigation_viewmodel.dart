@@ -21,6 +21,9 @@ class NavigationViewModel extends ChangeNotifier {
   final ARViewModel _arViewModel;
   final ProfileViewModel _profileViewModel;
 
+  static NavigationViewModel? _instance;
+  static NavigationViewModel? get instance => _instance;
+
   NavigationViewModel({
     required RouteRepository routeRepository,
     required LocationService locationService,
@@ -31,7 +34,15 @@ class NavigationViewModel extends ChangeNotifier {
         _locationService = locationService,
         _arService = arService,
         _arViewModel = arViewModel,
-        _profileViewModel = profileViewModel;
+        _profileViewModel = profileViewModel {
+    _instance = this;
+  }
+
+  @override
+  void dispose() {
+    _instance = null;
+    super.dispose();
+  }
 
   PlaceModel? _currentDestination;
   RouteModel? _currentRoute;
@@ -44,6 +55,7 @@ class NavigationViewModel extends ChangeNotifier {
   bool _showFasterRouteMap = false;
   int? _dismissedRouteDuration;
   bool _isStartingNavigation = false;
+  int _lastRemainingPolylineIndex = 0;
 
   PlaceModel? get currentDestination => _currentDestination;
   RouteModel? get currentRoute => _currentRoute;
@@ -144,6 +156,7 @@ class NavigationViewModel extends ChangeNotifier {
     _currentDestination = null;
     _activeRouteIndex = null;
     _remainingPolyline = const [];
+    _lastRemainingPolylineIndex = 0;
     _navigationStatus = NavigationStatus.idle;
     notifyListeners();
     if (stopService) {
@@ -172,6 +185,7 @@ class NavigationViewModel extends ChangeNotifier {
       );
       _arViewModel.setDestination(_currentDestination?.coordinates);
       _remainingPolyline = List.from(_currentRoute!.polylinePoints);
+      _lastRemainingPolylineIndex = 0;
       _navigationStatus = NavigationStatus.navigating;
     } catch (e) {
       _errorMessage = e.toString();
@@ -180,20 +194,33 @@ class NavigationViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void updateRemainingPolyline(LatLng currentLocation) {
-    final points = _currentRoute?.polylinePoints;
-    if (points == null || points.isEmpty) return;
+  void updateRemainingPolyline(LatLng location) {
+    if (_currentRoute == null) return;
+    final points = _currentRoute!.polylinePoints;
+    if (points.isEmpty) return;
 
-    var closestIndex = 0;
-    var closestDist = double.infinity;
-    for (var i = 0; i < points.length; i++) {
-      final dist = calculateDistance(currentLocation, points[i]);
-      if (dist < closestDist) {
-        closestDist = dist;
+    // Search forward from the last known index with a small backward
+    // buffer for GPS jitter, instead of scanning the full route every tick.
+    final start =
+        (_lastRemainingPolylineIndex - 5).clamp(0, points.length - 1);
+    final end =
+        (_lastRemainingPolylineIndex + 100).clamp(0, points.length - 1);
+
+    double closestDist = double.infinity;
+    int closestIndex = _lastRemainingPolylineIndex;
+
+    for (int i = start; i <= end; i++) {
+      final d = calculateDistance(
+        location,
+        LatLng(points[i].latitude, points[i].longitude),
+      );
+      if (d < closestDist) {
+        closestDist = d;
         closestIndex = i;
       }
     }
 
+    _lastRemainingPolylineIndex = closestIndex;
     _remainingPolyline = points.sublist(closestIndex);
     notifyListeners();
   }

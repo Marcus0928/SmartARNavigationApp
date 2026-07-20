@@ -5,8 +5,15 @@ import 'package:smart_ar_navigation/viewmodels/map_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/navigation_viewmodel.dart';
 import 'package:smart_ar_navigation/views/screens/ar_navigation_screen.dart';
 
-class NavigationBottomBar extends StatelessWidget {
+class NavigationBottomBar extends StatefulWidget {
   const NavigationBottomBar({super.key});
+
+  @override
+  State<NavigationBottomBar> createState() => _NavigationBottomBarState();
+}
+
+class _NavigationBottomBarState extends State<NavigationBottomBar> {
+  bool _isNavigatingToRoutes = false;
 
   @override
   Widget build(BuildContext context) {
@@ -104,17 +111,29 @@ class NavigationBottomBar extends StatelessWidget {
               _IconLabelButton(
                 icon: Icons.alt_route_rounded,
                 label: 'Routes',
+                isLoading: _isNavigatingToRoutes,
                 onTap: () async {
-                  context
-                      .findAncestorStateOfType<ARNavigationScreenState>()
-                      ?.isExiting = true;
-                  final mapVM = context.read<MapViewModel>();
-                  mapVM.setSelectingRouteFromNav(true);
-                  await mapVM.refreshPreviewRoute();
-                  if (context.mounted) Navigator.of(context).pushNamedAndRemoveUntil(
-                    '/home',
-                    (route) => route.isFirst,
-                  );
+                  if (_isNavigatingToRoutes) return;
+                  setState(() => _isNavigatingToRoutes = true);
+
+                  try {
+                    final mapVM = context.read<MapViewModel>();
+                    context
+                        .findAncestorStateOfType<ARNavigationScreenState>()
+                        ?.isExiting = true;
+                    mapVM.setSelectingRouteFromNav(true);
+                    await mapVM.refreshPreviewRoute();
+                    if (context.mounted) {
+                      Navigator.of(context).pushNamedAndRemoveUntil(
+                        '/home',
+                        (route) => route.isFirst,
+                      );
+                    }
+                  } finally {
+                    if (mounted) {
+                      setState(() => _isNavigatingToRoutes = false);
+                    }
+                  }
                 },
               ),
             ],
@@ -130,18 +149,29 @@ class _IconLabelButton extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.isLoading = false,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: Column(
+      child: isLoading
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                color: Colors.white,
+                strokeWidth: 2,
+              ),
+            )
+          : Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, color: Colors.white, size: 26),

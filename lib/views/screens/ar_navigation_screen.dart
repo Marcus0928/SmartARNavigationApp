@@ -54,8 +54,10 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (isExiting) return;
     if (state == AppLifecycleState.paused) {
+      context.read<MapViewModel>().setAppForegroundState(false);
       setState(() => _showAR = false);
     } else if (state == AppLifecycleState.resumed) {
+      context.read<MapViewModel>().setAppForegroundState(true);
       setState(() => _showAR = false);
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted && !isExiting) setState(() => _showAR = true);
