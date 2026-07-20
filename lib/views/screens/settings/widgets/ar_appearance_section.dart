@@ -28,38 +28,52 @@ class ArAppearanceSection extends StatelessWidget {
             onSelectionChanged: (s) => vm.setArrowSize(s.first),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        SwitchListTile(
+          title: const Text('Auto Brightness'),
+          subtitle: const Text(
+              'Adjust arrow brightness based on ambient light'),
+          value: vm.autoBrightness,
+          onChanged: vm.setAutoBrightness,
+          activeThumbColor: primaryColor,
+        ),
+        Opacity(
+          opacity: vm.autoBrightness ? 0.4 : 1.0,
+          child: AbsorbPointer(
+            absorbing: vm.autoBrightness,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('AR Overlay Opacity', style: TextStyle(fontSize: 16)),
-                  Text(
-                    '${(vm.overlayOpacity * 100).round()}%',
-                    style: const TextStyle(fontSize: 14, color: Colors.grey),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('AR Overlay Opacity', style: TextStyle(fontSize: 16)),
+                      Text(
+                        '${(vm.overlayOpacity * 100).round()}%',
+                        style: const TextStyle(fontSize: 14, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                  Slider(
+                    value: vm.overlayOpacity,
+                    min: 0.5,
+                    max: 1.0,
+                    divisions: 10,
+                    label: '${(vm.overlayOpacity * 100).round()}%',
+                    activeColor: primaryColor,
+                    onChanged: vm.setOverlayOpacity,
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('50%', style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                      Text('100%', style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                    ],
                   ),
                 ],
               ),
-              Slider(
-                value: vm.overlayOpacity,
-                min: 0.5,
-                max: 1.0,
-                divisions: 10,
-                label: '${(vm.overlayOpacity * 100).round()}%',
-                activeColor: primaryColor,
-                onChanged: vm.setOverlayOpacity,
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('50%', style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
-                  Text('100%', style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
-                ],
-              ),
-            ],
+            ),
           ),
         ),
         const Divider(height: 1),

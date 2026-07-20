@@ -48,6 +48,9 @@ dependencies:
   # Foreground service to keep GPS/navigation alive when app is backgrounded
   flutter_foreground_task: ^8.0.0
 
+  # Ambient light sensor for auto brightness/opacity of the AR arrow
+  light: ^5.0.0
+
 dev_dependencies: 
   flutter_test:
     sdk: flutter

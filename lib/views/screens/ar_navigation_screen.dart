@@ -15,9 +15,11 @@ import 'package:smart_ar_navigation/core/enums/navigation_approach_stage.dart';
 import 'package:smart_ar_navigation/models/route_model.dart';
 import 'package:smart_ar_navigation/core/enums/navigation_status.dart';
 import 'package:smart_ar_navigation/core/enums/turn_direction.dart';
+import 'package:smart_ar_navigation/services/ambient_light_service.dart';
 import 'package:smart_ar_navigation/viewmodels/ar_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/map_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/navigation_viewmodel.dart';
+import 'package:smart_ar_navigation/viewmodels/settings_viewmodel.dart';
 import 'package:smart_ar_navigation/views/widgets/dynamic_arrow_widget.dart';
 import 'package:smart_ar_navigation/views/widgets/navigation_bottom_bar.dart';
 
@@ -36,6 +38,9 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
 
   TurnDirection? _debugDirection;
 
+  final _ambientLight = AmbientLightService();
+  bool? _lastAutoBrightness;
+
   @override
   void initState() {
     super.initState();
@@ -45,9 +50,22 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
 
   @override
   void dispose() {
+    _ambientLight.dispose();
     WakelockPlus.disable();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  // Starts/stops the ambient light sensor when the Auto Brightness setting
+  // changes, without restarting it on every rebuild.
+  void _syncAmbientLight(bool autoBrightness) {
+    if (_lastAutoBrightness == autoBrightness) return;
+    _lastAutoBrightness = autoBrightness;
+    if (autoBrightness) {
+      _ambientLight.start();
+    } else {
+      _ambientLight.stop();
+    }
   }
 
   @override
@@ -112,6 +130,8 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
     }
 
     final arVM = context.watch<ARViewModel>();
+    final settingsVM = context.watch<SettingsViewModel>();
+    _syncAmbientLight(settingsVM.autoBrightness);
 
     // The faster-route map preview replaces the camera feed, so the AR
     // platform view is hidden while it's shown — otherwise the native
@@ -150,15 +170,43 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
           if (_debugDirection != null || arVM.nextTurnDirection != null)
             Positioned.fill(
               child: Center(
-                child: DynamicArrowWidget(
-                  direction:     _debugDirection ?? arVM.nextTurnDirection!,
-                  distance:      arVM.distanceToNextTurn ?? double.infinity,
-                  approachStage: _debugDirection != null
-                      ? NavigationApproachStage.far
-                      : arVM.approachStage,
-                  exitNumber: _debugDirection == TurnDirection.roundabout
-                      ? 2
-                      : arVM.roundaboutExit,
+                child: ValueListenableBuilder<LightLevel>(
+                  valueListenable: _ambientLight.levelNotifier,
+                  builder: (context, level, child) {
+                    final double opacity;
+                    final Color? arrowColor;
+
+                    if (!settingsVM.autoBrightness) {
+                      // Manual mode — use the settings slider value.
+                      opacity = settingsVM.overlayOpacity;
+                      arrowColor = null; // default arrow color
+                    } else {
+                      switch (level) {
+                        case LightLevel.bright:
+                          opacity = 1.0;
+                          arrowColor = const Color(0xFF00FF87);
+                        case LightLevel.normal:
+                          opacity = 0.85;
+                          arrowColor = const Color(0xFF00E676);
+                        case LightLevel.dark:
+                          opacity = 0.95;
+                          arrowColor = const Color(0xFF00C853);
+                      }
+                    }
+
+                    return DynamicArrowWidget(
+                      direction:     _debugDirection ?? arVM.nextTurnDirection!,
+                      distance:      arVM.distanceToNextTurn ?? double.infinity,
+                      approachStage: _debugDirection != null
+                          ? NavigationApproachStage.far
+                          : arVM.approachStage,
+                      exitNumber: _debugDirection == TurnDirection.roundabout
+                          ? 2
+                          : arVM.roundaboutExit,
+                      opacityOverride: opacity,
+                      colorOverride: arrowColor,
+                    );
+                  },
                 ),
               ),
             ),

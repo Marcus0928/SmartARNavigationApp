@@ -15,6 +15,8 @@ class DynamicArrowWidget extends StatefulWidget {
     this.size = 180,
     this.showLabel = true,
     this.exitNumber,
+    this.opacityOverride = 0.85,
+    this.colorOverride,
   });
 
   final TurnDirection direction;
@@ -23,6 +25,8 @@ class DynamicArrowWidget extends StatefulWidget {
   final double size;
   final bool showLabel;
   final int? exitNumber;
+  final double opacityOverride;
+  final Color? colorOverride;
 
   @override
   State<DynamicArrowWidget> createState() => _DynamicArrowWidgetState();
@@ -116,7 +120,7 @@ class _DynamicArrowWidgetState extends State<DynamicArrowWidget>
   );
 
   Color _colorForStage(NavigationApproachStage stage) => switch (stage) {
-        NavigationApproachStage.far         => arArrowColor,
+        NavigationApproachStage.far         => widget.colorOverride ?? arArrowColor,
         NavigationApproachStage.approaching => const Color(0xFFFFC107),
         NavigationApproachStage.imminent    => const Color(0xFFFF5252),
       };
@@ -148,7 +152,7 @@ class _DynamicArrowWidgetState extends State<DynamicArrowWidget>
         return Transform.scale(
           scale: _pulseAnimation.value * _directionAnimation.value,
           child: Opacity(
-            opacity: 0.85,
+            opacity: widget.opacityOverride,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
