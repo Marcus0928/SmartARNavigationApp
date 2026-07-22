@@ -51,6 +51,9 @@ dependencies:
   # Ambient light sensor for auto brightness/opacity of the AR arrow
   light: ^5.0.0
 
+  # Voice guidance using text-to-speech function
+  flutter_tts: ^4.2.5
+
 dev_dependencies: 
   flutter_test:
     sdk: flutter
