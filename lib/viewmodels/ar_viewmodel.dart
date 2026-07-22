@@ -84,7 +84,9 @@ class ARViewModel extends ChangeNotifier {
   void updateAROverlay(LatLng currentLocation) {
     if (_remainingTurns.isEmpty) {
       _nextTurnDirection = TurnDirection.forward;
-      _distanceToNextTurn = 0;
+      _distanceToNextTurn = _destinationCoordinates != null
+          ? calculateDistance(currentLocation, _destinationCoordinates!)
+          : 0;
       _instructionText = 'Continue';
       _currentStreetName = null;
       _roundaboutExit = null;
@@ -134,7 +136,9 @@ class ARViewModel extends ChangeNotifier {
 
     if (_remainingTurns.isEmpty) {
       _nextTurnDirection = TurnDirection.forward;
-      _distanceToNextTurn = 0;
+      _distanceToNextTurn = _destinationCoordinates != null
+          ? calculateDistance(currentLocation, _destinationCoordinates!)
+          : 0;
       _instructionText = 'Continue';
       _currentStreetName = null;
       _roundaboutExit = null;
