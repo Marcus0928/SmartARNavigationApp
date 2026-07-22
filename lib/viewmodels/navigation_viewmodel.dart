@@ -64,6 +64,18 @@ class NavigationViewModel extends ChangeNotifier {
     return (_currentRoute!.estimatedDuration * ratio).round();
   }
 
+  /// Estimates the remaining distance on the current route using the same
+  /// polyline-ratio approach as [remainingDuration], so the bottom bar's
+  /// distance figure shrinks in step with its ETA figure.
+  double get remainingDistance {
+    if (_currentRoute == null) return 0;
+    final fullLen = _currentRoute!.polylinePoints.length;
+    if (fullLen == 0) return 0;
+    final remainLen = _remainingPolyline.length;
+    final ratio = remainLen / fullLen;
+    return _currentRoute!.totalDistance * ratio;
+  }
+
   RouteModel? get suggestedFasterRoute => _suggestedFasterRoute;
   bool get showFasterRouteMap => _showFasterRouteMap;
   bool get isStartingNavigation => _isStartingNavigation;

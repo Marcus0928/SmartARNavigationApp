@@ -14,9 +14,9 @@ class NavigationBottomBar extends StatelessWidget {
 
     final route = navVM.currentRoute;
     final etaMinutes =
-        route != null ? (route.estimatedDuration / 60).ceil() : 0;
+        route != null ? (navVM.remainingDuration / 60).ceil() : 0;
     final distanceKm = route != null
-        ? (route.totalDistance / 1000).toStringAsFixed(1)
+        ? (navVM.remainingDistance / 1000).toStringAsFixed(1)
         : '--';
 
     final arrival = DateTime.now().add(Duration(minutes: etaMinutes));
