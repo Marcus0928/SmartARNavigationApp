@@ -139,6 +139,8 @@ class MapViewModel extends ChangeNotifier {
     _navRefreshTimer = null;
     _trackingStarted = false;
     _locationService.stopLocationStream();
+    _currentSpeed = null;
+    notifyListeners();
   }
 
   Future<void> restartLocationTracking() async {

@@ -11,13 +11,12 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' as ll;
 import 'package:wakelock_plus/wakelock_plus.dart';
 
-import 'package:smart_ar_navigation/core/enums/navigation_approach_stage.dart';
 import 'package:smart_ar_navigation/models/route_model.dart';
 import 'package:smart_ar_navigation/core/enums/navigation_status.dart';
-import 'package:smart_ar_navigation/core/enums/turn_direction.dart';
 import 'package:smart_ar_navigation/viewmodels/ar_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/map_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/navigation_viewmodel.dart';
+import 'package:smart_ar_navigation/views/screens/home/widgets/speed_indicator.dart';
 import 'package:smart_ar_navigation/views/widgets/dynamic_arrow_widget.dart';
 import 'package:smart_ar_navigation/views/widgets/navigation_bottom_bar.dart';
 
@@ -33,8 +32,6 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
   bool _arrivalHandled = false;
   bool _showAR = true;
   bool isExiting = false;
-
-  TurnDirection? _debugDirection;
 
   @override
   void initState() {
@@ -110,6 +107,7 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
     }
 
     final arVM = context.watch<ARViewModel>();
+    final mapVM = context.watch<MapViewModel>();
 
     // The faster-route map preview replaces the camera feed, so the AR
     // platform view is hidden while it's shown — otherwise the native
@@ -145,18 +143,14 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
             Container(color: Colors.black),
 
           // ── Layer 2: Chevron arrow ────────────────────────────────
-          if (_debugDirection != null || arVM.nextTurnDirection != null)
+          if (arVM.nextTurnDirection != null)
             Positioned.fill(
               child: Center(
                 child: DynamicArrowWidget(
-                  direction:     _debugDirection ?? arVM.nextTurnDirection!,
+                  direction:     arVM.nextTurnDirection!,
                   distance:      arVM.distanceToNextTurn ?? double.infinity,
-                  approachStage: _debugDirection != null
-                      ? NavigationApproachStage.far
-                      : arVM.approachStage,
-                  exitNumber: _debugDirection == TurnDirection.roundabout
-                      ? 2
-                      : arVM.roundaboutExit,
+                  approachStage: arVM.approachStage,
+                  exitNumber: arVM.roundaboutExit,
                 ),
               ),
             ),
@@ -169,37 +163,29 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _NavInfoCard(
-                  directionOverride: _debugDirection,
-                  approachStageOverride: _debugDirection != null
-                      ? NavigationApproachStage.far
-                      : null,
-                ),
+                const _NavInfoCard(),
                 if (navVM.navigationStatus == NavigationStatus.rerouting)
                   const _ReroutingBanner(),
               ],
             ),
           ),
 
-          // ── Layer 4: DEBUG direction buttons (remove before release) ─
+          // ── Layer 4: Bottom navigation bar + speed indicator ─────
           Positioned(
-            bottom: 100,
-            left: 0,
-            right: 0,
-            child: _DebugDirectionBar(
-              selected: _debugDirection,
-              onSelect: (d) => setState(
-                () => _debugDirection = _debugDirection == d ? null : d,
-              ),
-            ),
-          ),
-
-          // ── Layer 5: Bottom navigation bar ───────────────────────
-          const Positioned(
             bottom: 0,
             left: 0,
             right: 0,
-            child: NavigationBottomBar(),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 16, bottom: 12),
+                  child: SpeedIndicator(speedMs: mapVM.currentSpeed),
+                ),
+                const NavigationBottomBar(),
+              ],
+            ),
           ),
 
           // ── Layer 6: Faster route full-screen map preview ─────────
@@ -236,17 +222,14 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
 // ── Floating top info card ────────────────────────────────────────────────────
 
 class _NavInfoCard extends StatelessWidget {
-  const _NavInfoCard({this.directionOverride, this.approachStageOverride});
-
-  final TurnDirection? directionOverride;
-  final NavigationApproachStage? approachStageOverride;
+  const _NavInfoCard();
 
   @override
   Widget build(BuildContext context) {
     final arVM = context.watch<ARViewModel>();
-    if (arVM.nextTurnDirection == null && directionOverride == null) return const SizedBox.shrink();
+    if (arVM.nextTurnDirection == null) return const SizedBox.shrink();
 
-    final direction = directionOverride ?? arVM.nextTurnDirection!;
+    final direction = arVM.nextTurnDirection!;
     final distance = arVM.distanceToNextTurn ?? double.infinity;
 
     return Container(
@@ -307,7 +290,7 @@ class _NavInfoCard extends StatelessWidget {
               DynamicArrowWidget(
                 direction: direction,
                 distance: distance,
-                approachStage: approachStageOverride ?? arVM.approachStage,
+                approachStage: arVM.approachStage,
                 size: 48,
                 showLabel: false,
                 exitNumber: arVM.roundaboutExit,
@@ -618,65 +601,6 @@ class _AnimatedCancelButton extends StatelessWidget {
             ),
           );
         },
-      ),
-    );
-  }
-}
-
-// ── DEBUG: temporary direction buttons — remove before release ────────────────
-
-class _DebugDirectionBar extends StatelessWidget {
-  const _DebugDirectionBar({required this.selected, required this.onSelect});
-
-  final TurnDirection? selected;
-  final ValueChanged<TurnDirection> onSelect;
-
-  static const _buttons = [
-    (TurnDirection.right,     'Right'),
-    (TurnDirection.left,      'Left'),
-    (TurnDirection.keepRight, 'Keep R'),
-    (TurnDirection.keepLeft,  'Keep L'),
-    (TurnDirection.uTurn,     'U-Turn'),
-    (TurnDirection.roundabout,'Rndabt'),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Wrap(
-        alignment: WrapAlignment.center,
-        spacing: 6,
-        runSpacing: 6,
-        children: _buttons.map((entry) {
-          final (dir, label) = entry;
-          final isActive = selected == dir;
-          return GestureDetector(
-            onTap: () => onSelect(dir),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: isActive
-                    ? const Color(0xFF00E676)
-                    : const Color(0xCC000000),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: isActive
-                      ? const Color(0xFF00E676)
-                      : Colors.white38,
-                ),
-              ),
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: isActive ? Colors.black : Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          );
-        }).toList(),
       ),
     );
   }
