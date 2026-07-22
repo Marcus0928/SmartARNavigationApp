@@ -67,17 +67,6 @@ class HomeMapLayer extends StatelessWidget {
               ),
             ],
           ),
-        if (smoothedLoc != null)
-          MarkerLayer(
-            markers: [
-              Marker(
-                point: smoothedLoc!,
-                width: 44,
-                height: 44,
-                child: LocationIndicator(heading: smoothedHeading),
-              ),
-            ],
-          ),
         if (navigationPolyline != null && navigationPolyline!.isNotEmpty)
           PolylineLayer(
             polylines: [
@@ -127,6 +116,17 @@ class HomeMapLayer extends StatelessWidget {
                 strokeWidth: 6.0,
                 borderColor: Colors.white,
                 borderStrokeWidth: 2.0,
+              ),
+            ],
+          ),
+        if (smoothedLoc != null)
+          MarkerLayer(
+            markers: [
+              Marker(
+                point: smoothedLoc!,
+                width: 44,
+                height: 44,
+                child: LocationIndicator(heading: smoothedHeading),
               ),
             ],
           ),

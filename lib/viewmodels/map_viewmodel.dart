@@ -145,6 +145,8 @@ class MapViewModel extends ChangeNotifier {
     _trackingStarted = false;
     _lastClosestSegmentIndex = 0;
     _locationService.stopLocationStream();
+    _currentSpeed = null;
+    notifyListeners();
   }
 
   void setAppForegroundState(bool inForeground) {
