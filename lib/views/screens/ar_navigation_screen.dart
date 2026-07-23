@@ -20,6 +20,7 @@ import 'package:smart_ar_navigation/viewmodels/ar_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/map_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/navigation_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/settings_viewmodel.dart';
+import 'package:smart_ar_navigation/views/screens/home/widgets/floating_icon_button.dart';
 import 'package:smart_ar_navigation/views/screens/home/widgets/speed_indicator.dart';
 import 'package:smart_ar_navigation/views/widgets/dynamic_arrow_widget.dart';
 import 'package:smart_ar_navigation/views/widgets/navigation_bottom_bar.dart';
@@ -295,6 +296,19 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 16, bottom: 8),
+                  child: FloatingIconButton(
+                    icon: arVM.voiceGuidanceEnabled
+                        ? Icons.volume_up
+                        : Icons.volume_off,
+                    tooltip: arVM.voiceGuidanceEnabled
+                        ? 'Mute voice guidance'
+                        : 'Unmute voice guidance',
+                    onPressed: () =>
+                        context.read<ARViewModel>().toggleVoiceGuidance(),
+                  ),
+                ),
                 Padding(
                   padding: const EdgeInsets.only(right: 16, bottom: 12),
                   child: SpeedIndicator(speedMs: mapVM.currentSpeed),

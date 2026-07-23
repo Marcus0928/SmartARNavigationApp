@@ -20,7 +20,11 @@ class ARViewModel extends ChangeNotifier {
 
   ARViewModel({required ARService arService, VoiceService? voiceService})
       : _arService = arService,
-        _voiceService = voiceService ?? VoiceService();
+        _voiceService = voiceService ?? VoiceService() {
+    // Fire-and-forget: ARViewModel is constructed once at app startup, well
+    // before a navigation session can start and any speak() call could fire.
+    _voiceService.initialize();
+  }
 
   TurnDirection? _nextTurnDirection;
   double? _distanceToNextTurn;
@@ -336,6 +340,17 @@ class ARViewModel extends ChangeNotifier {
 
   void setDestination(LatLng? destination) {
     _destinationCoordinates = destination;
+  }
+
+  // Toggles the voice guidance mute button on the AR screen. Stops any
+  // in-progress speech immediately when muting, rather than letting the
+  // current announcement finish.
+  void toggleVoiceGuidance() {
+    voiceGuidanceEnabled = !voiceGuidanceEnabled;
+    if (!voiceGuidanceEnabled) {
+      _voiceService.stop();
+    }
+    notifyListeners();
   }
 
   // ── Static testing hooks (debug buttons) — no GPS/route required ──────────
