@@ -11,7 +11,7 @@
 | **Supervisor** | Dr Javid Iqbal Thirupattur |
 | **Institution** | Sunway University — School of Computing and Artificial Intelligence |
 | **Programme** | Bachelor of Software Engineering (Hons) |
-| **Version** | 3.3 |
+| **Version** | 3.4 |
 | **Last Updated** | July 2026 |
 
 ---
@@ -349,9 +349,10 @@ Check Location Permission
 | `roundaboutExit` | `int?` | Roundabout exit number (1–4); non-null only when `nextTurnDirection == roundabout` |
 | `isARInitialized` | `bool` | Whether ARCore session is ready |
 | `initializeAR(sessionManager, objectManager)` | `Future<void>` | Initialises the ARCore session via `ARService` |
-| `initializeOverlay(route, {heading})` | `Future<void>` | Seeds the turn queue from a `RouteModel`; when `heading` is non-null and the first step is a U-turn, discards that step (phantom U-turn guard) |
-| `updateAROverlay(location)` | `void` | Drops passed turns (< 25 m); finds the first upcoming non-forward turn; applies a 1 000 m engage / 1 100 m disengage hysteresis gate for **all** non-forward turns (not just roundabout); within gate: shows upcoming turn early; outside gate: shows forward; `distanceToNextTurn` always reflects the upcoming non-forward turn |
-| `resetOverlay()` | `void` | Clears all overlay state (called on navigation stop or arrival) |
+| `initializeOverlay(route, {heading})` | `Future<void>` | Seeds the turn queue from a `RouteModel`; when `heading` is non-null and the first step is a U-turn, discards that step (phantom U-turn guard); if the new head turn matches the previous head turn by direction and position (within 20 m), carries the old `_lastHeadTurn` reference forward instead of letting it look like a new turn — prevents a reroute from resetting the voice-announcement dedup state and re-speaking the same announcement mid-utterance |
+| `updateAROverlay(location)` | `void` | Drops passed turns (< 25 m); finds the first upcoming non-forward turn; applies a 1 000 m engage / 1 100 m disengage hysteresis gate for **all** non-forward turns (not just roundabout); within gate: shows upcoming turn early; outside gate: shows forward; `distanceToNextTurn` always reflects the upcoming non-forward turn; also drives the voice-announcement check (see `voiceGuidanceEnabled` below) |
+| `resetOverlay()` | `void` | Clears all overlay state and stops any in-progress speech (called on navigation stop or arrival) |
+| `voiceGuidanceEnabled` | `bool` | When `true` (default), `updateAROverlay()` triggers spoken turn announcements via `VoiceService` at four distance tiers: >1 km (once), 200 m–1 km, 50–200 m, and <50 m. Each tier is announced at most once per turn via a `_lastAnnounced` dedup flag, which resets when the head turn genuinely changes |
 
 #### `MapViewModel`
 **Responsibility:** Handles GPS location tracking and map data.
@@ -563,8 +564,15 @@ class PlaceModel {
 
 #### `ARService`
 - Wraps `ar_flutter_plugin_2`
-- Manages ARCore session lifecycle (initialize, dispose)
+- Manages ARCore session lifecycle (initialize, dispose). `initializeAR()` disposes any existing session first if one is already active, before initializing the new one — otherwise a previous session's camera/GL resources are never released and repeated re-entry into the AR screen accumulates sessions until ARCore crashes. `ARNavigationScreenState.dispose()` also calls `disposeAR()` unconditionally, so the session is released on screen teardown regardless of whether a new one happens to be created afterward
 - Arrow overlays are rendered as Flutter widget overlays driven by `ARViewModel` state; `placeArrow`, `updateArrow`, and `clearOverlays` are intentional no-ops that notify the widget layer via `ARViewModel` rather than placing 3D ARCore nodes directly
+
+#### `VoiceService`
+- Wraps `flutter_tts` to speak turn-by-turn announcements built by `ARViewModel`
+- `initialize()` — sets language (`en-US`), speech rate, volume, and requests transient "duck" audio focus (lowers other apps' volume instead of pausing them) via `setAudioAttributesForNavigation()`, matching how other turn-by-turn apps announce over music/podcasts
+- `speak(text)` — always calls `_tts.stop()` before `_tts.speak(text)` so a new announcement cleanly cuts off and replaces any still-playing one rather than queuing behind it
+- `stop()` / `dispose()` — cancel any in-progress speech; `resetOverlay()` and `stopNavigation()` call `stop()` so navigation ending mid-sentence doesn't leave stale speech playing
+- Owned by `ARViewModel` (constructed internally, or injected for testing)
 
 #### `AmbientLightService`
 - Wraps the `light` package's `Light().lightSensorStream` (`Stream<int>` of lux readings)
@@ -683,6 +691,7 @@ smart_ar_navigation/
 │   ├── services/                    # External service wrappers (Model layer)
 │   │   ├── location_service.dart        # GPS / geolocator wrapper
 │   │   ├── ar_service.dart              # ARCore / ar_flutter_plugin wrapper
+│   │   ├── voice_service.dart           # flutter_tts wrapper — speaks turn announcements
 │   │   ├── ambient_light_service.dart   # Ambient light sensor (light package) — drives AR arrow auto-brightness
 │   │   └── saved_locations_database.dart # SQLite database helper (sqflite)
 │   │
@@ -1056,10 +1065,10 @@ These features are **out of scope for the current FYP phase** but the design has
 | **Heading-Biased Route Fetch** | ✅ Implemented | `RouteRepository.getRoute()` accepts optional `heading`; appended as `&heading=N` to the Directions API request. `startNavigation()` and `recalculateRoute()` pass `_locationService.currentHeading`. `initializeOverlay()` discards a phantom step-1 U-turn when heading is provided. |
 | **Screen Wake Lock** | ✅ Implemented | `WakelockPlus.enable()` in `ARNavigationScreen.initState()`; disabled on dispose. |
 | **Edge-to-Edge Status Bar** | ✅ Implemented | `SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge)` in `main()`; per-screen `AnnotatedRegion<SystemUiOverlayStyle>` for icon brightness. |
-| **AR Camera Fix on Resume** | ✅ Implemented | `ARNavigationScreen` uses `UniqueKey _arViewKey`; `didChangeAppLifecycleState` assigns a new `UniqueKey` on resume, forcing Flutter to fully dispose and recreate the `ARView` native widget. |
+| **AR Camera Fix on Resume** | ✅ Implemented | `ARNavigationScreenState._showAR` (bool) conditionally swaps the `ARView` widget for a plain black `Container`. `didChangeAppLifecycleState` sets it `false` on pause/resume, then back to `true` after a 500 ms delay on resume — the widget swap forces Flutter to fully unmount and recreate the `ARView` native platform view rather than leaving a stale camera session running. |
 | **Route Refresh from Current Location** | ✅ Implemented | `MapViewModel.refreshPreviewRoute()` re-fetches from current GPS; `routeVersion` counter triggers camera re-fit in `HomeMapController`. |
 | **Ambient Light Auto-Brightness** | ✅ Implemented | `AmbientLightService` streams lux via the `light` package, classifies into `LightLevel` (bright/normal/dark) with a 2 s debounce, and exposes it via `ValueNotifier`. `ARNavigationScreen` wraps the main AR arrow in a `ValueListenableBuilder` that maps the level to an opacity/colour pair (or falls back to `SettingsViewModel.overlayOpacity` when the "Auto Brightness" toggle is off), passed to `DynamicArrowWidget`'s `opacityOverride`/`colorOverride` parameters. |
-| **Voice Instructions** | 🔮 Planned | Add a `VoiceService` in the services layer. `ARViewModel` already exposes `nextTurnDirection`, `distanceToNextTurn`, and `currentStreetName` — pass these to a `flutter_tts` call at appropriate distance thresholds. |
+| **Voice Instructions** | ✅ Implemented | `VoiceService` wraps `flutter_tts`. `ARViewModel._checkVoiceAnnouncement()` speaks at four distance tiers (>1 km once, 200 m–1 km, 50–200 m, <50 m), deduplicated per turn via `_lastAnnounced`. `_buildVoiceInstruction()` composes direction + distance + street name; `_formatKmForSpeech()` renders whole-kilometre distances naturally ("1 kilometre" instead of "1.0 kilometres"); `_sanitizeStreetNameForSpeech()` expands slashes/dashes to spoken words and letter-spells all-caps road codes. `initializeOverlay()` carries `_lastHeadTurn` forward across a reroute when the new head turn matches the old one by direction/position, so a reroute doesn't reset the dedup state and cause the same announcement to interrupt itself and repeat. |
 | **2D Map Toggle** | 🔮 Planned | Add `map_screen.dart` as a new View. `NavigationViewModel` already holds the `RouteModel` — pass it to a `GoogleMap` widget. A toggle button on `ARNavigationScreen` can push/pop between screens. |
 | **Offline Navigation** | 🔮 Planned | Replace `RouteRepository` with a cached route strategy. No changes needed in ViewModels or Views. |
 | **Speed Warning** | 🔮 Planned | `MapViewModel.currentSpeed` already exposes GPS speed. Add a `speedLimit` property and a warning overlay widget. |

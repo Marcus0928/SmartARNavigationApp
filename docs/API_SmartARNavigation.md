@@ -11,7 +11,7 @@
 | **Supervisor** | Dr Javid Iqbal Thirupattur |
 | **Institution** | Sunway University — School of Computing and Artificial Intelligence |
 | **Programme** | Bachelor of Software Engineering (Hons) |
-| **Version** | 1.5 |
+| **Version** | 1.6 |
 | **Last Updated** | July 2026 |
 
 ---
@@ -33,6 +33,7 @@
 13. [Enums & Constants](#13-enums--constants)
 14. [DynamicArrowWidget](#14-dynamicarrowwidget)
 15. [AmbientLightService](#15-ambientlightservice)
+16. [VoiceService](#16-voiceservice)
 
 ---
 
@@ -116,6 +117,7 @@ Stream<LatLng> getLocationStream()
 **Notes:**
 - Used during active navigation to update AR overlays in real time
 - Remember to cancel the stream subscription when navigation stops to save battery
+- Cancels any previous internal `Geolocator` subscription before creating the new one — a defensive guard so that if this is ever called twice without an intervening `stopLocationStream()` (not currently possible via `MapViewModel`'s `_trackingStarted` guard, but not defended against at this layer either), GPS fixes aren't delivered twice per real position update
 
 ---
 
@@ -198,6 +200,7 @@ List<RouteModel> parseRouteResponse(Map<String, dynamic> json)
 - Sets `hasTolls = true` when the route-level `warnings` array contains the word "toll", **or** when any step's `html_instructions` contains the word "toll" (covers Malaysian routes where warnings may be absent)
 - Extracts the road name from the first non-compass, non-ordinal `<b>` tag in `html_instructions`
 - Extracts roundabout exit numbers via `_parseRoundaboutExit()`: tries the structured `step['exit']` integer field first; falls back to parsing the ordinal in `html_instructions` (e.g. "take the **3rd** exit") when the field is absent — common in Malaysian API responses
+- Drops any step shorter than 15 m from the `turns` list (filters GPS/API noise steps that would otherwise be popped almost instantly by `ARViewModel`'s turn-pruning), **except** the last step in a leg, which is always kept regardless of length — Google often emits a short final "turn onto X; destination is on the Y" step when the destination sits close to the last turn, and dropping it would leave the final turn without an arrow or voice announcement
 
 ---
 
@@ -261,18 +264,25 @@ Future<PlaceModel> getPlaceDetails(String placeId)
 ### `initializeAR()`
 
 ```dart
-Future<bool> initializeAR()
+Future<bool> initializeAR(
+  ARSessionManager sessionManager,
+  ARObjectManager objectManager,
+)
 ```
 
 **Purpose:** Initializes the ARCore session on the device.
 
-**Parameters:** None
+**Parameters:**
+| Parameter | Type | Description |
+|---|---|---|
+| `sessionManager` | `ARSessionManager` | Provided by the `ARView` widget's `onARViewCreated` callback |
+| `objectManager` | `ARObjectManager` | Provided by the same callback |
 
-**Returns:** `bool` — `true` if ARCore initialized successfully, `false` otherwise
+**Returns:** `bool` — `true` once `onInitialize()` completes for both managers
 
 **Notes:**
-- Call this when the AR Navigation Screen loads
-- Will return `false` on devices that don't support ARCore
+- Call this when the AR Navigation Screen loads (from `ARNavigationScreenState._onARViewCreated`)
+- If a previous session is still active (`_isInitialized == true`), calls `disposeAR()` first to release it before initializing the new one — without this, re-entering the AR screen repeatedly (e.g. via the Routes button round-trip) would leak native ARCore sessions and eventually crash
 
 ---
 
@@ -325,8 +335,9 @@ void disposeAR()
 **Returns:** Nothing
 
 **Notes:**
-- Always call this in the `dispose()` method of the AR Navigation Screen
-- Failing to dispose will cause memory leaks
+- Called unconditionally from `ARNavigationScreenState.dispose()`, so the session is always released on screen teardown — not just when a new session happens to be created afterward
+- Also called internally by `initializeAR()` before it reinitializes, if a session is already active
+- Failing to dispose will cause memory leaks and, with repeated re-initialization, native ARCore crashes
 
 ---
 
@@ -365,6 +376,7 @@ Future<void> startNavigation(
 - Records `activeRouteIndex` so the route selection UI can show Resume vs Go labels
 - Starts the background faster-route check timer (`Timer.periodic` every 2 min) after a successful route fetch
 - Notifies listeners so the UI navigates to the AR screen
+- **Not** for resuming an already-active session on the same route: calling this while `navigationStatus == navigating` fully stops and restarts the session (fresh route fetch, `ARViewModel.initializeOverlay()` reseeded). The Home Screen's "Resume" button (shown when the selected route already matches `activeRouteIndex`) skips calling this entirely and just re-pushes the AR screen, to avoid an unnecessary restart
 
 ---
 
@@ -536,7 +548,22 @@ Future<void> initializeOverlay(RouteModel route, {double? heading})
 **Notes:**
 - Stores the route's `turns` list as `_remainingTurns` and sets the initial overlay state
 - Phantom U-turn guard: if `heading != null` and `_remainingTurns.length > 1` and the first turn is a U-turn, the U-turn step is discarded — it was produced by the Directions API because it had no heading context
-- Called once when the AR Navigation Screen first loads, and again after each reroute
+- Called once when the AR Navigation Screen first loads, and again after each reroute (`recalculateRoute()`) or accepted faster route (`acceptFasterRoute()`)
+- Rerouting always hands this a fresh list of `TurnInstruction` objects, even when the upcoming real-world turn hasn't changed. If the new head turn matches the previous `_lastHeadTurn` by direction and position (within 20 m), the old reference is carried forward instead of being treated as a new turn — otherwise the next `updateAROverlay()` tick would reset the voice-announcement dedup state and re-speak the same announcement mid-utterance
+
+---
+
+### `voiceGuidanceEnabled`
+
+```dart
+bool voiceGuidanceEnabled
+```
+
+**Purpose:** Enables/disables spoken turn announcements. `true` by default.
+
+**Notes:**
+- Read by `updateAROverlay()`'s internal `_checkVoiceAnnouncement()` step; when `false`, no `VoiceService.speak()` calls are made
+- Not currently exposed as a Settings toggle
 
 ---
 
@@ -1426,6 +1453,74 @@ ValueNotifier<LightLevel> levelNotifier
 
 ---
 
-*End of API & Function Documentation — Version 1.5*
+## 16. VoiceService
+
+**File:** `lib/services/voice_service.dart`
+**Purpose:** Wraps `flutter_tts` to speak turn-by-turn voice announcements.
+
+---
+
+### `initialize()`
+
+```dart
+Future<void> initialize()
+```
+
+**Purpose:** Configures the TTS engine — language, speech rate, volume, and navigation-style audio ducking.
+
+**Parameters:** None
+
+**Returns:** Nothing
+
+**Notes:**
+- Sets language to `'en-US'`, speech rate to `0.5`, volume to `1.0`
+- Calls `setAudioAttributesForNavigation()` to request transient "duck" audio focus (lowers other apps' volume instead of pausing them), matching how turn-by-turn navigation apps announce guidance over music/podcasts
+- Should be called once during setup, before the first `speak()` call
+
+---
+
+### `speak()`
+
+```dart
+Future<void> speak(String text)
+```
+
+**Purpose:** Speaks the given announcement text.
+
+**Parameters:**
+| Parameter | Type | Description |
+|---|---|---|
+| `text` | `String` | The announcement to speak, built by `ARViewModel._buildVoiceInstruction()` |
+
+**Returns:** Nothing
+
+**Notes:**
+- Always calls `_tts.stop()` before `_tts.speak(text)`, so any still-playing announcement is cut off and immediately replaced rather than queued — this is intentional (a new announcement should always take priority over a stale one) but means two `speak()` calls with the same text in quick succession will audibly sound like the first one was interrupted and restarted
+
+---
+
+### `stop()`
+
+```dart
+void stop()
+```
+
+**Purpose:** Cancels any in-progress speech immediately.
+
+**Notes:** Called by `ARViewModel.resetOverlay()` on navigation stop/arrival, so speech doesn't continue after navigation ends.
+
+---
+
+### `dispose()`
+
+```dart
+void dispose()
+```
+
+**Purpose:** Stops any in-progress speech. Owned and disposed by `ARViewModel`.
+
+---
+
+*End of API & Function Documentation — Version 1.6*
 
 *Prepared by: Liew Sau Yang | Sunway University | Bachelor of Software Engineering (Hons)*

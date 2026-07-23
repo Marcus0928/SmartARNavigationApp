@@ -12,7 +12,7 @@
 | **Institution** | Sunway University — School of Computing and Artificial Intelligence |
 | **Programme** | Bachelor of Software Engineering (Hons) |
 | **Semester** | September 2025 |
-| **Version** | 2.4 |
+| **Version** | 2.5 |
 | **Last Updated** | July 2026 |
 
 ---
@@ -29,6 +29,7 @@
    - [3.11 Plan a Drive Screen](#311-plan-a-drive-screen)
    - [3.12 Home Screen Route Selection](#312-home-screen-route-selection)
    - [3.13 Recent Search History](#313-recent-search-history)
+   - [3.14 Voice Guidance](#314-voice-guidance)
 4. [Non-Functional Requirements](#4-non-functional-requirements)
 5. [External Interface Requirements](#5-external-interface-requirements)
 6. [Technology Stack](#6-technology-stack)
@@ -352,6 +353,20 @@ Primary users are assumed to be comfortable with basic smartphone usage. No tech
 
 ---
 
+### 3.14 Voice Guidance
+
+**Description:** The app shall provide spoken turn-by-turn announcements via text-to-speech, so the driver does not need to look at the screen for turn timing.
+
+| ID | Requirement |
+|---|---|
+| FR-84 | The system shall speak a turn announcement (direction + street name) when the upcoming turn first comes within 1 000 m, again at 200 m, again at 50 m, and once more inside 50 m — each tier spoken at most once per turn. |
+| FR-85 | Spoken distance values shall be rounded the same way as the on-screen distance label, and whole-kilometre distances shall be read as a natural whole number (e.g. "1 kilometre") rather than with a redundant decimal (e.g. "1.0 kilometres"). |
+| FR-86 | Street names included in a spoken announcement shall be sanitized for speech: slashes and dashes shall be expanded to spoken words ("slash", "dash"), and consecutive all-caps letters (e.g. road codes) shall be spelled out letter-by-letter. |
+| FR-87 | When the route is recalculated (rerouting or accepting a faster route) while the upcoming turn is unchanged, the system shall not re-trigger an already-spoken announcement for that turn. When the upcoming turn does genuinely change, the system shall announce the new turn normally. |
+| FR-88 | Starting a new announcement shall immediately stop any announcement still playing, rather than queuing behind it. |
+
+---
+
 ## 4. Non-Functional Requirements
 
 ### 4.1 Performance
@@ -472,6 +487,7 @@ dependencies:
   sqflite: ^2.3.3                  # SQLite database for bookmarked saved locations
   path: ^1.9.0                     # File path utilities (required by sqflite)
   light: ^5.0.0                    # Ambient light sensor for AR arrow auto-brightness
+  flutter_tts: ^4.2.5              # Text-to-speech engine for voice guidance
 ```
 
 ---
@@ -484,7 +500,7 @@ dependencies:
 | **AR Hardware** | Device must support ARCore (not all Android devices do) |
 | **Internet Dependency** | Offline navigation is not supported |
 | **HUD Integration** | The app will not integrate with any vehicle head-up display |
-| **Voice Commands** | Voice-guided navigation is not included in this phase |
+| **Voice Guidance Controls** | Spoken turn announcements are always on — there is no in-app mute toggle or volume control in this phase; the device's media volume applies |
 | **Speed** | Intended for pedestrian or very low-speed use — not validated for highway speeds |
 | **Lighting** | AR performance may degrade in very low-light or high-glare environments |
 | **GPS Accuracy** | Navigation accuracy is subject to device GPS hardware quality |
