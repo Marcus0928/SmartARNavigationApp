@@ -117,7 +117,9 @@ TurnDirection _parseManeuver(String maneuver) {
 // Only inspects the main instruction text (before any supplementary <div> blocks
 // that Google Maps appends, e.g. "Partial result", "Destination on the right").
 // Returns null when no keyword is found. Never returns an empty string.
-// Truncates to 25 characters with "..." if the name is longer.
+// Returns the full name untouched — any visual truncation for layout must be
+// applied at the widget/display layer (Text(overflow: TextOverflow.ellipsis)),
+// not here, since this value also feeds voice guidance.
 String? _extractStreetName(String html) {
   // The main instruction text always precedes the first supplementary <div>.
   final mainHtml = html.split(RegExp(r'<div')).first;
@@ -129,8 +131,7 @@ String? _extractStreetName(String html) {
   if (match == null) return null;
   final name = match.group(1)!.trim();
   if (name.isEmpty) return null;
-  if (name.length <= 25) return name;
-  return '${name.substring(0, 25)}...';
+  return name;
 }
 
 // Reads the roundabout exit number from the step JSON.

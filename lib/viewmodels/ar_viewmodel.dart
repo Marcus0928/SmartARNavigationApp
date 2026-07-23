@@ -12,7 +12,15 @@ import 'package:smart_ar_navigation/models/turn_instruction.dart';
 import 'package:smart_ar_navigation/services/ar_service.dart';
 import 'package:smart_ar_navigation/services/voice_service.dart';
 
-enum VoiceAnnouncement { none, far1km, far200to1km, yellow, red }
+enum VoiceAnnouncement {
+  none,
+  farLive,
+  midLive,
+  checkpoint1km,
+  checkpoint500m,
+  yellow,
+  red
+}
 
 class ARViewModel extends ChangeNotifier {
   final ARService _arService;
@@ -39,6 +47,10 @@ class ARViewModel extends ChangeNotifier {
   double? _closestApproachToHead;
   LatLng? _destinationCoordinates;
   VoiceAnnouncement _lastAnnounced = VoiceAnnouncement.none;
+  double? _lastAnnouncedAtDistance;
+  double? _previousDistanceToNextTurn;
+  TurnDirection? _upcomingTurnDirection;
+  String? _upcomingTurnStreet;
   bool voiceGuidanceEnabled = true;
 
   // TEMPORARY - remove after voice guidance testing is complete
@@ -224,6 +236,8 @@ class ARViewModel extends ChangeNotifier {
         _roundaboutExit = null;
         _instructionText = 'Continue';
         _currentStreetName = currentStep.streetName;
+        _upcomingTurnDirection = currentStep.direction;
+        _upcomingTurnStreet = currentStep.streetName;
         _arService.updateArrow(TurnDirection.forward, distanceToCurrentStep);
         _checkVoiceAnnouncement();
         notifyListeners();
@@ -237,6 +251,8 @@ class ARViewModel extends ChangeNotifier {
         _roundaboutExit = null;
         _instructionText = 'Continue';
         _currentStreetName = currentStep.streetName;
+        _upcomingTurnDirection = currentStep.direction;
+        _upcomingTurnStreet = currentStep.streetName;
         _arService.updateArrow(TurnDirection.forward, distanceToCurrentStep);
         _checkVoiceAnnouncement();
         notifyListeners();
@@ -262,6 +278,8 @@ class ARViewModel extends ChangeNotifier {
       );
       _currentStreetName = currentStep.streetName;
       _roundaboutExit = currentStep.exitNumber;
+      _upcomingTurnDirection = currentStep.direction;
+      _upcomingTurnStreet = currentStep.streetName;
       _arService.updateArrow(currentStep.direction, distanceToCurrentStep);
     } else {
       // Current step is forward — scan ahead for the first non-forward turn within 1 km.
@@ -296,6 +314,8 @@ class ARViewModel extends ChangeNotifier {
         );
         _currentStreetName = upcomingTurn.streetName;
         _roundaboutExit = upcomingTurn.exitNumber;
+        _upcomingTurnDirection = upcomingTurn.direction;
+        _upcomingTurnStreet = upcomingTurn.streetName;
         _arService.updateArrow(upcomingTurn.direction, distanceToUpcoming);
       } else {
         _lookaheadActive = false;
@@ -306,6 +326,8 @@ class ARViewModel extends ChangeNotifier {
         );
         _currentStreetName = currentStep.streetName;
         _roundaboutExit = currentStep.exitNumber;
+        _upcomingTurnDirection = upcomingTurn.direction;
+        _upcomingTurnStreet = upcomingTurn.streetName;
         _arService.updateArrow(currentStep.direction, distanceToUpcoming);
         if (upcomingTurn == currentStep && _remainingTurns.isNotEmpty) {
           final targetPoint =
@@ -363,6 +385,14 @@ class ARViewModel extends ChangeNotifier {
     _debugOverrideActive = true;
     _nextTurnDirection = direction;
     _roundaboutExit = exitNumber;
+    // TEMPORARY - remove after voice guidance testing is complete
+    // Debug buttons only drive nextTurnDirection above, but farLive/midLive
+    // read from _upcomingTurnDirection/_upcomingTurnStreet (only populated by
+    // the real GPS logic in updateAROverlay(), which never runs in test
+    // mode) — mirror the test direction/street here so those tiers speak
+    // the button that was actually pressed instead of a stale value.
+    _upcomingTurnDirection = direction;
+    _upcomingTurnStreet = 'Jalan Universiti';
     notifyListeners();
   }
 
@@ -393,89 +423,193 @@ class ARViewModel extends ChangeNotifier {
     final d = _distanceToNextTurn;
     if (d == null) return;
 
+    if (_lastAnnounced == VoiceAnnouncement.none) {
+      // IMMEDIATE-FIRE — this turn just became active
+      if (d < 50) {
+        _voiceService.speak(_buildVoiceInstruction(
+          VoiceAnnouncement.red,
+          direction: _nextTurnDirection ?? TurnDirection.forward,
+          street: _currentStreetName,
+          distanceMetres: d,
+          roundaboutExit: _roundaboutExit,
+        ));
+        _lastAnnounced = VoiceAnnouncement.red;
+      } else if (d >= 50 && d <= 200) {
+        _voiceService.speak(_buildVoiceInstruction(
+          VoiceAnnouncement.yellow,
+          direction: _nextTurnDirection ?? TurnDirection.forward,
+          street: _currentStreetName,
+          distanceMetres: d,
+          roundaboutExit: _roundaboutExit,
+        ));
+        _lastAnnounced = VoiceAnnouncement.yellow;
+      } else if (d > 200 && d <= 1000) {
+        _voiceService.speak(_buildVoiceInstruction(
+          VoiceAnnouncement.midLive,
+          direction: _upcomingTurnDirection ?? TurnDirection.forward,
+          street: _upcomingTurnStreet,
+          distanceMetres: d,
+          roundaboutExit: _roundaboutExit,
+        ));
+        _lastAnnounced = VoiceAnnouncement.midLive;
+      } else if (d > 1000) {
+        _voiceService.speak(_buildVoiceInstruction(
+          VoiceAnnouncement.farLive,
+          direction: _upcomingTurnDirection ?? TurnDirection.forward,
+          street: _upcomingTurnStreet,
+          distanceMetres: d,
+          roundaboutExit: _roundaboutExit,
+        ));
+        _lastAnnounced = VoiceAnnouncement.farLive;
+      }
+      _lastAnnouncedAtDistance = d;
+      _previousDistanceToNextTurn = d;
+      return;
+    }
+
+    final prev = _previousDistanceToNextTurn;
+
     if (d < 50 && _lastAnnounced != VoiceAnnouncement.red) {
-      _voiceService.speak(
-        _buildVoiceInstruction(includeDistance: false, useKm: false),
-      );
+      _voiceService.speak(_buildVoiceInstruction(
+        VoiceAnnouncement.red,
+        direction: _nextTurnDirection ?? TurnDirection.forward,
+        street: _currentStreetName,
+        distanceMetres: d,
+        roundaboutExit: _roundaboutExit,
+      ));
       _lastAnnounced = VoiceAnnouncement.red;
     } else if (d >= 50 &&
         d <= 200 &&
-        (_lastAnnounced == VoiceAnnouncement.none ||
-            _lastAnnounced == VoiceAnnouncement.far200to1km ||
-            _lastAnnounced == VoiceAnnouncement.far1km)) {
-      _voiceService.speak(
-        _buildVoiceInstruction(includeDistance: true, useKm: false),
-      );
+        _lastAnnounced != VoiceAnnouncement.yellow &&
+        _lastAnnounced != VoiceAnnouncement.red) {
+      _voiceService.speak(_buildVoiceInstruction(
+        VoiceAnnouncement.yellow,
+        direction: _nextTurnDirection ?? TurnDirection.forward,
+        street: _currentStreetName,
+        distanceMetres: d,
+        roundaboutExit: _roundaboutExit,
+      ));
       _lastAnnounced = VoiceAnnouncement.yellow;
-    } else if (d > 200 &&
-        d <= 1000 &&
-        (_lastAnnounced == VoiceAnnouncement.none ||
-            _lastAnnounced == VoiceAnnouncement.far1km)) {
-      _voiceService.speak(
-        _buildVoiceInstruction(includeDistance: true, useKm: false),
-      );
-      _lastAnnounced = VoiceAnnouncement.far200to1km;
-    } else if (d > 1000 && _lastAnnounced == VoiceAnnouncement.none) {
-      _voiceService.speak(
-        _buildVoiceInstruction(includeDistance: true, useKm: true),
-      );
-      _lastAnnounced = VoiceAnnouncement.far1km;
+    } else if (prev != null &&
+        prev >= 500 &&
+        d < 500 &&
+        _lastAnnounced != VoiceAnnouncement.checkpoint500m &&
+        _lastAnnounced != VoiceAnnouncement.yellow &&
+        _lastAnnounced != VoiceAnnouncement.red) {
+      if (_lastAnnouncedAtDistance != null &&
+          _lastAnnouncedAtDistance! >= 400 &&
+          _lastAnnouncedAtDistance! <= 600) {
+        // within +-100m of the 500m checkpoint already — skip
+        // speaking, just mark this tier as covered
+        _lastAnnounced = VoiceAnnouncement.checkpoint500m;
+      } else {
+        _voiceService.speak(_buildVoiceInstruction(
+          VoiceAnnouncement.checkpoint500m,
+          direction: _upcomingTurnDirection ?? TurnDirection.forward,
+          street: _upcomingTurnStreet,
+          distanceMetres: d,
+          roundaboutExit: _roundaboutExit,
+        ));
+        _lastAnnounced = VoiceAnnouncement.checkpoint500m;
+        _lastAnnouncedAtDistance = d;
+      }
+    } else if (prev != null &&
+        prev >= 1000 &&
+        d < 1000 &&
+        _lastAnnounced != VoiceAnnouncement.checkpoint1km &&
+        _lastAnnounced != VoiceAnnouncement.checkpoint500m &&
+        _lastAnnounced != VoiceAnnouncement.yellow &&
+        _lastAnnounced != VoiceAnnouncement.red) {
+      if (_lastAnnouncedAtDistance != null &&
+          _lastAnnouncedAtDistance! >= 900 &&
+          _lastAnnouncedAtDistance! <= 1100) {
+        // within +-100m of the 1000m checkpoint already — skip
+        // speaking, just mark this tier as covered
+        _lastAnnounced = VoiceAnnouncement.checkpoint1km;
+      } else {
+        _voiceService.speak(_buildVoiceInstruction(
+          VoiceAnnouncement.checkpoint1km,
+          direction: _upcomingTurnDirection ?? TurnDirection.forward,
+          street: _upcomingTurnStreet,
+          distanceMetres: d,
+          roundaboutExit: _roundaboutExit,
+        ));
+        _lastAnnounced = VoiceAnnouncement.checkpoint1km;
+        _lastAnnouncedAtDistance = d;
+      }
     }
+
+    _previousDistanceToNextTurn = d;
   }
 
-  String _buildVoiceInstruction({
-    required bool includeDistance,
-    required bool useKm,
-  }) {
-    final direction = switch (_nextTurnDirection) {
+  // Direction/action wording shared by every announcement tier.
+  String _actionForDirection(TurnDirection? direction, {int? roundaboutExit}) {
+    return switch (direction) {
       TurnDirection.forward    => 'Continue straight',
       TurnDirection.left       => 'Turn left',
       TurnDirection.right      => 'Turn right',
       TurnDirection.keepLeft   => 'Keep left',
       TurnDirection.keepRight  => 'Keep right',
       TurnDirection.uTurn      => 'Make a U-turn',
-      TurnDirection.roundabout => switch (_roundaboutExit) {
+      TurnDirection.roundabout => switch (roundaboutExit) {
           1 => 'At the roundabout, take the first exit',
           2 => 'At the roundabout, take the second exit',
           3 => 'At the roundabout, take the third exit',
           4 => 'At the roundabout, take the fourth exit',
-          null => 'At the roundabout, take the exit',
-          _ => 'At the roundabout, take exit $_roundaboutExit',
+          _ => 'At the roundabout, take exit $roundaboutExit',
         },
       null => 'Continue straight',
     };
-
-    // Metres branch mirrors the rounding DynamicArrowWidget._distanceLabel
-    // already applies to the on-screen "170 m" style label, so voice and the
-    // AR overlay never read out different numbers for the same distance.
-    final prefix = !includeDistance
-        ? ''
-        : useKm
-            ? 'In ${_formatKmForSpeech(_distanceToNextTurn ?? 0)}, '
-            : 'In ${(((_distanceToNextTurn ?? 0) / 10).round() * 10).clamp(10, 990)} metres, ';
-
-    var instruction = '$prefix$direction';
-
-    // Street name only on the direct-command (red) and first-heard (far1km)
-    // announcements — yellow and far200to1km stay shorter.
-    final includeStreet = (!includeDistance || useKm) && _currentStreetName != null;
-    if (includeStreet) {
-      instruction = '$instruction onto ${_sanitizeStreetNameForSpeech(_currentStreetName!)}';
-    }
-
-    return instruction;
   }
 
-  // Rounds to one decimal place, then drops the decimal for whole-number
-  // results so "1.0 kilometres" reads as "1 kilometre" instead — matches
-  // how a person would actually say the distance aloud.
-  String _formatKmForSpeech(double metres) {
-    final formatted = (metres / 1000).toStringAsFixed(1);
-    if (formatted.endsWith('.0')) {
-      final whole = formatted.substring(0, formatted.length - 2);
-      return whole == '1' ? '1 kilometre' : '$whole kilometres';
-    }
+  // Metres rounding mirrors DynamicArrowWidget._distanceLabel so voice and
+  // the AR overlay never read out different numbers for the same distance.
+  String _liveDistanceMetres(double metres) {
+    final rounded = ((metres / 10).round() * 10).clamp(10, 990);
+    return '$rounded metres';
+  }
+
+  String _liveDistanceKm(double metres) {
+    final km = metres / 1000;
+    final formatted = km >= 10 ? km.round().toString() : km.toStringAsFixed(1);
     return '$formatted kilometres';
+  }
+
+  // Single place every spoken string is assembled — tier wording,
+  // direction/action mapping, and distance formatting all funnel through
+  // here so every call site in _checkVoiceAnnouncement() stays in sync.
+  String _buildVoiceInstruction(
+    VoiceAnnouncement style, {
+    required TurnDirection direction,
+    required String? street,
+    required double distanceMetres,
+    int? roundaboutExit,
+  }) {
+    final action =
+        _actionForDirection(direction, roundaboutExit: roundaboutExit);
+    final spokenStreet =
+        street != null ? _sanitizeStreetNameForSpeech(street) : null;
+
+    switch (style) {
+      case VoiceAnnouncement.farLive:
+        final distance = _liveDistanceKm(distanceMetres);
+        if (direction == TurnDirection.forward) {
+          return 'Continue straight for $distance';
+        }
+        return 'Continue straight for $distance, then $action onto $spokenStreet';
+      case VoiceAnnouncement.midLive:
+        return 'In ${_liveDistanceMetres(distanceMetres)}, $action onto $spokenStreet';
+      case VoiceAnnouncement.checkpoint1km:
+        return 'In 1 kilometre, $action onto $spokenStreet';
+      case VoiceAnnouncement.checkpoint500m:
+        return 'In 500 metres, $action onto $spokenStreet';
+      case VoiceAnnouncement.yellow:
+        return 'In ${_liveDistanceMetres(distanceMetres)}, $action';
+      case VoiceAnnouncement.red:
+        return action;
+      case VoiceAnnouncement.none:
+        return action;
+    }
   }
 
   // Builds a speech-only copy of the street name — never touches
