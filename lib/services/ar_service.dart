@@ -20,9 +20,11 @@ class ARService {
     // Release the previous native ARCore session before replacing it —
     // otherwise the old session's camera/GL resources are never freed and
     // repeated re-initialization (e.g. leaving and returning to the AR
-    // screen) accumulates sessions until ARCore crashes.
+    // screen) accumulates sessions until ARCore crashes. Awaited so the old
+    // session's native teardown is confirmed complete before the new one
+    // starts pumping frames.
     if (_isInitialized) {
-      disposeAR();
+      await disposeAR();
     }
 
     _sessionManager = sessionManager;
@@ -57,8 +59,8 @@ class ARService {
     // No ARCore nodes to remove; resetting ViewModel state clears the UI.
   }
 
-  void disposeAR() {
-    _sessionManager?.dispose();
+  Future<void> disposeAR() async {
+    await _sessionManager?.dispose();
     _sessionManager = null;
     _objectManager = null;
     _isInitialized = false;

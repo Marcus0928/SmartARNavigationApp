@@ -155,10 +155,16 @@ class NavigationViewModel extends ChangeNotifier {
     }
   }
 
+  // Does not touch _isStartingNavigation — that guard is owned exclusively
+  // by startNavigation(), including when this runs as its internal
+  // "stop the old session first" sub-step. Resetting it here would
+  // re-enable the Start/Go button mid-switch and let a second tap start a
+  // second, concurrent startNavigation() call — which creates a second
+  // ArView/ARCore Session and fatally crashes when both sessions' frame
+  // loops contend for the camera.
   Future<void> stopNavigation({bool stopService = true}) async {
     _fasterRouteTimer?.cancel();
     _fasterRouteTimer = null;
-    _isStartingNavigation = false;
     _suggestedFasterRoute = null;
     _showFasterRouteMap = false;
     _dismissedRouteDuration = null;

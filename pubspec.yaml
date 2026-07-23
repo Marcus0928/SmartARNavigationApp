@@ -54,6 +54,9 @@ dependencies:
   # Voice guidance using text-to-speech function
   flutter_tts: ^4.2.5
 
+  # Explicit audio focus control (true ducking, not pause) for voice guidance
+  audio_session: ^0.1.25
+
 dev_dependencies: 
   flutter_test:
     sdk: flutter
