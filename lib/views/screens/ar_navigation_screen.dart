@@ -3,11 +3,13 @@ import 'package:ar_flutter_plugin_2/managers/ar_anchor_manager.dart';
 import 'package:ar_flutter_plugin_2/managers/ar_location_manager.dart';
 import 'package:ar_flutter_plugin_2/managers/ar_object_manager.dart';
 import 'package:ar_flutter_plugin_2/managers/ar_session_manager.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart' show LatLng;
 import 'package:latlong2/latlong.dart' as ll;
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -24,6 +26,8 @@ import 'package:smart_ar_navigation/views/screens/home/widgets/floating_icon_but
 import 'package:smart_ar_navigation/views/screens/home/widgets/speed_indicator.dart';
 import 'package:smart_ar_navigation/views/widgets/dynamic_arrow_widget.dart';
 import 'package:smart_ar_navigation/views/widgets/navigation_bottom_bar.dart';
+import 'package:smart_ar_navigation/views/widgets/traffic_delay_badge.dart';
+import 'package:smart_ar_navigation/views/widgets/traffic_progress_bar.dart';
 
 class ARNavigationScreen extends StatefulWidget {
   const ARNavigationScreen({super.key});
@@ -37,6 +41,8 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
   bool _arrivalHandled = false;
   bool _showAR = true;
   bool isExiting = false;
+
+  AppLifecycleState? _previousLifecycleState;
 
   TurnDirection? _debugDirection;
 
@@ -74,15 +80,25 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (isExiting) return;
+    final previousState = _previousLifecycleState;
+    _previousLifecycleState = state;
+
     if (state == AppLifecycleState.paused) {
       context.read<MapViewModel>().setAppForegroundState(false);
       setState(() => _showAR = false);
     } else if (state == AppLifecycleState.resumed) {
       context.read<MapViewModel>().setAppForegroundState(true);
-      setState(() => _showAR = false);
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted && !isExiting) setState(() => _showAR = true);
-      });
+      // Only replay the black-flash recovery toggle when actually
+      // recovering from a genuine background pause (camera/session were
+      // released). A transient `inactive` interruption — e.g. pulling
+      // down the notification shade — never paused the camera, so
+      // _showAR is already true and should be left alone.
+      if (previousState == AppLifecycleState.paused) {
+        setState(() => _showAR = false);
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted && !isExiting) setState(() => _showAR = true);
+        });
+      }
     }
   }
 
@@ -226,6 +242,21 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
             ),
           ),
 
+          // ── Layer 3.5: Traffic progress bar (left side, spans most of the
+          // vertical space between the instruction card and the bottom bar)
+          if (navVM.trafficSegmentInfo != null &&
+              navVM.hasEnteredTrafficSegment)
+            Positioned(
+              left: 16,
+              top: 210,
+              bottom: 170,
+              child: TrafficProgressBar(
+                progress: navVM.trafficSegmentProgress,
+                minutesToClear: navVM.trafficMinutesToClear,
+                severity: navVM.trafficSegmentInfo!.severity,
+              ),
+            ),
+
           // ── Layer 4: DEBUG direction + distance buttons (remove before release) ─
           Positioned(
             bottom: 100,
@@ -283,6 +314,17 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
                       .read<ARViewModel>()
                       .testVoiceAnnouncement(distance),
                 ),
+                // TEMPORARY - remove after traffic delay testing is complete
+                if (kDebugMode) ...[
+                  const SizedBox(height: 6),
+                  _DebugTrafficTestButton(
+                    stage: navVM.trafficTestStage,
+                    onTap: () => navVM.testCycleTrafficDelay(
+                      mapVM.currentLocation ??
+                          const LatLng(3.0738, 101.5077),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -309,9 +351,31 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
                         context.read<ARViewModel>().toggleVoiceGuidance(),
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.only(right: 16, bottom: 12),
-                  child: SpeedIndicator(speedMs: mapVM.currentSpeed),
+                // SpeedIndicator's own Padding/position is unchanged below —
+                // wrapping it in this Stack only gives the traffic badge a
+                // reliable vertical anchor (same row, centered) without
+                // hardcoding a bottom offset that would drift on devices
+                // with a different NavigationBottomBar safe-area inset.
+                SizedBox(
+                  width: double.infinity,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Padding(
+                          padding:
+                              const EdgeInsets.only(right: 16, bottom: 12),
+                          child: SpeedIndicator(speedMs: mapVM.currentSpeed),
+                        ),
+                      ),
+                      if (navVM.trafficSegmentInfo != null &&
+                          !navVM.hasEnteredTrafficSegment)
+                        TrafficDelayBadge(
+                          segmentInfo: navVM.trafficSegmentInfo!,
+                        ),
+                    ],
+                  ),
                 ),
                 const NavigationBottomBar(),
               ],
@@ -839,6 +903,48 @@ class _DebugDistanceBar extends StatelessWidget {
             ),
           );
         }).toList(),
+      ),
+    );
+  }
+}
+
+// ── DEBUG: temporary traffic-delay test button — remove before release ────────
+
+class _DebugTrafficTestButton extends StatelessWidget {
+  const _DebugTrafficTestButton({required this.stage, required this.onTap});
+
+  final int stage;
+  final VoidCallback onTap;
+
+  static const _labels = [
+    'Traffic Test: Off',
+    'Traffic Test: Moderate',
+    'Traffic Test: Heavy',
+    'Traffic Test: In Jam',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final isActive = stage != 0;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isActive ? const Color(0xFF00E676) : const Color(0xCC000000),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isActive ? const Color(0xFF00E676) : Colors.white38,
+          ),
+        ),
+        child: Text(
+          _labels[stage],
+          style: TextStyle(
+            color: isActive ? Colors.black : Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
     );
   }

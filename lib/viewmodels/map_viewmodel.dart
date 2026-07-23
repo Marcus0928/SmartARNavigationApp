@@ -122,6 +122,7 @@ class MapViewModel extends ChangeNotifier {
       _arViewModel.updateAROverlay(location);
       _navigationViewModel.updateRemainingPolyline(location);
       _navigationViewModel.checkIfArrived(location);
+      _navigationViewModel.updateTrafficSegmentProgress(location);
     });
 
     // Heartbeat: force-refresh the AR overlay every 2 s so the screen stays

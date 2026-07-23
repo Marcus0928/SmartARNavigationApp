@@ -4,9 +4,11 @@ import 'package:flutter/foundation.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'package:smart_ar_navigation/core/enums/navigation_status.dart';
+import 'package:smart_ar_navigation/core/enums/traffic_severity.dart';
 import 'package:smart_ar_navigation/core/utils/location_utils.dart';
 import 'package:smart_ar_navigation/models/place_model.dart';
 import 'package:smart_ar_navigation/models/route_model.dart';
+import 'package:smart_ar_navigation/models/traffic_segment_info.dart';
 import 'package:smart_ar_navigation/repositories/route_repository.dart';
 import 'package:smart_ar_navigation/services/ar_service.dart';
 import 'package:smart_ar_navigation/services/location_service.dart';
@@ -56,6 +58,14 @@ class NavigationViewModel extends ChangeNotifier {
   int? _dismissedRouteDuration;
   bool _isStartingNavigation = false;
   int _lastRemainingPolylineIndex = 0;
+  TrafficSegmentInfo? _trafficSegmentInfo;
+  Timer? _trafficTimer;
+  bool _hasEnteredTrafficSegment = false;
+  double _trafficSegmentProgress = 0.0;
+
+  // TEMPORARY - remove after traffic delay testing is complete
+  int _trafficTestStage = 0; // 0=off, 1=moderate, 2=heavy, 3=inside jam
+  Timer? _trafficTestAnimationTimer;
 
   PlaceModel? get currentDestination => _currentDestination;
   RouteModel? get currentRoute => _currentRoute;
@@ -91,6 +101,23 @@ class NavigationViewModel extends ChangeNotifier {
   RouteModel? get suggestedFasterRoute => _suggestedFasterRoute;
   bool get showFasterRouteMap => _showFasterRouteMap;
   bool get isStartingNavigation => _isStartingNavigation;
+  TrafficSegmentInfo? get trafficSegmentInfo => _trafficSegmentInfo;
+  bool get hasEnteredTrafficSegment => _hasEnteredTrafficSegment;
+  double get trafficSegmentProgress => _trafficSegmentProgress;
+
+  // TEMPORARY - remove after traffic delay testing is complete
+  int get trafficTestStage => _trafficTestStage;
+
+  /// Estimated minutes remaining until the vehicle clears the current
+  /// traffic segment, scaled down from the segment's total delay by how
+  /// much of the segment is left to travel.
+  int get trafficMinutesToClear {
+    final info = _trafficSegmentInfo;
+    if (info == null) return 0;
+    return (info.delayMinutes * (1 - _trafficSegmentProgress))
+        .ceil()
+        .clamp(0, info.delayMinutes);
+  }
 
   Future<void> startNavigation(
     PlaceModel destination, {
@@ -123,28 +150,39 @@ class NavigationViewModel extends ChangeNotifier {
       }
       _arViewModel.setDestination(_currentDestination?.coordinates);
       _remainingPolyline = List.from(_currentRoute!.polylinePoints);
-      await Future.wait<void>([
-        _arViewModel.initializeOverlay(
-          _currentRoute!,
-          heading: _locationService.currentHeading,
-        ),
-        NavigationForegroundService.startService(
-          destination: _currentDestination?.name ?? '',
-          eta: '${(_currentRoute!.estimatedDuration / 60).ceil()} min',
-        ).then((ok) {
-          if (!ok) {
-            debugPrint(
-              'Warning: foreground service did not start — '
-              'app may be killed in background',
-            );
-          }
-        }),
-      ]);
+
+      // Fire-and-forget: nothing on the AR screen or in ARViewModel depends
+      // on the foreground service having finished starting, so it shouldn't
+      // block the screen transition — that transition is what gates
+      // ARCore's native session init, the actual expensive step.
+      NavigationForegroundService.startService(
+        destination: _currentDestination?.name ?? '',
+        eta: '${(_currentRoute!.estimatedDuration / 60).ceil()} min',
+      ).then((ok) {
+        if (!ok) {
+          debugPrint(
+            'Warning: foreground service did not start — '
+            'app may be killed in background',
+          );
+        }
+      }).catchError((e) {
+        debugPrint('Foreground service start threw: $e');
+      });
+
+      await _arViewModel.initializeOverlay(
+        _currentRoute!,
+        heading: _locationService.currentHeading,
+      );
       _navigationStatus = NavigationStatus.navigating;
       _fasterRouteTimer?.cancel();
       _fasterRouteTimer = Timer.periodic(
         const Duration(minutes: 5),
         (_) => _checkForFasterRoute(),
+      );
+      _trafficTimer?.cancel();
+      _trafficTimer = Timer.periodic(
+        const Duration(minutes: 3),
+        (_) => _checkTrafficSegment(),
       );
     } catch (e) {
       _errorMessage = e.toString();
@@ -168,6 +206,14 @@ class NavigationViewModel extends ChangeNotifier {
     _suggestedFasterRoute = null;
     _showFasterRouteMap = false;
     _dismissedRouteDuration = null;
+    _trafficTimer?.cancel();
+    _trafficTimer = null;
+    _trafficTestAnimationTimer?.cancel();
+    _trafficTestAnimationTimer = null;
+    _trafficTestStage = 0;
+    _trafficSegmentInfo = null;
+    _hasEnteredTrafficSegment = false;
+    _trafficSegmentProgress = 0.0;
     _arService.clearOverlays();
     _arViewModel.resetOverlay();
     _currentRoute = null;
@@ -304,6 +350,153 @@ class NavigationViewModel extends ChangeNotifier {
     } catch (_) {
       // Best-effort — silently ignore network/API errors
     }
+  }
+
+  Future<void> _checkTrafficSegment() async {
+    // Skip while the debug test button owns trafficSegmentInfo — the real
+    // check would otherwise overwrite the mocked segment mid-test.
+    if (_trafficTestStage != 0) return;
+    if (_currentDestination == null ||
+        _navigationStatus != NavigationStatus.navigating ||
+        _currentRoute == null) {
+      return;
+    }
+
+    try {
+      final origin = await _locationService.getLastKnownLocation();
+      if (origin == null) return;
+      final info = await _routeRepository.getTrafficSeverityAhead(
+        currentLocation: origin,
+        remainingPolyline: _remainingPolyline,
+      );
+      _trafficSegmentInfo = info;
+      _hasEnteredTrafficSegment = false;
+      _trafficSegmentProgress = 0.0;
+      notifyListeners();
+    } catch (_) {
+      // Best-effort — silently ignore network/API errors
+    }
+  }
+
+  /// Recalculates traffic-segment progress from the live GPS position on
+  /// every location tick. Classifies [location] against the active
+  /// [_trafficSegmentInfo] using the triangle-inequality relationship
+  /// between the three distances (start→location, location→end,
+  /// start→end): a location can only be farther from one endpoint than the
+  /// full segment span if it lies outside that endpoint, so this avoids
+  /// needing a full vector projection for a short (~2 km) lookahead segment.
+  void updateTrafficSegmentProgress(LatLng location) {
+    // Skip while the debug test button owns trafficSegmentInfo — real GPS
+    // movement shouldn't reclassify a mocked segment mid-test.
+    if (_trafficTestStage != 0) return;
+    final info = _trafficSegmentInfo;
+    if (info == null) return;
+
+    final totalDistance =
+        calculateDistance(info.segmentStartPosition, info.segmentEndPosition);
+    if (totalDistance <= 0) {
+      _clearTrafficSegment();
+      return;
+    }
+
+    final distanceFromStart =
+        calculateDistance(info.segmentStartPosition, location);
+    final distanceFromEnd = calculateDistance(location, info.segmentEndPosition);
+
+    if (distanceFromStart > totalDistance) {
+      // Passed the end of the segment.
+      _clearTrafficSegment();
+      return;
+    }
+
+    if (distanceFromEnd > totalDistance) {
+      // Hasn't reached the start of the segment yet.
+      _hasEnteredTrafficSegment = false;
+      _trafficSegmentProgress = 0.0;
+    } else {
+      _hasEnteredTrafficSegment = true;
+      _trafficSegmentProgress =
+          (distanceFromStart / totalDistance).clamp(0.0, 1.0);
+    }
+    notifyListeners();
+  }
+
+  void _clearTrafficSegment() {
+    _trafficSegmentInfo = null;
+    _hasEnteredTrafficSegment = false;
+    _trafficSegmentProgress = 0.0;
+    notifyListeners();
+  }
+
+  // TEMPORARY - remove after traffic delay testing is complete
+  //
+  // Cycles through the traffic-delay UI states without needing real GPS
+  // movement or live traffic: off -> moderate badge -> heavy badge ->
+  // inside-jam progress bar (auto-animates 0 -> 1 over ~5s) -> off. Bypasses
+  // the real Directions API call entirely by writing a fake
+  // TrafficSegmentInfo directly. While active (_trafficTestStage != 0),
+  // _checkTrafficSegment() and updateTrafficSegmentProgress() both skip
+  // themselves so the real timer/GPS-tick path can't fight over state.
+  void testCycleTrafficDelay(LatLng currentLocation) {
+    _trafficTestStage = (_trafficTestStage + 1) % 4;
+    _trafficTestAnimationTimer?.cancel();
+    _trafficTestAnimationTimer = null;
+
+    switch (_trafficTestStage) {
+      case 1:
+        _setMockTrafficSegment(
+          currentLocation,
+          severity: TrafficSeverity.moderate,
+          delayMinutes: 6,
+        );
+        _hasEnteredTrafficSegment = false;
+        _trafficSegmentProgress = 0.0;
+      case 2:
+        _setMockTrafficSegment(
+          currentLocation,
+          severity: TrafficSeverity.heavy,
+          delayMinutes: 14,
+        );
+        _hasEnteredTrafficSegment = false;
+        _trafficSegmentProgress = 0.0;
+      case 3:
+        _hasEnteredTrafficSegment = true;
+        _trafficSegmentProgress = 0.0;
+        _trafficTestAnimationTimer = Timer.periodic(
+          const Duration(milliseconds: 100),
+          (timer) {
+            _trafficSegmentProgress =
+                (_trafficSegmentProgress + 0.02).clamp(0.0, 1.0);
+            if (_trafficSegmentProgress >= 1.0) timer.cancel();
+            notifyListeners();
+          },
+        );
+      default: // 0
+        _trafficSegmentInfo = null;
+        _hasEnteredTrafficSegment = false;
+        _trafficSegmentProgress = 0.0;
+    }
+    notifyListeners();
+  }
+
+  // TEMPORARY - remove after traffic delay testing is complete
+  void _setMockTrafficSegment(
+    LatLng currentLocation, {
+    required TrafficSeverity severity,
+    required int delayMinutes,
+  }) {
+    // Fixed offset ~1.1 km "ahead" — simpler than projecting along the real
+    // route polyline, and sufficient for exercising the badge/bar UI.
+    final segmentEnd = LatLng(
+      currentLocation.latitude + 0.01,
+      currentLocation.longitude,
+    );
+    _trafficSegmentInfo = TrafficSegmentInfo(
+      delayMinutes: delayMinutes,
+      segmentStartPosition: currentLocation,
+      segmentEndPosition: segmentEnd,
+      severity: severity,
+    );
   }
 
   void checkIfArrived(LatLng currentLocation) {
