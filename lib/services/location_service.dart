@@ -51,6 +51,7 @@ class LocationService {
   }
 
   Stream<LatLng> getLocationStream() {
+    _streamSubscription?.cancel();
     final settings = Platform.isAndroid
         ? AndroidSettings(
             accuracy: LocationAccuracy.bestForNavigation,

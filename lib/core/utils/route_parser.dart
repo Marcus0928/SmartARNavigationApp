@@ -29,7 +29,9 @@ List<RouteModel> parseRouteResponse(Map<String, dynamic> json) {
     final List<TurnInstruction> turns = [];
     final List<LatLng> waypoints = [];
 
-    for (final step in leg['steps']) {
+    final steps = leg['steps'] as List<dynamic>;
+    for (var i = 0; i < steps.length; i++) {
+      final step = steps[i] as Map<String, dynamic>;
       final startLoc = step['start_location'];
       final position = LatLng(
         (startLoc['lat'] as num).toDouble(),
@@ -40,7 +42,12 @@ List<RouteModel> parseRouteResponse(Map<String, dynamic> json) {
       final rawManeuver = step['maneuver'] as String? ?? 'straight';
       final direction = _parseManeuver(rawManeuver);
       final stepDistance = (step['distance']['value'] as num).toDouble();
-      if (stepDistance >= 15.0) {
+      // The last step is never filtered, even when short — Google often
+      // emits a short final "turn onto X; destination is on the Y" step
+      // when the destination sits close to the last turn, and dropping it
+      // would leave the final turn without an arrow or voice announcement.
+      final isLastStep = i == steps.length - 1;
+      if (stepDistance >= 15.0 || isLastStep) {
         turns.add(TurnInstruction(
           direction: direction,
           distanceFromPrev: stepDistance,
