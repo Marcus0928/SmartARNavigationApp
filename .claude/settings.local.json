@@ -35,7 +35,9 @@
       "Bash(flutter devices *)",
       "Bash('C:\\\\Users\\\\Marcus Liew Sau Yang\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe' devices)",
       "Bash('C:\\\\Users\\\\Marcus Liew Sau Yang\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe' logcat -c)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(dart -e ' *)",
+      "Bash(python3 -c ' *)"
     ]
   }
 }

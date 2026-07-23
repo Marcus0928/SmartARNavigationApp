@@ -43,6 +43,14 @@ class VoiceService {
     // Cancel any in-progress speech first so announcements never overlap or queue.
     await _tts.stop();
     await _session?.setActive(true);
+    // Small buffer delay: Android's audio focus grant is near-instant
+    // and does not wait for the demoted app (e.g. Spotify) to actually
+    // finish lowering its volume. There is no API that signals when
+    // ducking has visibly taken effect, so this fixed delay is a
+    // heuristic to reduce (not guarantee) the chance that TTS speech
+    // starts before the music has audibly ducked. Adjust if testing
+    // shows it's too short or noticeably too long.
+    await Future.delayed(const Duration(milliseconds: 200));
     // focus: false — audio_session now owns the focus request (configured
     // above); letting flutter_tts also request its own focus would create
     // two independent, conflicting requests.
