@@ -186,7 +186,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               onStartNavigation: () async {
                 final navigator  = Navigator.of(context);
                 final messenger  = ScaffoldMessenger.of(context);
+
+                // "Resume": the selected route is already the one actively
+                // navigating — just return to the existing AR session instead
+                // of restarting it (restarting was also what caused the
+                // Resume label to flicker to Start, via the transient
+                // idle/loading states startNavigation() passes through).
+                final isResume =
+                    navVM.navigationStatus == NavigationStatus.navigating &&
+                        mapVM.selectedRouteIndex == navVM.activeRouteIndex;
+
                 mapVM.setSelectingRouteFromNav(false);
+
+                if (isResume) {
+                  navigator.pushNamed('/ar-navigation');
+                  return;
+                }
+
                 await navVM.startNavigation(
                   mapVM.selectedDestination!,
                   route: mapVM.selectedRoute,

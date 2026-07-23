@@ -67,17 +67,34 @@ class ARViewModel extends ChangeNotifier {
 
 
   Future<void> initializeOverlay(RouteModel route, {double? heading}) async {
-    _remainingTurns = List.from(route.turns);
+    final newTurns = List<TurnInstruction>.from(route.turns);
 
     // Discard a phantom U-turn at step 1: Google may produce one when the
     // origin snaps to the wrong road side because no heading was available.
     // If we do have heading (driver is moving) and a subsequent step exists,
     // the U-turn is almost certainly spurious.
-    if (_remainingTurns.length > 1 &&
-        _remainingTurns.first.direction == TurnDirection.uTurn &&
+    if (newTurns.length > 1 &&
+        newTurns.first.direction == TurnDirection.uTurn &&
         heading != null) {
-      _remainingTurns.removeAt(0);
+      newTurns.removeAt(0);
     }
+
+    // Rerouting (recalculateRoute/acceptFasterRoute) always hands us brand-new
+    // TurnInstruction objects, even when the upcoming real-world turn hasn't
+    // actually changed. If the new head turn matches the previous one by
+    // direction and position, carry _lastHeadTurn forward so the next
+    // updateAROverlay() tick doesn't see a reference mismatch, reset
+    // _lastAnnounced, and re-speak the announcement mid-utterance.
+    if (newTurns.isNotEmpty && _lastHeadTurn != null) {
+      final newHead = newTurns.first;
+      final sameTurn = newHead.direction == _lastHeadTurn!.direction &&
+          calculateDistance(newHead.position, _lastHeadTurn!.position) <= 20.0;
+      if (sameTurn) {
+        _lastHeadTurn = newHead;
+      }
+    }
+
+    _remainingTurns = newTurns;
 
     if (_remainingTurns.isNotEmpty) {
       final first = _remainingTurns.first;
@@ -419,7 +436,7 @@ class ARViewModel extends ChangeNotifier {
     final prefix = !includeDistance
         ? ''
         : useKm
-            ? 'In ${((_distanceToNextTurn ?? 0) / 1000).toStringAsFixed(1)} kilometres, '
+            ? 'In ${_formatKmForSpeech(_distanceToNextTurn ?? 0)}, '
             : 'In ${(((_distanceToNextTurn ?? 0) / 10).round() * 10).clamp(10, 990)} metres, ';
 
     var instruction = '$prefix$direction';
@@ -432,6 +449,18 @@ class ARViewModel extends ChangeNotifier {
     }
 
     return instruction;
+  }
+
+  // Rounds to one decimal place, then drops the decimal for whole-number
+  // results so "1.0 kilometres" reads as "1 kilometre" instead — matches
+  // how a person would actually say the distance aloud.
+  String _formatKmForSpeech(double metres) {
+    final formatted = (metres / 1000).toStringAsFixed(1);
+    if (formatted.endsWith('.0')) {
+      final whole = formatted.substring(0, formatted.length - 2);
+      return whole == '1' ? '1 kilometre' : '$whole kilometres';
+    }
+    return '$formatted kilometres';
   }
 
   // Builds a speech-only copy of the street name — never touches

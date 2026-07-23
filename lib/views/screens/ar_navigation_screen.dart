@@ -15,6 +15,7 @@ import 'package:smart_ar_navigation/models/route_model.dart';
 import 'package:smart_ar_navigation/core/enums/navigation_status.dart';
 import 'package:smart_ar_navigation/core/enums/turn_direction.dart';
 import 'package:smart_ar_navigation/services/ambient_light_service.dart';
+import 'package:smart_ar_navigation/services/ar_service.dart';
 import 'package:smart_ar_navigation/viewmodels/ar_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/map_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/navigation_viewmodel.dart';
@@ -50,6 +51,7 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
 
   @override
   void dispose() {
+    context.read<ARService>().disposeAR();
     _ambientLight.dispose();
     WakelockPlus.disable();
     WidgetsBinding.instance.removeObserver(this);

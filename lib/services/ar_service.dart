@@ -17,6 +17,14 @@ class ARService {
     ARSessionManager sessionManager,
     ARObjectManager objectManager,
   ) async {
+    // Release the previous native ARCore session before replacing it —
+    // otherwise the old session's camera/GL resources are never freed and
+    // repeated re-initialization (e.g. leaving and returning to the AR
+    // screen) accumulates sessions until ARCore crashes.
+    if (_isInitialized) {
+      disposeAR();
+    }
+
     _sessionManager = sessionManager;
     _objectManager = objectManager;
 
