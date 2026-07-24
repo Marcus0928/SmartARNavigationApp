@@ -3,7 +3,7 @@ import 'package:ar_flutter_plugin_2/managers/ar_anchor_manager.dart';
 import 'package:ar_flutter_plugin_2/managers/ar_location_manager.dart';
 import 'package:ar_flutter_plugin_2/managers/ar_object_manager.dart';
 import 'package:ar_flutter_plugin_2/managers/ar_session_manager.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -30,7 +30,14 @@ import 'package:smart_ar_navigation/views/widgets/traffic_delay_badge.dart';
 import 'package:smart_ar_navigation/views/widgets/traffic_progress_bar.dart';
 
 class ARNavigationScreen extends StatefulWidget {
-  const ARNavigationScreen({super.key});
+  const ARNavigationScreen({super.key, this.isRecovering = false});
+
+  // True only when this screen instance was mounted by
+  // _recoverArViewAfterScreenOff() to replace a screen-off'd instance —
+  // gates the "Reconnecting camera..." loading overlay so it never shows
+  // on a normal AR navigation launch (Start button already covers that
+  // wait via NavigationViewModel.isStartingNavigation).
+  final bool isRecovering;
 
   @override
   State<ARNavigationScreen> createState() => ARNavigationScreenState();
@@ -39,10 +46,22 @@ class ARNavigationScreen extends StatefulWidget {
 class ARNavigationScreenState extends State<ARNavigationScreen>
     with WidgetsBindingObserver {
   bool _arrivalHandled = false;
-  bool _showAR = true;
   bool isExiting = false;
 
-  AppLifecycleState? _previousLifecycleState;
+  // Flips true once _onARViewCreated's initializeAR() call completes for
+  // THIS screen instance. Only consulted when widget.isRecovering — see
+  // that field's doc.
+  bool _arReady = false;
+
+  // Set true only in the paused branch below (a genuine screen-off/
+  // backgrounding), and reset false only after a resumed-triggered
+  // recovery runs. Flutter's lifecycle fires paused -> hidden -> inactive
+  // -> resumed on a real screen-off/on cycle (5-state model since Flutter
+  // 3.13), so comparing resumed against only the immediately-preceding
+  // state (previously _previousLifecycleState) never worked: hidden and
+  // inactive always overwrote it before resumed could see paused. This
+  // flag survives those intermediate states instead.
+  bool _wasGenuinelyPaused = false;
 
   TurnDirection? _debugDirection;
 
@@ -80,26 +99,76 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (isExiting) return;
-    final previousState = _previousLifecycleState;
-    _previousLifecycleState = state;
 
     if (state == AppLifecycleState.paused) {
       context.read<MapViewModel>().setAppForegroundState(false);
-      setState(() => _showAR = false);
+      _wasGenuinelyPaused = true;
     } else if (state == AppLifecycleState.resumed) {
       context.read<MapViewModel>().setAppForegroundState(true);
-      // Only replay the black-flash recovery toggle when actually
-      // recovering from a genuine background pause (camera/session were
-      // released). A transient `inactive` interruption — e.g. pulling
-      // down the notification shade — never paused the camera, so
-      // _showAR is already true and should be left alone.
-      if (previousState == AppLifecycleState.paused) {
-        setState(() => _showAR = false);
-        Future.delayed(const Duration(milliseconds: 500), () {
-          if (mounted && !isExiting) setState(() => _showAR = true);
-        });
+      // Only recover the camera feed when actually recovering from a
+      // genuine background pause (camera/session were released by the
+      // real Activity onPause()). A transient `inactive` interruption —
+      // e.g. pulling down the notification shade — never paused the
+      // camera, so there is nothing to recover here. _wasGenuinelyPaused
+      // (rather than comparing against only the immediately-preceding
+      // state) survives the hidden/inactive states Flutter fires on the
+      // way back to resumed after a real screen-off.
+      if (_wasGenuinelyPaused) {
+        _wasGenuinelyPaused = false;
+        _recoverArViewAfterScreenOff();
       }
     }
+  }
+
+  // Recovers the camera feed after a genuine screen-off/resume by
+  // replacing this screen via the Navigator — the same mechanism the
+  // "Routes" button already uses successfully. An in-place ArView
+  // recreate driven from inside this lifecycle callback (toggling a bool
+  // to swap ARView for a Container within this same still-mounted State)
+  // was tried and confirmed NOT to work: it necessarily runs in the same
+  // window as the real Activity.onResume(), and every zombie ARSceneView
+  // ever left behind by a prior recreation (see ARService's class doc —
+  // destroy() never unregisters from the Activity's shared Lifecycle)
+  // receives that exact same ON_RESUME callback and contends for the
+  // camera against the freshly (re)created instance. pushReplacementNamed
+  // is a pure Flutter-side Navigator transition — it never touches the
+  // Activity lifecycle, so it can't provoke that collision, the same
+  // reason the Routes button path (pop away, push back later) works.
+  //
+  // NavigationViewModel / MapViewModel / ARViewModel / ARService are
+  // Provider-scoped above MaterialApp's Navigator (see app.dart), so
+  // replacing this screen does not reset the active navigation session —
+  // this is a pure screen/ArView swap, deliberately not calling
+  // startNavigation()/stopNavigation() or touching the route/progress
+  // state (see Bug 25 — "resume restarts navigation").
+  // ARNavigationScreenState.dispose() (which calls
+  // context.read<ARService>().disposeAR()) still fires on this old
+  // screen instance as it's replaced, same cleanup path Bug 25 already
+  // relies on.
+  //
+  // This still permanently leaks one more zombie Lifecycle observer per
+  // screen-off event — same underlying plugin defect described in
+  // ARService's class doc, just no longer visible as a black camera;
+  // there is no fix short of patching the plugin. _recreationCount
+  // (incremented inside ARService.initializeAR, which the fresh screen's
+  // ARView triggers via _onARViewCreated the same as any other AR screen
+  // mount) counts this path's recreations too.
+  void _recoverArViewAfterScreenOff() {
+    isExiting = true;
+    // A plain (non-zero-duration) route transition here would slide/fade in
+    // right as the fresh ArView's camera is still cold-starting — two
+    // separate motions reading as one janky moment. PageRouteBuilder with
+    // zero transition durations swaps the screen instantly instead; the
+    // _ArRecoveryLoadingOverlay below (widget.isRecovering) then covers the
+    // actual camera/ARCore init latency with an intentional loading state.
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        pageBuilder: (_, _, _) =>
+            const ARNavigationScreen(isRecovering: true),
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
+      ),
+    );
   }
 
   void _onARViewCreated(
@@ -108,7 +177,16 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
     ARAnchorManager anchorManager,
     ARLocationManager locationManager,
   ) {
-    context.read<ARViewModel>().initializeAR(sessionManager, objectManager);
+    // whenComplete (not .then) so _arReady flips on failure too — the
+    // loading overlay is tied to real completion, not just success, and
+    // this doesn't change initializeAR()'s existing unhandled-error
+    // behavior since whenComplete doesn't catch/swallow the Future's error.
+    context
+        .read<ARViewModel>()
+        .initializeAR(sessionManager, objectManager)
+        .whenComplete(() {
+      if (mounted) setState(() => _arReady = true);
+    });
   }
 
   void _handleArrival(BuildContext context) {
@@ -119,6 +197,7 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
 
     final navVM = context.read<NavigationViewModel>();
     final mapVM = context.read<MapViewModel>();
+    final arVM = context.read<ARViewModel>();
     final navigator = Navigator.of(context);
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -136,7 +215,10 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
       mapVM.clearDestination();
       mapVM.requestRecenter();
 
-      navigator.pop();
+      // Leaving the screen is deferred to the arrival announcement's speech
+      // completion (immediate if voice guidance is muted) so navigation
+      // away doesn't cut "You have reached your destination" off mid-word.
+      arVM.announceArrival(() => navigator.pop());
     });
   }
 
@@ -181,10 +263,26 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
       body: Stack(
         children: [
           // ── Layer 1: Full-screen AR camera feed ───────────────────
-          if (_showAR && !hideArForFasterRoute)
+          // Recovery from a genuine screen-off pause/resume is handled by
+          // _recoverArViewAfterScreenOff() replacing this whole screen via
+          // the Navigator (see didChangeAppLifecycleState) rather than by
+          // toggling this widget in place — see that method's comment for
+          // why. hideArForFasterRoute is a separate, unrelated full swap
+          // to stop the platform view intercepting touches meant for the
+          // faster-route preview's buttons.
+          if (!hideArForFasterRoute)
             ARView(onARViewCreated: _onARViewCreated)
           else
             Container(color: Colors.black),
+
+          // ── Layer 1.5: Camera recovery loading state ───────────────
+          // Only shown while recovering from a genuine screen-off
+          // (widget.isRecovering — see that field's doc), until
+          // _onARViewCreated's initializeAR() call actually completes.
+          // Masks the fresh ArView's camera/ARCore cold-start latency
+          // with an intentional loading state instead of a blank frame.
+          if (widget.isRecovering && !_arReady && !hideArForFasterRoute)
+            const _ArRecoveryLoadingOverlay(),
 
           // ── Layer 2: Chevron arrow ────────────────────────────────
           if (arVM.nextTurnDirection != null)
@@ -500,6 +598,36 @@ class _NavInfoCard extends StatelessWidget {
     if (metres >= 1000) return '${(metres / 1000).toStringAsFixed(1)} km';
     final rounded = ((metres / 10).round() * 10).clamp(10, 990);
     return '$rounded m';
+  }
+}
+
+// ── Camera recovery loading overlay ─────────────────────────────────────────
+// Same visual pattern as SplashScreen's loading state (white
+// CircularProgressIndicator + white70 caption) for consistency.
+
+class _ArRecoveryLoadingOverlay extends StatelessWidget {
+  const _ArRecoveryLoadingOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: Container(
+        color: Colors.black,
+        child: const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(color: Colors.white),
+              SizedBox(height: 16),
+              Text(
+                'Reconnecting camera...',
+                style: TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

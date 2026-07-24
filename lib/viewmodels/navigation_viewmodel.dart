@@ -258,6 +258,13 @@ class NavigationViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Beyond this, the windowed search result is untrustworthy — the user's
+  // real position has drifted outside the search window entirely (e.g. after
+  // a GPS gap or an app-backgrounded pause) rather than just jittering, so
+  // the index needs re-anchoring via a full scan instead of being left to
+  // lag behind indefinitely.
+  static const double _polylineSearchFallbackThreshold = 300.0;
+
   void updateRemainingPolyline(LatLng location) {
     if (_currentRoute == null) return;
     final points = _currentRoute!.polylinePoints;
@@ -281,6 +288,19 @@ class NavigationViewModel extends ChangeNotifier {
       if (d < closestDist) {
         closestDist = d;
         closestIndex = i;
+      }
+    }
+
+    if (closestDist > _polylineSearchFallbackThreshold) {
+      for (int i = 0; i < points.length; i++) {
+        final d = calculateDistance(
+          location,
+          LatLng(points[i].latitude, points[i].longitude),
+        );
+        if (d < closestDist) {
+          closestDist = d;
+          closestIndex = i;
+        }
       }
     }
 

@@ -100,8 +100,12 @@ class MapViewModel extends ChangeNotifier {
         return;
       }
 
-      // Off-route check only when actively navigating — skip during rerouting
-      // to avoid triggering a second reroute while the first is in flight.
+      // Off-route re-trigger check only when actively navigating — skip
+      // during rerouting to avoid triggering a second reroute while the
+      // first is in flight. The overlay/polyline/arrival/traffic updates
+      // below stay outside this gate so they keep running off the
+      // last-known route (stale-but-updating) while a reroute is in flight,
+      // instead of freezing the on-screen distance entirely.
       if (status == NavigationStatus.navigating) {
         final route = _navigationViewModel.currentRoute;
         if (route != null && _isOffRoute(location, route)) {
@@ -116,9 +120,6 @@ class MapViewModel extends ChangeNotifier {
         }
       }
 
-      if (_navigationViewModel.navigationStatus == NavigationStatus.rerouting) {
-        return;
-      }
       _arViewModel.updateAROverlay(location);
       _navigationViewModel.updateRemainingPolyline(location);
       _navigationViewModel.checkIfArrived(location);
@@ -319,6 +320,13 @@ class MapViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Beyond this, the windowed search result is untrustworthy — the user's
+  // real position has drifted outside the search window entirely (e.g. after
+  // a GPS gap) rather than just being off-route, so the index needs
+  // re-anchoring via a full scan instead of being left to lag behind
+  // indefinitely.
+  static const double _segmentSearchFallbackThreshold = 300.0;
+
   bool _isOffRoute(LatLng location, RouteModel route) {
     final points = route.polylinePoints;
     if (points.length < 2) return false;
@@ -341,6 +349,20 @@ class MapViewModel extends ChangeNotifier {
       if (d < closestDist) {
         closestDist = d;
         closestIdx = i;
+      }
+    }
+
+    if (closestDist > _segmentSearchFallbackThreshold) {
+      for (int i = 0; i < points.length - 1; i++) {
+        final d = _distanceToSegment(
+          location,
+          LatLng(points[i].latitude, points[i].longitude),
+          LatLng(points[i + 1].latitude, points[i + 1].longitude),
+        );
+        if (d < closestDist) {
+          closestDist = d;
+          closestIdx = i;
+        }
       }
     }
 

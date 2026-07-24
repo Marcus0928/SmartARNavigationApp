@@ -58,7 +58,7 @@ class RouteRepository {
 
     late http.Response response;
     try {
-      response = await http.get(uri);
+      response = await http.get(uri).timeout(const Duration(seconds: 10));
     } catch (_) {
       throw const NetworkException('No internet connection.');
     }

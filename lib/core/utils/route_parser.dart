@@ -113,23 +113,27 @@ TurnDirection _parseManeuver(String maneuver) {
   return map[maneuver] ?? TurnDirection.forward;
 }
 
-// Strips HTML then extracts the road name that follows "onto", "on", or "toward".
-// Only inspects the main instruction text (before any supplementary <div> blocks
-// that Google Maps appends, e.g. "Partial result", "Destination on the right").
-// Returns null when no keyword is found. Never returns an empty string.
-// Returns the full name untouched — any visual truncation for layout must be
-// applied at the widget/display layer (Text(overflow: TextOverflow.ellipsis)),
-// not here, since this value also feeds voice guidance.
+// Extracts the road name from the <b>...</b> segment Google's Directions API
+// puts right after "on"/"onto"/"stay on" — that bold tag is how the API
+// visually distinguishes the actual road from any destination/signage list
+// that follows (e.g. ", follow signs for Klang/Shah Alam" or "(signs for
+// Klang)"), so matching against the raw HTML (before any tag-stripping)
+// lets the capture stop cleanly at the closing </b> instead of running into
+// that trailing text. Bold segments that only follow "toward" (e.g. "take
+// the exit toward Petaling Jaya/Shah Alam/Klang") are a destination list,
+// not a road, so they're deliberately not matched — returns null instead.
+// Only inspects the main instruction text (before any supplementary <div>
+// blocks that Google Maps appends, e.g. "Partial result", "Destination on
+// the right"). Never returns an empty string.
 String? _extractStreetName(String html) {
   // The main instruction text always precedes the first supplementary <div>.
   final mainHtml = html.split(RegExp(r'<div')).first;
-  final text = _stripHtml(mainHtml).trim();
   final match = RegExp(
-    r'(?:onto|on|toward)\s+(.+)',
+    r'\bon(?:to)?\b\s*<b>(.*?)</b>',
     caseSensitive: false,
-  ).firstMatch(text);
+  ).firstMatch(mainHtml);
   if (match == null) return null;
-  final name = match.group(1)!.trim();
+  final name = _stripHtml(match.group(1)!).trim();
   if (name.isEmpty) return null;
   return name;
 }

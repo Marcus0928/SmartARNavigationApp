@@ -38,7 +38,25 @@
       "WebFetch(domain:github.com)",
       "Bash(dart --version)",
       "Bash(dart run *)",
-      "Bash(tee \"C:/Users/MARCUS~1/AppData/Local/Temp/claude/C--Sunway-Bachelor-in-Software-Engineering-Semester-9-Capstone-2-SmartARNavigationApp/cca6849f-6938-48b8-ace4-d9ac06c47620/scratchpad/flutter_run.log\")"
+      "Bash(tee \"C:/Users/MARCUS~1/AppData/Local/Temp/claude/C--Sunway-Bachelor-in-Software-Engineering-Semester-9-Capstone-2-SmartARNavigationApp/cca6849f-6938-48b8-ace4-d9ac06c47620/scratchpad/flutter_run.log\")",
+      "Bash(adb version *)",
+      "Bash(java -version)",
+      "Bash(javap -p -c 'io/github/sceneview/ar/ARSceneView$LifeCycleObserver.class')",
+      "Bash(grep -v \"^\\\\s*//\")",
+      "Bash(flutter build *)",
+      "Bash(adb install *)",
+      "Bash(adb shell *)",
+      "Bash(adb logcat *)",
+      "Bash(echo \"logcat pid: $!\")",
+      "Bash(cygpath -w /tmp/bug29_livetest_logcat.txt)",
+      "PowerShell(Get-Process *)",
+      "Bash(adb pull *)",
+      "Bash(cygpath -w /c/Users/Marcus/AppData/Local/Temp/claude/D--My-Documents-SmartARNavigationApp-SmartARNavigationApp/2e52e66e-38ce-4bab-8050-70c89caefb9a/scratchpad/bug29_after_test.png)",
+      "Bash(export MSYS_NO_PATHCONV=1)",
+      "Bash(MSYS_NO_PATHCONV=1 adb pull /sdcard/bug29_after_test.png \"C:\\\\Users\\\\Marcus\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--My-Documents-SmartARNavigationApp-SmartARNavigationApp\\\\2e52e66e-38ce-4bab-8050-70c89caefb9a\\\\scratchpad\\\\bug29_after_test.png\")",
+      "Bash(MSYS_NO_PATHCONV=1 adb shell rm /sdcard/bug29_after_test.png)",
+      "Bash(MSYS_NO_PATHCONV=1 adb shell screencap -p /sdcard/bug29_after_test.png)",
+      "Bash(unset MSYS_NO_PATHCONV)"
     ]
   }
 }

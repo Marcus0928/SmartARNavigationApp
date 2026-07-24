@@ -53,6 +53,13 @@ class ARViewModel extends ChangeNotifier {
   String? _upcomingTurnStreet;
   bool voiceGuidanceEnabled = true;
 
+  // Final-leg heads-up ("In X, you will reach your destination") and the
+  // arrival announcement each fire at most once per route — separate from
+  // the 6-tier turn system's _lastAnnounced, since neither concept maps to
+  // a turn tier ("red = imminent turn" doesn't apply to "you've arrived").
+  bool _finalLegAnnounced = false;
+  bool _arrivalAnnounced = false;
+
   // TEMPORARY - remove after voice guidance testing is complete
   bool _debugOverrideActive = false;
   // TEMPORARY - remove after voice guidance testing is complete
@@ -80,7 +87,6 @@ class ARViewModel extends ChangeNotifier {
         await _arService.initializeAR(sessionManager, objectManager);
     notifyListeners();
   }
-
 
   Future<void> initializeOverlay(RouteModel route, {double? heading}) async {
     final newTurns = List<TurnInstruction>.from(route.turns);
@@ -139,6 +145,7 @@ class ARViewModel extends ChangeNotifier {
       _instructionText = 'Continue';
       _currentStreetName = null;
       _roundaboutExit = null;
+      _checkFinalLegAnnouncement(_distanceToNextTurn!);
       notifyListeners();
       return;
     }
@@ -191,6 +198,7 @@ class ARViewModel extends ChangeNotifier {
       _instructionText = 'Continue';
       _currentStreetName = null;
       _roundaboutExit = null;
+      _checkFinalLegAnnouncement(_distanceToNextTurn!);
       notifyListeners();
       return;
     }
@@ -355,6 +363,8 @@ class ARViewModel extends ChangeNotifier {
     _closestApproachToHead = null;
     _destinationCoordinates = null;
     _lastAnnounced = VoiceAnnouncement.none;
+    _finalLegAnnounced = false;
+    _arrivalAnnounced = false;
     _arService.clearOverlays();
     _voiceService.stop();
     notifyListeners();
@@ -542,6 +552,47 @@ class ARViewModel extends ChangeNotifier {
     _previousDistanceToNextTurn = d;
   }
 
+  // Fires once per route, the moment the last turn has been passed and
+  // there's nothing left but a straight run to the destination pin — a
+  // separate, simpler system from the 6-tier turn announcements above,
+  // since "you're almost there" isn't a turn tier. Skipped (but still
+  // marked fired) when already under 50 m, since a heads-up that close to
+  // arrival would just be redundant chatter right after the last turn.
+  void _checkFinalLegAnnouncement(double distanceToDestination) {
+    if (_finalLegAnnounced) return;
+    _finalLegAnnounced = true;
+    if (distanceToDestination < 50.0) return;
+    if (!voiceGuidanceEnabled) return;
+
+    final distance = distanceToDestination > 1000
+        ? _liveDistanceKm(distanceToDestination)
+        : _liveDistanceMetres(distanceToDestination);
+    _voiceService.speak('In $distance, you will reach your destination');
+  }
+
+  // Speaks the arrival line and defers [onSpeechComplete] (the caller's
+  // navigate-to-home transition) until the TTS engine reports the utterance
+  // actually finished, via VoiceService's completion-handler mechanism —
+  // otherwise the screen would navigate away mid-sentence. When voice
+  // guidance is muted, there's no utterance to wait for, so the transition
+  // runs immediately instead.
+  void announceArrival(void Function() onSpeechComplete) {
+    if (_arrivalAnnounced) {
+      onSpeechComplete();
+      return;
+    }
+    _arrivalAnnounced = true;
+
+    if (!voiceGuidanceEnabled) {
+      onSpeechComplete();
+      return;
+    }
+    _voiceService.speak(
+      'You have reached your destination',
+      onComplete: onSpeechComplete,
+    );
+  }
+
   // Direction/action wording shared by every announcement tier.
   String _actionForDirection(TurnDirection? direction, {int? roundaboutExit}) {
     return switch (direction) {
@@ -589,6 +640,9 @@ class ARViewModel extends ChangeNotifier {
         _actionForDirection(direction, roundaboutExit: roundaboutExit);
     final spokenStreet =
         street != null ? _sanitizeStreetNameForSpeech(street) : null;
+    // Omit the "onto <street>" clause entirely when there's no road name,
+    // rather than leaving a dangling "onto" or speaking the literal "null".
+    final ontoClause = spokenStreet != null ? ' onto $spokenStreet' : '';
 
     switch (style) {
       case VoiceAnnouncement.farLive:
@@ -596,13 +650,13 @@ class ARViewModel extends ChangeNotifier {
         if (direction == TurnDirection.forward) {
           return 'Continue straight for $distance';
         }
-        return 'Continue straight for $distance, then $action onto $spokenStreet';
+        return 'Continue straight for $distance, then $action$ontoClause';
       case VoiceAnnouncement.midLive:
-        return 'In ${_liveDistanceMetres(distanceMetres)}, $action onto $spokenStreet';
+        return 'In ${_liveDistanceMetres(distanceMetres)}, $action$ontoClause';
       case VoiceAnnouncement.checkpoint1km:
-        return 'In 1 kilometre, $action onto $spokenStreet';
+        return 'In 1 kilometre, $action$ontoClause';
       case VoiceAnnouncement.checkpoint500m:
-        return 'In 500 metres, $action onto $spokenStreet';
+        return 'In 500 metres, $action$ontoClause';
       case VoiceAnnouncement.yellow:
         return 'In ${_liveDistanceMetres(distanceMetres)}, $action';
       case VoiceAnnouncement.red:
