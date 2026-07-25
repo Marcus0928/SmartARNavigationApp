@@ -61,11 +61,9 @@ class NavigationViewModel extends ChangeNotifier {
   TrafficSegmentInfo? _trafficSegmentInfo;
   Timer? _trafficTimer;
   bool _hasEnteredTrafficSegment = false;
-  double _trafficSegmentProgress = 0.0;
 
   // TEMPORARY - remove after traffic delay testing is complete
   int _trafficTestStage = 0; // 0=off, 1=moderate, 2=heavy, 3=inside jam
-  Timer? _trafficTestAnimationTimer;
 
   PlaceModel? get currentDestination => _currentDestination;
   RouteModel? get currentRoute => _currentRoute;
@@ -103,21 +101,9 @@ class NavigationViewModel extends ChangeNotifier {
   bool get isStartingNavigation => _isStartingNavigation;
   TrafficSegmentInfo? get trafficSegmentInfo => _trafficSegmentInfo;
   bool get hasEnteredTrafficSegment => _hasEnteredTrafficSegment;
-  double get trafficSegmentProgress => _trafficSegmentProgress;
 
   // TEMPORARY - remove after traffic delay testing is complete
   int get trafficTestStage => _trafficTestStage;
-
-  /// Estimated minutes remaining until the vehicle clears the current
-  /// traffic segment, scaled down from the segment's total delay by how
-  /// much of the segment is left to travel.
-  int get trafficMinutesToClear {
-    final info = _trafficSegmentInfo;
-    if (info == null) return 0;
-    return (info.delayMinutes * (1 - _trafficSegmentProgress))
-        .ceil()
-        .clamp(0, info.delayMinutes);
-  }
 
   Future<void> startNavigation(
     PlaceModel destination, {
@@ -208,12 +194,9 @@ class NavigationViewModel extends ChangeNotifier {
     _dismissedRouteDuration = null;
     _trafficTimer?.cancel();
     _trafficTimer = null;
-    _trafficTestAnimationTimer?.cancel();
-    _trafficTestAnimationTimer = null;
     _trafficTestStage = 0;
     _trafficSegmentInfo = null;
     _hasEnteredTrafficSegment = false;
-    _trafficSegmentProgress = 0.0;
     _arService.clearOverlays();
     _arViewModel.resetOverlay();
     _currentRoute = null;
@@ -391,20 +374,19 @@ class NavigationViewModel extends ChangeNotifier {
       );
       _trafficSegmentInfo = info;
       _hasEnteredTrafficSegment = false;
-      _trafficSegmentProgress = 0.0;
       notifyListeners();
     } catch (_) {
       // Best-effort — silently ignore network/API errors
     }
   }
 
-  /// Recalculates traffic-segment progress from the live GPS position on
-  /// every location tick. Classifies [location] against the active
-  /// [_trafficSegmentInfo] using the triangle-inequality relationship
-  /// between the three distances (start→location, location→end,
-  /// start→end): a location can only be farther from one endpoint than the
-  /// full segment span if it lies outside that endpoint, so this avoids
-  /// needing a full vector projection for a short (~2 km) lookahead segment.
+  /// Classifies [location] against the active [_trafficSegmentInfo] on every
+  /// GPS tick — has the vehicle entered the checked segment, or passed it
+  /// entirely — using the triangle-inequality relationship between the
+  /// three distances (start→location, location→end, start→end): a location
+  /// can only be farther from one endpoint than the full segment span if it
+  /// lies outside that endpoint, so this avoids needing a full vector
+  /// projection for a short (~2 km) lookahead segment.
   void updateTrafficSegmentProgress(LatLng location) {
     // Skip while the debug test button owns trafficSegmentInfo — real GPS
     // movement shouldn't reclassify a mocked segment mid-test.
@@ -429,38 +411,29 @@ class NavigationViewModel extends ChangeNotifier {
       return;
     }
 
-    if (distanceFromEnd > totalDistance) {
-      // Hasn't reached the start of the segment yet.
-      _hasEnteredTrafficSegment = false;
-      _trafficSegmentProgress = 0.0;
-    } else {
-      _hasEnteredTrafficSegment = true;
-      _trafficSegmentProgress =
-          (distanceFromStart / totalDistance).clamp(0.0, 1.0);
-    }
+    // Hasn't reached the start of the segment yet if farther from the end
+    // than the segment's own length — otherwise, inside it.
+    _hasEnteredTrafficSegment = distanceFromEnd <= totalDistance;
     notifyListeners();
   }
 
   void _clearTrafficSegment() {
     _trafficSegmentInfo = null;
     _hasEnteredTrafficSegment = false;
-    _trafficSegmentProgress = 0.0;
     notifyListeners();
   }
 
   // TEMPORARY - remove after traffic delay testing is complete
   //
-  // Cycles through the traffic-delay UI states without needing real GPS
-  // movement or live traffic: off -> moderate badge -> heavy badge ->
-  // inside-jam progress bar (auto-animates 0 -> 1 over ~5s) -> off. Bypasses
-  // the real Directions API call entirely by writing a fake
-  // TrafficSegmentInfo directly. While active (_trafficTestStage != 0),
-  // _checkTrafficSegment() and updateTrafficSegmentProgress() both skip
-  // themselves so the real timer/GPS-tick path can't fight over state.
+  // Cycles through the traffic-delay pill's states without needing real GPS
+  // movement or live traffic: off -> moderate (approaching) -> heavy
+  // (approaching) -> inside-jam -> off. Bypasses the real Directions API
+  // call entirely by writing a fake TrafficSegmentInfo directly. While
+  // active (_trafficTestStage != 0), _checkTrafficSegment() and
+  // updateTrafficSegmentProgress() both skip themselves so the real
+  // timer/GPS-tick path can't fight over state.
   void testCycleTrafficDelay(LatLng currentLocation) {
     _trafficTestStage = (_trafficTestStage + 1) % 4;
-    _trafficTestAnimationTimer?.cancel();
-    _trafficTestAnimationTimer = null;
 
     switch (_trafficTestStage) {
       case 1:
@@ -470,7 +443,6 @@ class NavigationViewModel extends ChangeNotifier {
           delayMinutes: 6,
         );
         _hasEnteredTrafficSegment = false;
-        _trafficSegmentProgress = 0.0;
       case 2:
         _setMockTrafficSegment(
           currentLocation,
@@ -478,23 +450,11 @@ class NavigationViewModel extends ChangeNotifier {
           delayMinutes: 14,
         );
         _hasEnteredTrafficSegment = false;
-        _trafficSegmentProgress = 0.0;
       case 3:
         _hasEnteredTrafficSegment = true;
-        _trafficSegmentProgress = 0.0;
-        _trafficTestAnimationTimer = Timer.periodic(
-          const Duration(milliseconds: 100),
-          (timer) {
-            _trafficSegmentProgress =
-                (_trafficSegmentProgress + 0.02).clamp(0.0, 1.0);
-            if (_trafficSegmentProgress >= 1.0) timer.cancel();
-            notifyListeners();
-          },
-        );
       default: // 0
         _trafficSegmentInfo = null;
         _hasEnteredTrafficSegment = false;
-        _trafficSegmentProgress = 0.0;
     }
     notifyListeners();
   }

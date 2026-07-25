@@ -53,12 +53,57 @@ class ARViewModel extends ChangeNotifier {
   String? _upcomingTurnStreet;
   bool voiceGuidanceEnabled = true;
 
+  // Bug 34: whether the CURRENT head turn's displayed distance has already
+  // reached _distanceFloorMetres at least once. Reset whenever a new turn
+  // becomes the head (same place _lookaheadActive/_closestApproachToHead
+  // are reset) and in resetOverlay().
+  bool _headTurnReachedFloor = false;
+
   // Final-leg heads-up ("In X, you will reach your destination") and the
   // arrival announcement each fire at most once per route — separate from
   // the 6-tier turn system's _lastAnnounced, since neither concept maps to
   // a turn tier ("red = imminent turn" doesn't apply to "you've arrived").
   bool _finalLegAnnounced = false;
   bool _arrivalAnnounced = false;
+
+  // Bug 32: proximity to a turn's junction coordinate alone doesn't mean the
+  // turn was actually completed — a driver stopped waiting there (roundabout
+  // gap, red light) sits within the pop radius the whole time. The proximity
+  // pop loop in updateAROverlay() also requires current heading to roughly
+  // match the outgoing segment's bearing, within this tolerance, before
+  // treating the turn as done.
+  static const double _headingConfirmationToleranceDegrees = 55.0;
+
+  // Bug 33: GPS-derived heading is temporarily unreliable right after a turn
+  // (course-over-ground lags the actual turn and gets noisier at the lower
+  // speed typical mid-turn), so the heading gate above can take several
+  // seconds to be satisfied even though the turn is genuinely done — the
+  // stale turn stays displayed with its distance visibly counting up as the
+  // driver drives away from it. Rather than loosen the heading tolerance
+  // (which would blunt Bug 32's protection specifically for ~90° turns,
+  // where the approach and outgoing bearings are already that far apart),
+  // the proximity pop loop also accepts a second, independent condition:
+  // the driver is clearly moving (speed above this floor — well above GPS
+  // noise/idling drift, but low enough to still count a driver just pulling
+  // away from the turn) AND has moved away from the closest approach this
+  // turn ever recorded by at least this margin. A stopped/waiting driver
+  // (Bug 32's original case) has speed ~0 and never satisfies this, so
+  // still relies purely on the heading gate.
+  static const double _movingAwaySpeedThresholdMetresPerSecond = 2.0;
+  static const double _movingAwayFallbackMarginMetres = 15.0;
+
+  // Bug 34 (display-only): once a turn's distance has been driven down to
+  // ~0, straight-line distance to that same (now-passed) point necessarily
+  // starts climbing again as the driver continues past it — even though
+  // the turn is genuinely done, this reads as broken on screen during the
+  // brief window where the pop loop above is still waiting to confirm it
+  // (heading gate or the Bug 33 moving-away fallback). Once
+  // distanceToNextTurn for the current head turn reaches this floor, it's
+  // held at 0 for the rest of that turn's display window instead of
+  // tracking the growing straight-line distance. Purely a display clamp —
+  // the pop condition logic above is untouched, and this doesn't affect
+  // when the turn actually pops.
+  static const double _distanceFloorMetres = 5.0;
 
   // TEMPORARY - remove after voice guidance testing is complete
   bool _debugOverrideActive = false;
@@ -133,7 +178,7 @@ class ARViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void updateAROverlay(LatLng currentLocation) {
+  void updateAROverlay(LatLng currentLocation, {double? heading, double? speed}) {
     // TEMPORARY - remove after voice guidance testing is complete
     if (_debugOverrideActive) return;
 
@@ -154,6 +199,29 @@ class ARViewModel extends ChangeNotifier {
     // multiple turns simultaneously when consecutive positions are close together.
     // U-turns get a wider threshold (20 m) because wide arcs may never bring the
     // driver within 10 m of the theoretical turn start point.
+    //
+    // Proximity alone doesn't confirm the turn was actually completed (Bug
+    // 32): a driver stopped waiting right at the junction — a gap in
+    // roundabout traffic, a red light before turning — sits within this
+    // radius the whole time without having turned. Current heading must also
+    // roughly match the outgoing segment's bearing (turn -> next turn, or
+    // turn -> destination on the final turn) rather than the approach
+    // direction. When heading is null (GPS course-over-ground is stale/
+    // unavailable, which is exactly what happens while genuinely stationary)
+    // or there's no outgoing point to bear toward, the turn is correctly
+    // left unpopped — that's the "still waiting" case, not a bug.
+    //
+    // Bug 33 fallback: heading can lag for several seconds right after a
+    // genuinely-completed turn (see _movingAwaySpeedThresholdMetresPerSecond
+    // doc above), so the loop also pops when the driver is clearly moving
+    // and has pulled away from this turn's closest recorded approach by
+    // _movingAwayFallbackMarginMetres — regardless of current heading.
+    // _closestApproachToHead is the same tracker mechanism B (the missed-
+    // turn heuristic below) uses; it's only populated once the driver has
+    // actually gotten close to this head turn, so this fallback can't fire
+    // before proximity was genuinely reached. Speed near zero (stopped/
+    // waiting, Bug 32's original case) never satisfies this, leaving that
+    // case to rely purely on the heading gate, unchanged.
     while (_remainingTurns.isNotEmpty) {
       final head = _remainingTurns.first;
       final threshold =
@@ -161,7 +229,29 @@ class ARViewModel extends ChangeNotifier {
            head.direction == TurnDirection.roundabout)
               ? 20.0
               : 10.0;
-      if (calculateDistance(currentLocation, head.position) < threshold) {
+      final distanceToHead = calculateDistance(currentLocation, head.position);
+      final withinRadius = distanceToHead < threshold;
+
+      final outgoingTarget = _remainingTurns.length > 1
+          ? _remainingTurns[1].position
+          : _destinationCoordinates;
+      final turnConfirmedByHeading = heading != null &&
+          outgoingTarget != null &&
+          angularDifference(
+                heading,
+                calculateBearing(head.position, outgoingTarget),
+              ) <=
+              _headingConfirmationToleranceDegrees;
+
+      final turnConfirmedByMovingAway = speed != null &&
+          speed > _movingAwaySpeedThresholdMetresPerSecond &&
+          _closestApproachToHead != null &&
+          _closestApproachToHead! < threshold &&
+          distanceToHead >
+              _closestApproachToHead! + _movingAwayFallbackMarginMetres;
+
+      if ((withinRadius && turnConfirmedByHeading) ||
+          turnConfirmedByMovingAway) {
         _remainingTurns.removeAt(0);
         _lastDistanceToNextTurn = null;
         _closestApproachToHead = null;
@@ -228,6 +318,7 @@ class ARViewModel extends ChangeNotifier {
       _lookaheadActive = false;
       _closestApproachToHead = null;
       _lastAnnounced = VoiceAnnouncement.none;
+      _headTurnReachedFloor = false;
     }
     _lastHeadTurn = currentHead;
 
@@ -269,13 +360,25 @@ class ARViewModel extends ChangeNotifier {
 
       // Within lookahead range — show the turn directly.
       _lookaheadActive = true;
-      double newDistance = distanceToCurrentStep;
-      if (_lastDistanceToNextTurn != null &&
-          newDistance < 500.0 &&
-          newDistance > _lastDistanceToNextTurn! + 20.0 &&
-          _closestApproachToHead != null &&
-          newDistance <= _closestApproachToHead! + 30.0) {
-        newDistance = _lastDistanceToNextTurn!;
+      double newDistance;
+      if (_headTurnReachedFloor) {
+        // Bug 34: this turn already reached the floor once — hold at 0
+        // rather than tracking the growing straight-line distance while
+        // still waiting for the pop condition to confirm the turn is done.
+        newDistance = 0.0;
+      } else {
+        newDistance = distanceToCurrentStep;
+        if (_lastDistanceToNextTurn != null &&
+            newDistance < 500.0 &&
+            newDistance > _lastDistanceToNextTurn! + 20.0 &&
+            _closestApproachToHead != null &&
+            newDistance <= _closestApproachToHead! + 30.0) {
+          newDistance = _lastDistanceToNextTurn!;
+        }
+        if (newDistance <= _distanceFloorMetres) {
+          _headTurnReachedFloor = true;
+          newDistance = 0.0;
+        }
       }
       _lastDistanceToNextTurn = newDistance;
       _distanceToNextTurn = newDistance;
@@ -361,6 +464,7 @@ class ARViewModel extends ChangeNotifier {
     _lastHeadTurn = null;
     _lookaheadActive = false;
     _closestApproachToHead = null;
+    _headTurnReachedFloor = false;
     _destinationCoordinates = null;
     _lastAnnounced = VoiceAnnouncement.none;
     _finalLegAnnounced = false;

@@ -120,7 +120,11 @@ class MapViewModel extends ChangeNotifier {
         }
       }
 
-      _arViewModel.updateAROverlay(location);
+      _arViewModel.updateAROverlay(
+        location,
+        heading: _currentHeading,
+        speed: _currentSpeed,
+      );
       _navigationViewModel.updateRemainingPolyline(location);
       _navigationViewModel.checkIfArrived(location);
       _navigationViewModel.updateTrafficSegmentProgress(location);
@@ -134,7 +138,11 @@ class MapViewModel extends ChangeNotifier {
       final loc = _currentLocation;
       if (loc != null &&
           _navigationViewModel.navigationStatus == NavigationStatus.navigating) {
-        _arViewModel.updateAROverlay(loc);
+        _arViewModel.updateAROverlay(
+          loc,
+          heading: _currentHeading,
+          speed: _currentSpeed,
+        );
       }
     });
   }

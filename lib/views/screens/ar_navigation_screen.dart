@@ -16,6 +16,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:smart_ar_navigation/models/route_model.dart';
 import 'package:smart_ar_navigation/core/enums/navigation_status.dart';
 import 'package:smart_ar_navigation/core/enums/turn_direction.dart';
+import 'package:smart_ar_navigation/core/utils/location_utils.dart';
 import 'package:smart_ar_navigation/services/ambient_light_service.dart';
 import 'package:smart_ar_navigation/services/ar_service.dart';
 import 'package:smart_ar_navigation/viewmodels/ar_viewmodel.dart';
@@ -27,7 +28,6 @@ import 'package:smart_ar_navigation/views/screens/home/widgets/speed_indicator.d
 import 'package:smart_ar_navigation/views/widgets/dynamic_arrow_widget.dart';
 import 'package:smart_ar_navigation/views/widgets/navigation_bottom_bar.dart';
 import 'package:smart_ar_navigation/views/widgets/traffic_delay_badge.dart';
-import 'package:smart_ar_navigation/views/widgets/traffic_progress_bar.dart';
 
 class ARNavigationScreen extends StatefulWidget {
   const ARNavigationScreen({super.key, this.isRecovering = false});
@@ -218,7 +218,18 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
       // Leaving the screen is deferred to the arrival announcement's speech
       // completion (immediate if voice guidance is muted) so navigation
       // away doesn't cut "You have reached your destination" off mid-word.
-      arVM.announceArrival(() => navigator.pop());
+      //
+      // popUntil(first) rather than a bare pop() (Bug 31): a single pop only
+      // reaches Home when Home is exactly one level below /ar-navigation,
+      // which isn't true for the "Plan a Drive" entry path (Home ->
+      // PlanDriveScreen -> AR, all plain pushNamed) — it would leave the
+      // user on the leftover PlanDriveScreen instead. The first route is
+      // always the real Home (splash_screen.dart replaces '/' with '/home'
+      // immediately after splash), and reusing it here — rather than the
+      // Routes button's pushNamedAndRemoveUntil('/home', ...), which pushes
+      // a brand-new instance on top — avoids accumulating duplicate Home
+      // instances across repeated trips.
+      arVM.announceArrival(() => navigator.popUntil((route) => route.isFirst));
     });
   }
 
@@ -240,6 +251,39 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
     // platform view can intercept touches meant for the preview's buttons.
     final hideArForFasterRoute =
         navVM.showFasterRouteMap && navVM.suggestedFasterRoute != null;
+
+    // Traffic pill: two content states sharing one badge/visual style —
+    // "approaching" (suppressed entirely once farther than 2 km from the
+    // jam) and "inside the jam" (shown for as long as GPS sits between the
+    // segment's start/end, per NavigationViewModel.hasEnteredTrafficSegment).
+    final trafficInfo = navVM.trafficSegmentInfo;
+    Widget? trafficBadge;
+    if (trafficInfo != null) {
+      if (navVM.hasEnteredTrafficSegment) {
+        trafficBadge = TrafficDelayBadge(
+          segmentInfo: trafficInfo,
+          hasEnteredSegment: true,
+          jamLengthKm: calculateDistance(
+                trafficInfo.segmentStartPosition,
+                trafficInfo.segmentEndPosition,
+              ) /
+              1000,
+        );
+      } else if (mapVM.currentLocation != null) {
+        final distanceAheadKm = calculateDistance(
+              mapVM.currentLocation!,
+              trafficInfo.segmentStartPosition,
+            ) /
+            1000;
+        if (distanceAheadKm <= 2.0) {
+          trafficBadge = TrafficDelayBadge(
+            segmentInfo: trafficInfo,
+            hasEnteredSegment: false,
+            distanceAheadKm: distanceAheadKm,
+          );
+        }
+      }
+    }
 
     return PopScope(
       canPop: false,
@@ -339,21 +383,6 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
               ],
             ),
           ),
-
-          // ── Layer 3.5: Traffic progress bar (left side, spans most of the
-          // vertical space between the instruction card and the bottom bar)
-          if (navVM.trafficSegmentInfo != null &&
-              navVM.hasEnteredTrafficSegment)
-            Positioned(
-              left: 16,
-              top: 210,
-              bottom: 170,
-              child: TrafficProgressBar(
-                progress: navVM.trafficSegmentProgress,
-                minutesToClear: navVM.trafficMinutesToClear,
-                severity: navVM.trafficSegmentInfo!.severity,
-              ),
-            ),
 
           // ── Layer 4: DEBUG direction + distance buttons (remove before release) ─
           Positioned(
@@ -467,11 +496,7 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
                           child: SpeedIndicator(speedMs: mapVM.currentSpeed),
                         ),
                       ),
-                      if (navVM.trafficSegmentInfo != null &&
-                          !navVM.hasEnteredTrafficSegment)
-                        TrafficDelayBadge(
-                          segmentInfo: navVM.trafficSegmentInfo!,
-                        ),
+                      ?trafficBadge,
                     ],
                   ),
                 ),

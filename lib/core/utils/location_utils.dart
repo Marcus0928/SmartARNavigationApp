@@ -11,6 +11,23 @@ double calculateDistance(LatLng point1, LatLng point2) {
   );
 }
 
+// Bearing in degrees (-180 to 180, 0 = north, clockwise) from [from] to [to].
+double calculateBearing(LatLng from, LatLng to) {
+  return Geolocator.bearingBetween(
+    from.latitude,
+    from.longitude,
+    to.latitude,
+    to.longitude,
+  );
+}
+
+// Smallest angle between two headings/bearings, normalized to 0-180 degrees
+// (e.g. 350 vs 10 -> 20, not 340).
+double angularDifference(double heading1, double heading2) {
+  final diff = (heading1 - heading2).abs() % 360;
+  return diff > 180 ? 360 - diff : diff;
+}
+
 TurnInstruction? findNextTurn(
   LatLng currentLocation,
   List<TurnInstruction> turns,

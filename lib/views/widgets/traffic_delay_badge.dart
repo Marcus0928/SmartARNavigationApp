@@ -6,10 +6,22 @@ import 'package:smart_ar_navigation/models/traffic_segment_info.dart';
 class TrafficDelayBadge extends StatelessWidget {
   final TrafficSegmentInfo segmentInfo;
 
-  const TrafficDelayBadge({super.key, required this.segmentInfo});
+  // Which of the two content states to render — the visual style (pill,
+  // severity color, icon) is identical either way; only the second line of
+  // text changes. Exactly one of distanceAheadKm/jamLengthKm is expected to
+  // be set, matching hasEnteredSegment.
+  final bool hasEnteredSegment;
+  final double? distanceAheadKm;
+  final double? jamLengthKm;
 
-  // Matches TrafficProgressBar's saturated fill colors, so the badge and
-  // the in-jam progress bar read as the same severity language.
+  const TrafficDelayBadge({
+    super.key,
+    required this.segmentInfo,
+    required this.hasEnteredSegment,
+    this.distanceAheadKm,
+    this.jamLengthKm,
+  });
+
   Color get _backgroundColor {
     switch (segmentInfo.severity) {
       case TrafficSeverity.moderate:
@@ -35,6 +47,10 @@ class TrafficDelayBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final secondLine = hasEnteredSegment
+        ? '${jamLengthKm!.toStringAsFixed(1)} km jam'
+        : '${distanceAheadKm!.toStringAsFixed(1)} km ahead';
+
     return Center(
       child: Container(
         padding: const EdgeInsets.fromLTRB(12, 8, 20, 8),
@@ -63,7 +79,7 @@ class TrafficDelayBadge extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  '${segmentInfo.delayMinutes} min delay',
+                  '${segmentInfo.delayMinutes} min jam',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -71,7 +87,7 @@ class TrafficDelayBadge extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '~2 km ahead',
+                  secondLine,
                   style: TextStyle(
                     fontSize: 12,
                     // Solid, not faded — fading toward the colored

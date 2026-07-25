@@ -44,7 +44,7 @@ class _NavigationBottomBarState extends State<NavigationBottomBar> {
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
           child: Row(
             children: [
               // ── Left: Stop button (✕, no text) ───────────────────
@@ -89,17 +89,17 @@ class _NavigationBottomBarState extends State<NavigationBottomBar> {
                       '$etaMinutes min',
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 28,
+                        fontSize: 32,
                         fontWeight: FontWeight.w800,
                         height: 1.0,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Text(
                       '$arrivalStr  ·  $distanceKm km',
                       style: const TextStyle(
                         color: Colors.white60,
-                        fontSize: 13,
+                        fontSize: 18,
                         fontWeight: FontWeight.w500,
                       ),
                     ),

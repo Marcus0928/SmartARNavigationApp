@@ -95,7 +95,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _ctrl.handleDestinationChange(mapVM, _sheetController);
     _ctrl.handleRouteFitting(mapVM, context, _sheetController);
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final shouldExit = await _showExitConfirmationDialog(context);
+        if (shouldExit) {
+          SystemNavigator.pop();
+        }
+      },
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.dark.copyWith(
         statusBarColor: Colors.transparent,
       ),
@@ -235,6 +244,33 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         ],
       ),
       ),
+      ),
     );
+  }
+
+  // Waze-style "are you sure?" prompt on the physical back button — this
+  // screen sits at the bottom of the navigation stack (route.isFirst), so a
+  // bare back-press here would otherwise exit the app with no confirmation.
+  // Style matches the existing "Shut Down" dialog in WazeDrawer for
+  // consistency, since that's the app's other exit-confirmation prompt.
+  Future<bool> _showExitConfirmationDialog(BuildContext context) async {
+    final shouldExit = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Exit App?'),
+        content: const Text('Are you sure you want to exit the app?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text('Exit', style: TextStyle(color: Colors.red.shade400)),
+          ),
+        ],
+      ),
+    );
+    return shouldExit ?? false;
   }
 }
