@@ -47,6 +47,8 @@ class ARViewModel extends ChangeNotifier {
   double? _closestApproachToHead;
   int _missedTurnStreak = 0;
   DateTime? _lastMissedTurnPopTime;
+  int _movingAwayStreak = 0;
+  DateTime? _lastMovingAwayPopTime;
   LatLng? _destinationCoordinates;
   VoiceAnnouncement _lastAnnounced = VoiceAnnouncement.none;
   double? _lastAnnouncedAtDistance;
@@ -93,6 +95,29 @@ class ARViewModel extends ChangeNotifier {
   // still relies purely on the heading gate.
   static const double _movingAwaySpeedThresholdMetresPerSecond = 2.0;
   static const double _movingAwayFallbackMarginMetres = 15.0;
+
+  // Bug 37: unlike the missed-turn heuristic below (which already requires
+  // sustained confirmation, a cooldown, and a plausibility check — see the
+  // Bug 36 constants), the moving-away fallback above used to pop on a
+  // SINGLE tick's speed+distance reading alone. A single transient bad GPS
+  // fix (speed/position noise right after a reroute, near a tunnel/
+  // overpass, or general signal noise) could satisfy it long enough to pop
+  // a turn the driver hadn't actually completed, and — since it only ever
+  // evaluates _remainingTurns.first — do so again on the very next
+  // (still-noisy) tick, cascading through several real, un-passed turns.
+  // Mirrors the same three-part gate as the missed-turn heuristic, kept as
+  // independent constants (not shared with _missedTurn*) so this fallback
+  // stays separately tunable and this fix stays scoped to it alone:
+  //  - require the raw condition to hold for several consecutive ticks
+  //  - cool down between pops
+  //  - reject the pop outright if the resulting new head turn would be
+  //    implausibly far from the driver
+  // Core 80 m/200 m-equivalent trigger values above (speed threshold,
+  // fallback margin) are unchanged — this only gates when the already-true
+  // condition is acted on.
+  static const int _movingAwayConfirmationTicks = 3;
+  static const Duration _movingAwayPopCooldown = Duration(seconds: 3);
+  static const double _movingAwayPlausibilityMetres = 10000.0;
 
   // Bug 34 (display-only): once a turn's distance has been driven down to
   // ~0, straight-line distance to that same (now-passed) point necessarily
@@ -265,19 +290,58 @@ class ARViewModel extends ChangeNotifier {
               ) <=
               _headingConfirmationToleranceDegrees;
 
-      final turnConfirmedByMovingAway = speed != null &&
+      final turnConfirmedByMovingAwayRaw = speed != null &&
           speed > _movingAwaySpeedThresholdMetresPerSecond &&
           _closestApproachToHead != null &&
           _closestApproachToHead! < threshold &&
           distanceToHead >
               _closestApproachToHead! + _movingAwayFallbackMarginMetres;
 
-      if ((withinRadius && turnConfirmedByHeading) ||
-          turnConfirmedByMovingAway) {
+      if (withinRadius && turnConfirmedByHeading) {
         _remainingTurns.removeAt(0);
         _lastDistanceToNextTurn = null;
         _closestApproachToHead = null;
+        _movingAwayStreak = 0;
+      } else if (turnConfirmedByMovingAwayRaw) {
+        // Bug 37: gate the raw single-tick reading behind sustained
+        // confirmation, a cooldown, and a plausibility check — see the
+        // constants above — instead of acting on it immediately.
+        _movingAwayStreak++;
+
+        final now = DateTime.now();
+        final cooldownElapsed = _lastMovingAwayPopTime == null ||
+            now.difference(_lastMovingAwayPopTime!) >= _movingAwayPopCooldown;
+
+        var popped = false;
+        if (_movingAwayStreak >= _movingAwayConfirmationTicks &&
+            cooldownElapsed) {
+          final newHeadPosition = _remainingTurns.length > 1
+              ? _remainingTurns[1].position
+              : _destinationCoordinates;
+          final distanceToNewHead = newHeadPosition != null
+              ? calculateDistance(currentLocation, newHeadPosition)
+              : null;
+          final plausible = distanceToNewHead == null ||
+              distanceToNewHead <= _movingAwayPlausibilityMetres;
+
+          if (plausible) {
+            _remainingTurns.removeAt(0);
+            _lastDistanceToNextTurn = null;
+            _closestApproachToHead = null;
+            _movingAwayStreak = 0;
+            _lastMovingAwayPopTime = now;
+            popped = true;
+          } else {
+            debugPrint(
+              'ARViewModel: moving-away pop rejected — new head would be '
+              '${distanceToNewHead.round()}m away, likely GPS noise rather '
+              'than a genuinely completed turn.',
+            );
+          }
+        }
+        if (!popped) break;
       } else {
+        _movingAwayStreak = 0;
         break;
       }
     }
@@ -375,6 +439,7 @@ class ARViewModel extends ChangeNotifier {
       _lastAnnounced = VoiceAnnouncement.none;
       _headTurnReachedFloor = false;
       _missedTurnStreak = 0;
+      _movingAwayStreak = 0;
     }
     _lastHeadTurn = currentHead;
 
@@ -522,6 +587,8 @@ class ARViewModel extends ChangeNotifier {
     _closestApproachToHead = null;
     _missedTurnStreak = 0;
     _lastMissedTurnPopTime = null;
+    _movingAwayStreak = 0;
+    _lastMovingAwayPopTime = null;
     _headTurnReachedFloor = false;
     _destinationCoordinates = null;
     _lastAnnounced = VoiceAnnouncement.none;
