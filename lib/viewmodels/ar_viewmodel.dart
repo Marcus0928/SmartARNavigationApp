@@ -45,6 +45,8 @@ class ARViewModel extends ChangeNotifier {
   TurnInstruction? _lastHeadTurn;
   bool _lookaheadActive = false;
   double? _closestApproachToHead;
+  int _missedTurnStreak = 0;
+  DateTime? _lastMissedTurnPopTime;
   LatLng? _destinationCoordinates;
   VoiceAnnouncement _lastAnnounced = VoiceAnnouncement.none;
   double? _lastAnnouncedAtDistance;
@@ -104,6 +106,26 @@ class ARViewModel extends ChangeNotifier {
   // the pop condition logic above is untouched, and this doesn't affect
   // when the turn actually pops.
   static const double _distanceFloorMetres = 5.0;
+
+  // Bug 36 regression fix: the missed-turn heuristic below used to act on a
+  // single tick where the driver appeared to have moved away from the head
+  // turn. A transient bad GPS fix (settling right after a reroute, near a
+  // tunnel/overpass, or plain signal noise) could satisfy that condition
+  // for several turns in a row across consecutive updateAROverlay() ticks —
+  // each tick only ever looks at _remainingTurns.first, so nothing stopped
+  // it cascading through multiple real, un-passed turns. These three
+  // constants gate the pop with more confidence instead of changing the
+  // underlying 80 m/200 m trigger distances:
+  //  - require the moved-away condition to hold for several consecutive
+  //    ticks (filters a one-off jump, still catches a genuine departure)
+  //  - cool down between pops (stops back-to-back cascades even if the
+  //    sustained condition is somehow re-satisfied immediately)
+  //  - reject the pop outright if the resulting new head turn would be
+  //    implausibly far from the driver (a sign multiple turns are being
+  //    skipped over at once, not that one was genuinely missed)
+  static const int _missedTurnConfirmationTicks = 3;
+  static const Duration _missedTurnPopCooldown = Duration(seconds: 3);
+  static const double _missedTurnPlausibilityMetres = 10000.0;
 
   // TEMPORARY - remove after voice guidance testing is complete
   bool _debugOverrideActive = false;
@@ -261,18 +283,51 @@ class ARViewModel extends ChangeNotifier {
     }
 
     // Missed turn detection: if the user got close to a turn but is now
-    // moving away, consider it missed and pop it.
+    // moving away, consider it missed and pop it. See the Bug 36 constants
+    // above for why the pop itself is gated behind sustained confirmation,
+    // a cooldown, and a plausibility check rather than firing on one tick.
     if (_remainingTurns.isNotEmpty) {
       final head = _remainingTurns.first;
       final distToHead = calculateDistance(currentLocation, head.position);
 
-      if (_closestApproachToHead != null &&
+      final movedAway = _closestApproachToHead != null &&
           distToHead > _closestApproachToHead! + 80.0 &&
-          _closestApproachToHead! < 200.0) {
-        _remainingTurns.removeAt(0);
-        _closestApproachToHead = null;
-        _lastDistanceToNextTurn = null;
+          _closestApproachToHead! < 200.0;
+
+      if (movedAway) {
+        _missedTurnStreak++;
+
+        final now = DateTime.now();
+        final cooldownElapsed = _lastMissedTurnPopTime == null ||
+            now.difference(_lastMissedTurnPopTime!) >= _missedTurnPopCooldown;
+
+        if (_missedTurnStreak >= _missedTurnConfirmationTicks &&
+            cooldownElapsed) {
+          final newHeadPosition = _remainingTurns.length > 1
+              ? _remainingTurns[1].position
+              : _destinationCoordinates;
+          final distanceToNewHead = newHeadPosition != null
+              ? calculateDistance(currentLocation, newHeadPosition)
+              : null;
+          final plausible = distanceToNewHead == null ||
+              distanceToNewHead <= _missedTurnPlausibilityMetres;
+
+          if (plausible) {
+            _remainingTurns.removeAt(0);
+            _closestApproachToHead = null;
+            _lastDistanceToNextTurn = null;
+            _missedTurnStreak = 0;
+            _lastMissedTurnPopTime = now;
+          } else {
+            debugPrint(
+              'ARViewModel: missed-turn pop rejected — new head would be '
+              '${distanceToNewHead.round()}m away, likely GPS noise rather '
+              'than a genuinely missed turn.',
+            );
+          }
+        }
       } else {
+        _missedTurnStreak = 0;
         if (_closestApproachToHead == null ||
             distToHead < _closestApproachToHead!) {
           _closestApproachToHead = distToHead;
@@ -319,6 +374,7 @@ class ARViewModel extends ChangeNotifier {
       _closestApproachToHead = null;
       _lastAnnounced = VoiceAnnouncement.none;
       _headTurnReachedFloor = false;
+      _missedTurnStreak = 0;
     }
     _lastHeadTurn = currentHead;
 
@@ -464,6 +520,8 @@ class ARViewModel extends ChangeNotifier {
     _lastHeadTurn = null;
     _lookaheadActive = false;
     _closestApproachToHead = null;
+    _missedTurnStreak = 0;
+    _lastMissedTurnPopTime = null;
     _headTurnReachedFloor = false;
     _destinationCoordinates = null;
     _lastAnnounced = VoiceAnnouncement.none;
