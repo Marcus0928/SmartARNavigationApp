@@ -15,6 +15,7 @@ import 'package:smart_ar_navigation/services/location_service.dart';
 import 'package:smart_ar_navigation/viewmodels/ar_viewmodel.dart';
 import 'package:smart_ar_navigation/services/navigation_foreground_service.dart';
 import 'package:smart_ar_navigation/viewmodels/profile_viewmodel.dart';
+import 'package:smart_ar_navigation/viewmodels/settings_viewmodel.dart';
 
 class NavigationViewModel extends ChangeNotifier {
   final RouteRepository _routeRepository;
@@ -22,6 +23,7 @@ class NavigationViewModel extends ChangeNotifier {
   final ARService _arService;
   final ARViewModel _arViewModel;
   final ProfileViewModel _profileViewModel;
+  final SettingsViewModel _settingsViewModel;
 
   static NavigationViewModel? _instance;
   static NavigationViewModel? get instance => _instance;
@@ -32,11 +34,13 @@ class NavigationViewModel extends ChangeNotifier {
     required ARService arService,
     required ARViewModel arViewModel,
     required ProfileViewModel profileViewModel,
+    required SettingsViewModel settingsViewModel,
   })  : _routeRepository = routeRepository,
         _locationService = locationService,
         _arService = arService,
         _arViewModel = arViewModel,
-        _profileViewModel = profileViewModel {
+        _profileViewModel = profileViewModel,
+        _settingsViewModel = settingsViewModel {
     _instance = this;
   }
 
@@ -129,6 +133,7 @@ class NavigationViewModel extends ChangeNotifier {
         final routes = await _routeRepository.getRoute(
           origin: origin,
           destination: destination.coordinates,
+          avoidTolls: _settingsViewModel.avoidTolls,
           heading: _locationService.currentHeading,
         );
         _currentRoute = routes.first;
@@ -223,6 +228,7 @@ class NavigationViewModel extends ChangeNotifier {
       final routes = await _routeRepository.getRoute(
         origin: from,
         destination: _currentDestination!.coordinates,
+        avoidTolls: _settingsViewModel.avoidTolls,
         heading: _locationService.currentHeading,
       );
       _currentRoute = routes.first;
@@ -330,6 +336,7 @@ class NavigationViewModel extends ChangeNotifier {
       final routes = await _routeRepository.getRoute(
         origin: origin,
         destination: _currentDestination!.coordinates,
+        avoidTolls: _settingsViewModel.avoidTolls,
         heading: _locationService.currentHeading,
       );
       if (routes.isEmpty) return;

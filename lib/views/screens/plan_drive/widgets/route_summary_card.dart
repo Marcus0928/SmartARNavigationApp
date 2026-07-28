@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import 'package:smart_ar_navigation/core/constants/app_colors.dart';
 import 'package:smart_ar_navigation/core/constants/app_strings.dart';
+import 'package:smart_ar_navigation/core/utils/distance_formatter.dart';
 import 'package:smart_ar_navigation/viewmodels/plan_drive_viewmodel.dart';
+import 'package:smart_ar_navigation/viewmodels/settings_viewmodel.dart';
 import 'package:smart_ar_navigation/views/screens/plan_drive/widgets/fetching_indicator.dart';
 import 'package:smart_ar_navigation/views/screens/plan_drive/widgets/stat_chip.dart';
 
@@ -16,11 +19,6 @@ class RouteSummaryCard extends StatelessWidget {
   final PlanDriveViewModel vm;
   final VoidCallback onStart;
 
-  String _formatDistance(double metres) {
-    if (metres >= 1000) return '${(metres / 1000).toStringAsFixed(1)} km';
-    return '${metres.toInt()} m';
-  }
-
   String _formatETA(int seconds) {
     final eta = DateTime.now().add(Duration(seconds: seconds));
     final h = eta.hour;
@@ -32,6 +30,7 @@ class RouteSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final distanceUnit = context.watch<SettingsViewModel>().distanceUnit;
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -49,7 +48,7 @@ class RouteSummaryCard extends StatelessWidget {
           ? const FetchingIndicator()
           : vm.error != null
               ? _buildError(vm.error!)
-              : _buildRouteDetails(),
+              : _buildRouteDetails(distanceUnit),
     );
   }
 
@@ -66,7 +65,7 @@ class RouteSummaryCard extends StatelessWidget {
     );
   }
 
-  Widget _buildRouteDetails() {
+  Widget _buildRouteDetails(String distanceUnit) {
     final route = vm.selectedRoute!;
     final durationMin = (route.estimatedDuration / 60).ceil();
 
@@ -89,7 +88,7 @@ class RouteSummaryCard extends StatelessWidget {
           children: [
             StatChip(
               icon: Icons.route_rounded,
-              label: _formatDistance(route.totalDistance),
+              label: formatDistance(route.totalDistance, distanceUnit),
             ),
             const SizedBox(width: 4),
             _Dot(),

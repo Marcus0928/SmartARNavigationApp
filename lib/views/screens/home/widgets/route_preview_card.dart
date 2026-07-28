@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:smart_ar_navigation/core/constants/app_colors.dart';
+import 'package:smart_ar_navigation/core/utils/distance_formatter.dart';
 import 'package:smart_ar_navigation/models/place_model.dart';
 import 'package:smart_ar_navigation/models/route_model.dart';
 import 'package:smart_ar_navigation/viewmodels/navigation_viewmodel.dart';
+import 'package:smart_ar_navigation/viewmodels/settings_viewmodel.dart';
 
 class RoutePreviewCard extends StatelessWidget {
   const RoutePreviewCard({
@@ -34,6 +36,7 @@ class RoutePreviewCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isStarting =
         context.watch<NavigationViewModel>().isStartingNavigation;
+    final distanceUnit = context.watch<SettingsViewModel>().distanceUnit;
     return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -142,7 +145,7 @@ class RoutePreviewCard extends StatelessWidget {
                         const SizedBox(width: 8),
                         // Distance
                         Text(
-                          _formatDistance(r.totalDistance),
+                          formatDistance(r.totalDistance, distanceUnit),
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey.shade500,
@@ -247,11 +250,6 @@ class RoutePreviewCard extends StatelessWidget {
           }),
         ],
     );
-  }
-
-  String _formatDistance(double metres) {
-    if (metres >= 1000) return '${(metres / 1000).toStringAsFixed(1)} km';
-    return '${metres.toInt()} m';
   }
 }
 

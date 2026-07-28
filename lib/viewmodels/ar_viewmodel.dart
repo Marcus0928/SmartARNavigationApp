@@ -152,6 +152,19 @@ class ARViewModel extends ChangeNotifier {
   static const Duration _missedTurnPopCooldown = Duration(seconds: 3);
   static const double _missedTurnPlausibilityMetres = 10000.0;
 
+  // Bug 37: a reroute (recalculateRoute/acceptFasterRoute) can be triggered
+  // from a bad sideways/forward GPS jump (e.g. onto a parallel service
+  // road) rather than a genuine deviation. Google still returns a valid,
+  // non-error route from that bad origin — often a legitimately shorter,
+  // fewer-turn one, since it's computed from a point that isn't actually
+  // where the driver is. Mirrors the shape of _missedTurnPlausibilityMetres:
+  // a flat sanity margin on a distance value, not a full kinematic model.
+  // A genuine reroute (the driver really did take a shorter path, or Google
+  // found a better one) should never shave more than this much off the
+  // previously known remaining route distance in one go.
+  static const double _rerouteRemainingDistancePlausibilityMarginMetres =
+      3000.0;
+
   // TEMPORARY - remove after voice guidance testing is complete
   bool _debugOverrideActive = false;
   // TEMPORARY - remove after voice guidance testing is complete
@@ -205,6 +218,36 @@ class ARViewModel extends ChangeNotifier {
           calculateDistance(newHead.position, _lastHeadTurn!.position) <= 20.0;
       if (sameTurn) {
         _lastHeadTurn = newHead;
+      }
+    }
+
+    // Bug 37: reroute plausibility check — a reroute triggered by a bad
+    // sideways/forward GPS jump can hand back a route that is implausibly
+    // shorter than what was already known to remain, with nothing else
+    // (no error, no backward-looking candidate) to signal it's wrong. If
+    // adopting it would drop the remaining route distance by more than the
+    // margin below, reject it and keep the existing route/turns untouched
+    // — a later call (from fresh, hopefully-correct GPS) gets another
+    // chance to reroute.
+    if (_remainingTurns.isNotEmpty) {
+      final oldRemainingDistance = _remainingTurns.fold<double>(
+        0.0,
+        (sum, t) => sum + t.distanceFromPrev,
+      );
+      final newRemainingDistance = newTurns.fold<double>(
+        0.0,
+        (sum, t) => sum + t.distanceFromPrev,
+      );
+      if (oldRemainingDistance - newRemainingDistance >
+          _rerouteRemainingDistancePlausibilityMarginMetres) {
+        debugPrint(
+          'ARViewModel.initializeOverlay: rejected new route — remaining '
+          'distance dropped from ${oldRemainingDistance.round()}m to '
+          '${newRemainingDistance.round()}m, more than the '
+          '${_rerouteRemainingDistancePlausibilityMarginMetres.round()}m '
+          'plausibility margin allows; keeping the existing route.',
+        );
+        return;
       }
     }
 

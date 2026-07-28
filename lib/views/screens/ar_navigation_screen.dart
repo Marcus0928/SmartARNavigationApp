@@ -16,6 +16,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:smart_ar_navigation/models/route_model.dart';
 import 'package:smart_ar_navigation/core/enums/navigation_status.dart';
 import 'package:smart_ar_navigation/core/enums/turn_direction.dart';
+import 'package:smart_ar_navigation/core/utils/distance_formatter.dart';
 import 'package:smart_ar_navigation/core/utils/location_utils.dart';
 import 'package:smart_ar_navigation/services/ambient_light_service.dart';
 import 'package:smart_ar_navigation/services/ar_service.dart';
@@ -95,6 +96,15 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
       _ambientLight.stop();
     }
   }
+
+  // Maps the Settings screen's Arrow Size choice to the main chevron's
+  // pixel size — the mini top-instruction-card arrow stays fixed at its
+  // own hardcoded 48 regardless of this setting.
+  double _arrowSizeFor(String arrowSize) => switch (arrowSize) {
+        'Small' => 130.0,
+        'Large' => 230.0,
+        _ => 180.0, // 'Medium' and any unrecognised value
+      };
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -363,6 +373,8 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
                       exitNumber: arVM.roundaboutExit,
                       opacityOverride: opacity,
                       colorOverride: arrowColor,
+                      distanceUnit: settingsVM.distanceUnit,
+                      size: _arrowSizeFor(settingsVM.arrowSize),
                     );
                   },
                 ),
@@ -488,14 +500,15 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: Padding(
-                          padding:
-                              const EdgeInsets.only(right: 16, bottom: 12),
-                          child: SpeedIndicator(speedMs: mapVM.currentSpeed),
+                      if (settingsVM.showSpeed)
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: Padding(
+                            padding:
+                                const EdgeInsets.only(right: 16, bottom: 12),
+                            child: SpeedIndicator(speedMs: mapVM.currentSpeed),
+                          ),
                         ),
-                      ),
                       ?trafficBadge,
                     ],
                   ),
@@ -544,6 +557,7 @@ class _NavInfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final arVM = context.watch<ARViewModel>();
+    final settingsVM = context.watch<SettingsViewModel>();
     if (arVM.nextTurnDirection == null) return const SizedBox.shrink();
 
     final direction = arVM.nextTurnDirection!;
@@ -580,7 +594,7 @@ class _NavInfoCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      _formatDistance(distance),
+                      formatDistance(distance, settingsVM.distanceUnit),
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 32,
@@ -611,18 +625,13 @@ class _NavInfoCard extends StatelessWidget {
                 size: 48,
                 showLabel: false,
                 exitNumber: arVM.roundaboutExit,
+                distanceUnit: settingsVM.distanceUnit,
               ),
             ],
           ),
         ),
       ),
     );
-  }
-
-  String _formatDistance(double metres) {
-    if (metres >= 1000) return '${(metres / 1000).toStringAsFixed(1)} km';
-    final rounded = ((metres / 10).round() * 10).clamp(10, 990);
-    return '$rounded m';
   }
 }
 
