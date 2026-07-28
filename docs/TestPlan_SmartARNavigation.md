@@ -14,7 +14,7 @@
 | **Testing Type** | Manual Black-Box Testing |
 | **Test Device** | OPPO Reno 7 5G (CPH2371) |
 | **Test Device** | OPPO Reno 15 5G (CPH2825) |
-| **Version** | 1.4 |
+| **Version** | 1.5 |
 | **Last Updated** | July 2026 |
 
 ---
@@ -35,7 +35,8 @@
 12. [Test Cases — Early Turn Warning & Roundabout Exit Number](#12-test-cases--early-turn-warning--roundabout-exit-number)
 13. [Test Cases — Navigation Improvements (v1.3)](#13-test-cases--navigation-improvements-v13)
 14. [Test Cases — Ambient Light Auto-Brightness (v1.4)](#14-test-cases--ambient-light-auto-brightness-v14)
-15. [Test Results Summary Table](#15-test-results-summary-table)
+15. [Test Cases — Voice Guidance (v1.5)](#15-test-cases--voice-guidance-v15)
+16. [Test Results Summary Table](#16-test-results-summary-table)
 
 ---
 
@@ -1031,7 +1032,125 @@ These tests cover the ambient light sensor integration that automatically adjust
 
 ---
 
-## 15. Test Results Summary Table
+## 15. Test Cases — Voice Guidance (v1.5)
+
+These tests cover the spoken turn-by-turn voice guidance feature introduced in version 1.5, including the reroute-interruption fix and natural distance phrasing.
+
+---
+
+### TC-056 — Voice Announces Turn at Far Tier (>1 km)
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-056 |
+| **Feature** | Voice Guidance |
+| **Covers** | FR-84 |
+| **Description** | Verify a spoken announcement fires once when the upcoming turn first comes within range while still more than 200 m away |
+| **Precondition** | Active AR navigation, upcoming turn initially more than 1 km away |
+| **Steps** | 1. Start navigation on a route with an upcoming left/right turn 2. Listen as the distance to that turn passes below 1 km |
+| **Expected Result** | A single spoken announcement is heard, including direction and street name (e.g. "In 1 kilometre, turn right onto Jalan Universiti") |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+### TC-057 — Voice Announces Turn at 200 m–1 km and 50–200 m Tiers
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-057 |
+| **Feature** | Voice Guidance |
+| **Covers** | FR-84 |
+| **Description** | Verify a spoken announcement fires once when crossing into the 200 m–1 km tier, and again once when crossing into the 50–200 m tier |
+| **Precondition** | Active AR navigation approaching a turn |
+| **Steps** | 1. Continue approaching the turn from TC-056 2. Listen as distance crosses below 1 000 m, then below 200 m |
+| **Expected Result** | One announcement is heard as distance drops below 1 000 m (or on first tick if navigation started inside that range), and one more as it drops below 200 m — no repeats within the same tier |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+### TC-058 — Voice Announces Imminent Turn (<50 m)
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-058 |
+| **Feature** | Voice Guidance |
+| **Covers** | FR-84 |
+| **Description** | Verify a direct command announcement (no distance prefix) fires once the turn is imminent |
+| **Precondition** | Active AR navigation, closing in on a turn |
+| **Steps** | 1. Continue toward the turn until within 50 m 2. Listen to the announcement |
+| **Expected Result** | A short announcement without a distance prefix is heard (e.g. "Turn right onto Jalan Universiti") |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+### TC-059 — Whole-Kilometre Distance Spoken Naturally
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-059 |
+| **Feature** | Voice Guidance — Distance Phrasing |
+| **Covers** | FR-85 |
+| **Description** | Verify a distance that rounds to an exact whole kilometre is spoken without a redundant decimal |
+| **Precondition** | Use the AR screen's debug distance buttons (`>1km` = 1500 m, or a route where the far-tier announcement triggers near 1.0/2.0 km) |
+| **Steps** | 1. Trigger a far-tier (>1 km) announcement at a distance that rounds to exactly 1.0 or 2.0 km 2. Listen to the phrasing |
+| **Expected Result** | The announcement says "1 kilometre" or "2 kilometres" — never "1.0 kilometres". A non-round value (e.g. 1.5 km) is still spoken with the decimal ("1.5 kilometres") |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+### TC-060 — Street Name Sanitized for Speech
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-060 |
+| **Feature** | Voice Guidance — Street Name Sanitization |
+| **Covers** | FR-86 |
+| **Description** | Verify a street name containing a slash, dash, or all-caps road code is spoken clearly rather than read as raw punctuation/letters run together |
+| **Precondition** | Active navigation on a route whose upcoming street name includes a slash, dash, or an all-caps abbreviation (e.g. a highway code) |
+| **Steps** | 1. Approach a turn onto such a street 2. Listen to the announcement |
+| **Expected Result** | Slashes are spoken as "slash", dashes as "dash", and all-caps road codes are spelled out letter-by-letter (e.g. "P L U S") rather than mispronounced as a single word |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+### TC-061 — No Repeated Announcement After Reroute (Same Turn)
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-061 |
+| **Feature** | Voice Guidance — Reroute Safety |
+| **Covers** | FR-87 |
+| **Description** | Verify that when a reroute occurs (off-route recalculation or accepting a faster route) while the upcoming real-world turn is unchanged, the just-spoken announcement for that turn is not interrupted and repeated |
+| **Precondition** | Active AR navigation with a voice announcement recently spoken for the current upcoming turn |
+| **Steps** | 1. Deliberately trigger a reroute (deviate >50 m from the route) shortly after an announcement has played, where the upcoming turn after rerouting is the same real-world turn 2. Listen for whether the announcement restarts |
+| **Expected Result** | The announcement is **not** interrupted mid-sentence and repeated. If the upcoming turn is genuinely different after the reroute, a new, distinct announcement is expected and acceptable |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+### TC-062 — New Announcement Interrupts Previous One
+
+| Field | Details |
+|---|---|
+| **Test ID** | TC-062 |
+| **Feature** | Voice Guidance |
+| **Covers** | FR-88 |
+| **Description** | Verify that a genuinely new announcement (different tier or different turn) cuts off a still-playing previous announcement rather than queuing behind it |
+| **Precondition** | Active AR navigation approaching two turns in quick succession, or use the debug distance buttons to trigger tiers in rapid succession |
+| **Steps** | 1. Trigger one announcement 2. Before it finishes speaking, trigger a second, genuinely different announcement (e.g. tap a different debug distance button) |
+| **Expected Result** | The first announcement stops immediately and the second one is heard in full — they do not overlap or queue |
+| **Actual Result** | *(fill during testing)* |
+| **Status** | ⏳ Not tested |
+
+---
+
+## 16. Test Results Summary Table
 
 Fill in this table after completing all tests.
 
@@ -1092,6 +1211,13 @@ Fill in this table after completing all tests.
 | TC-053 | Auto Brightness | Manual Slider Works When Auto Off | ⏳ | |
 | TC-054 | Auto Brightness | Graceful Fallback — No Sensor | ⏳ | |
 | TC-055 | Auto Brightness | Toggling Mid-Navigation | ⏳ | |
+| TC-056 | Voice Guidance | Far Tier Announcement (>1 km) | ⏳ | |
+| TC-057 | Voice Guidance | 200 m–1 km / 50–200 m Tier Announcements | ⏳ | |
+| TC-058 | Voice Guidance | Imminent Turn Announcement (<50 m) | ⏳ | |
+| TC-059 | Voice Guidance | Whole-Kilometre Distance Phrasing | ⏳ | |
+| TC-060 | Voice Guidance | Street Name Sanitized for Speech | ⏳ | |
+| TC-061 | Voice Guidance | No Repeated Announcement After Reroute | ⏳ | |
+| TC-062 | Voice Guidance | New Announcement Interrupts Previous | ⏳ | |
 
 ---
 
@@ -1103,8 +1229,8 @@ Fill in this table after completing all tests.
 | ❌ FAIL | — |
 | ⚠️ PARTIAL | 3 |
 | ⏭️ SKIP | — |
-| ⏳ Not tested | 19 |
-| **Total** | **55** |
+| ⏳ Not tested | 26 |
+| **Total** | **62** |
 
 ---
 
@@ -1115,6 +1241,6 @@ Fill in this table after completing all tests.
 
 ---
 
-*End of Test Plan Document — Version 1.4*
+*End of Test Plan Document — Version 1.5*
 
 *Prepared by: Liew Sau Yang | Sunway University | Bachelor of Software Engineering (Hons)*

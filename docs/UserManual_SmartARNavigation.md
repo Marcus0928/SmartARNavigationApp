@@ -11,7 +11,7 @@
 | **Supervisor** | Dr Javid Iqbal Thirupattur |
 | **Institution** | Sunway University — School of Computing and Artificial Intelligence |
 | **Programme** | Bachelor of Software Engineering (Hons) |
-| **App Version** | 1.5 |
+| **App Version** | 1.6 |
 | **Last Updated** | July 2026 |
 
 ---
@@ -399,6 +399,29 @@ The AR arrow automatically adapts to how bright or dark your surroundings are, s
 
 ---
 
+### 5.11 Voice Guidance
+
+The app speaks turn-by-turn directions out loud, so you don't need to look at the screen to know when a turn is coming up.
+
+**What you'll hear, and when:**
+
+| Distance to next turn | What's announced |
+|---|---|
+| First comes within 1 km | "In *N* kilometre(s), *turn direction* onto *street name*" |
+| Crosses below 200 m | "In *N* metres, *turn direction*" |
+| Crosses below 50 m | "In *N* metres, *turn direction*" |
+| Less than 50 m (turn now) | "*Turn direction* onto *street name*" — no distance, spoken as a direct command |
+
+Each of these is spoken only **once** per turn — the app won't repeat itself as you continue driving through the same distance range.
+
+> 💡 **Tip:** Distances are read the way you'd naturally say them — "1 kilometre" rather than "1.0 kilometres" — and street names with slashes, dashes, or highway codes (e.g. "PLUS") are spoken clearly rather than run together.
+
+**Rerouting and voice guidance:** If the app recalculates your route (see [5.8](#58-if-the-route-changes-rerouting)) while your upcoming turn hasn't actually changed, it won't interrupt itself and repeat the same announcement. If the reroute genuinely changes your next turn, you'll hear a new announcement for it instead.
+
+> ℹ️ There is currently no in-app toggle to mute voice guidance — it uses your device's media volume. Turn your phone's media volume down or use silent/vibrate mode if you'd prefer navigation without sound.
+
+---
+
 ## 6. Understanding the AR Overlays
 
 ### 6.1 Arrow Types
@@ -515,14 +538,14 @@ When you are within **1 km** of an upcoming turn (left, right, keep, U-turn, or 
 
 ## 9. Known Limitations
 
-These are known limitations of the current Version 1.5 of the app. They are documented for transparency and may be addressed in future versions.
+These are known limitations of the current Version 1.6 of the app. They are documented for transparency and may be addressed in future versions.
 
 | Limitation | Detail |
 |---|---|
 | **Android only** | The app does not support iOS devices |
 | **Driving speeds** | Optimised for normal urban driving speeds — performance at highway speeds may vary |
 | **No offline navigation** | An internet connection is required at all times |
-| **No voice guidance** | The app is visual only — no spoken turn instructions in this version |
+| **No voice guidance mute toggle** | Spoken turn announcements (see [5.11](#511-voice-guidance)) are always on — there's no in-app mute or volume control yet; use your device's media volume |
 | **No 2D map view** | Only AR camera view is available in this version |
 | **GPS accuracy** | Distance accuracy is ± 10 metres — dependent on device GPS quality |
 | **Tunnel / underpass** | AR and GPS performance degrades in tunnels or underpasses |
@@ -608,6 +631,6 @@ build/app/outputs/flutter-apk/app-release.apk
 
 ---
 
-*End of User Manual — Version 1.5*
+*End of User Manual — Version 1.6*
 
 *Prepared by: Liew Sau Yang | Sunway University | Bachelor of Software Engineering (Hons)*

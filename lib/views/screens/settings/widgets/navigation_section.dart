@@ -49,6 +49,13 @@ class NavigationSection extends StatelessWidget {
           onChanged: vm.setAvoidTolls,
           activeThumbColor: primaryColor,
         ),
+        SwitchListTile(
+          title: const Text('Mute Voice Guidance'),
+          subtitle: const Text('Silence spoken turn-by-turn announcements'),
+          value: vm.voiceMuted,
+          onChanged: vm.setVoiceMuted,
+          activeThumbColor: primaryColor,
+        ),
         const Divider(height: 1),
       ],
     );

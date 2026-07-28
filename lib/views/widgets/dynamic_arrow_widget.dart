@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:smart_ar_navigation/core/constants/app_colors.dart';
 import 'package:smart_ar_navigation/core/enums/navigation_approach_stage.dart';
 import 'package:smart_ar_navigation/core/enums/turn_direction.dart';
+import 'package:smart_ar_navigation/core/utils/distance_formatter.dart';
 
 class DynamicArrowWidget extends StatefulWidget {
   const DynamicArrowWidget({
@@ -17,6 +18,7 @@ class DynamicArrowWidget extends StatefulWidget {
     this.exitNumber,
     this.opacityOverride = 0.85,
     this.colorOverride,
+    this.distanceUnit = 'km',
   });
 
   final TurnDirection direction;
@@ -27,6 +29,7 @@ class DynamicArrowWidget extends StatefulWidget {
   final int? exitNumber;
   final double opacityOverride;
   final Color? colorOverride;
+  final String distanceUnit;
 
   @override
   State<DynamicArrowWidget> createState() => _DynamicArrowWidgetState();
@@ -207,9 +210,7 @@ class _DynamicArrowWidgetState extends State<DynamicArrowWidget>
 
   String _distanceLabel(double distance) {
     if (distance < 50) return 'Turn now!';
-    if (distance >= 1000) return 'In ${(distance / 1000).toStringAsFixed(1)}km';
-    final rounded = ((distance / 10).round() * 10).clamp(10, 990);
-    return 'In ${rounded}m';
+    return 'In ${formatDistance(distance, widget.distanceUnit)}';
   }
 }
 

@@ -37,6 +37,7 @@ Think of it as **Google Maps or Waze, but with AR directions on your camera view
 - 🏠 **Quick-Access Saved Places** — Home, Work, and Favourite one-tap buttons persist destinations via `shared_preferences`
 - 🔖 **Bookmarked Locations** — Bookmark any search result; a SQLite-backed list of saved places is accessible via the "Saved Places" button in the bottom sheet
 - 💡 **Auto Brightness (Ambient Light Sensor)** — The AR arrow's opacity and colour automatically adapt to real-world lighting (bright / normal / dark) via the device's ambient light sensor, with a 2-second debounce to prevent flicker; can be toggled off in Settings to use a manual opacity slider instead
+- 🔊 **Voice Guidance** — Spoken turn-by-turn announcements via `flutter_tts`, staged across four distance tiers (>1 km, 200 m–1 km, 50–200 m, <50 m); distances are read naturally (e.g. "1 kilometre" instead of "1.0 kilometres"), street names are sanitized for speech (slashes/dashes spelled out, all-caps road codes letter-spelled), and announcements survive a mid-route reroute without restarting or repeating
 
 ---
 
@@ -56,6 +57,7 @@ Think of it as **Google Maps or Waze, but with AR directions on your camera view
 | [shared_preferences](https://pub.dev/packages/shared_preferences) | Persistent key-value storage for Home / Work / Favourite places and settings |
 | [wakelock_plus](https://pub.dev/packages/wakelock_plus) | Keeps the screen on during AR navigation |
 | [light](https://pub.dev/packages/light) | Ambient light sensor stream — drives AR arrow auto-brightness |
+| [flutter_tts](https://pub.dev/packages/flutter_tts) | Text-to-speech engine for spoken turn-by-turn voice guidance |
 
 ---
 
@@ -209,6 +211,7 @@ dependencies:
   path: ^1.9.0                     # File path utilities (required by sqflite)
   wakelock_plus: ^1.2.8            # Keeps screen on during AR navigation
   light: ^5.0.0                    # Ambient light sensor for AR arrow auto-brightness
+  flutter_tts: ^4.2.5              # Text-to-speech engine for voice guidance
 ```
 
 ---
@@ -268,7 +271,7 @@ All project documentation is located in the `/docs` folder:
 - [x] GPS accuracy improvement — passed-turn threshold raised from 10 m to 25 m for Malaysian urban GPS conditions
 - [x] Roundabout exit number fallback — parses ordinal from `html_instructions` when structured `exit` field is absent
 - [x] Auto Brightness — ambient light sensor (`light` package) adjusts AR arrow opacity/colour (bright/normal/dark), 2 s debounce, toggle + fallback manual opacity slider in Settings
-- [ ] Voice guidance
+- [x] Voice guidance — spoken turn-by-turn announcements via `flutter_tts`, staged across 4 distance tiers with hysteresis-style dedup (`ARViewModel._checkVoiceAnnouncement()`); natural distance phrasing, speech-safe street name sanitization, reroute-safe (announcements are not repeated when a reroute swaps in new turn objects for the same real-world turn)
 - [ ] Manual testing & bug fixes
 - [ ] Final APK build & submission
 
@@ -278,7 +281,7 @@ All project documentation is located in the `/docs` folder:
 
 - Android only — no iOS support
 - Requires active internet connection
-- No voice guidance in this version
+- Voice guidance has no in-app mute/volume control yet — uses the device's media volume
 - AR performance may vary in tunnels or low-light conditions
 
 ---

@@ -12,6 +12,7 @@ import 'package:smart_ar_navigation/repositories/route_repository.dart';
 import 'package:smart_ar_navigation/services/location_service.dart';
 import 'package:smart_ar_navigation/viewmodels/ar_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/navigation_viewmodel.dart';
+import 'package:smart_ar_navigation/viewmodels/settings_viewmodel.dart';
 
 class MapViewModel extends ChangeNotifier {
   final LocationService _locationService;
@@ -19,6 +20,7 @@ class MapViewModel extends ChangeNotifier {
   final RouteRepository _routeRepository;
   final NavigationViewModel _navigationViewModel;
   final ARViewModel _arViewModel;
+  final SettingsViewModel _settingsViewModel;
 
   MapViewModel({
     required LocationService locationService,
@@ -26,11 +28,13 @@ class MapViewModel extends ChangeNotifier {
     required RouteRepository routeRepository,
     required NavigationViewModel navigationViewModel,
     required ARViewModel arViewModel,
+    required SettingsViewModel settingsViewModel,
   })  : _locationService = locationService,
         _placesRepository = placesRepository,
         _routeRepository = routeRepository,
         _navigationViewModel = navigationViewModel,
-        _arViewModel = arViewModel;
+        _arViewModel = arViewModel,
+        _settingsViewModel = settingsViewModel;
 
   LatLng? _currentLocation;
   double? _currentHeading;
@@ -54,6 +58,18 @@ class MapViewModel extends ChangeNotifier {
   Timer? _navRefreshTimer;
   int _lastClosestSegmentIndex = 0;
   bool _isAppInForeground = true;
+
+  // Bug 37: _isOffRoute() used to trigger recalculateRoute() off a single
+  // GPS tick reading >50m from the route polyline — no smoothing, no
+  // confirmation. A single noisy fix (multipath, urban canyon, bridge/
+  // underpass) was enough to discard a perfectly good route. Mirrors the
+  // sustained-confirmation pattern already proven for the missed-turn
+  // heuristic in ARViewModel (_missedTurnConfirmationTicks): require the
+  // off-route reading to hold for several consecutive ticks before acting
+  // on it. Reset to 0 the instant any tick reads back within the polyline,
+  // so this only ever catches a sustained deviation, not noise.
+  int _offRouteStreak = 0;
+  static const int _offRouteConfirmationTicks = 3;
 
   LatLng? get currentLocation => _currentLocation;
   double? get currentHeading => _currentHeading;
@@ -100,28 +116,40 @@ class MapViewModel extends ChangeNotifier {
         return;
       }
 
-      // Off-route check only when actively navigating — skip during rerouting
-      // to avoid triggering a second reroute while the first is in flight.
+      // Off-route re-trigger check only when actively navigating — skip
+      // during rerouting to avoid triggering a second reroute while the
+      // first is in flight. The overlay/polyline/arrival/traffic updates
+      // below stay outside this gate so they keep running off the
+      // last-known route (stale-but-updating) while a reroute is in flight,
+      // instead of freezing the on-screen distance entirely.
       if (status == NavigationStatus.navigating) {
         final route = _navigationViewModel.currentRoute;
         if (route != null && _isOffRoute(location, route)) {
-          final now = DateTime.now();
-          final cooldownElapsed = _lastRerouteTime == null ||
-              now.difference(_lastRerouteTime!) >= const Duration(seconds: 30);
-          if (cooldownElapsed) {
-            _lastRerouteTime = now;
-            _lastClosestSegmentIndex = 0;
-            _navigationViewModel.recalculateRoute(from: location);
+          _offRouteStreak++;
+          if (_offRouteStreak >= _offRouteConfirmationTicks) {
+            final now = DateTime.now();
+            final cooldownElapsed = _lastRerouteTime == null ||
+                now.difference(_lastRerouteTime!) >= const Duration(seconds: 30);
+            if (cooldownElapsed) {
+              _lastRerouteTime = now;
+              _lastClosestSegmentIndex = 0;
+              _offRouteStreak = 0;
+              _navigationViewModel.recalculateRoute(from: location);
+            }
           }
+        } else {
+          _offRouteStreak = 0;
         }
       }
 
-      if (_navigationViewModel.navigationStatus == NavigationStatus.rerouting) {
-        return;
-      }
-      _arViewModel.updateAROverlay(location);
+      _arViewModel.updateAROverlay(
+        location,
+        heading: _currentHeading,
+        speed: _currentSpeed,
+      );
       _navigationViewModel.updateRemainingPolyline(location);
       _navigationViewModel.checkIfArrived(location);
+      _navigationViewModel.updateTrafficSegmentProgress(location);
     });
 
     // Heartbeat: force-refresh the AR overlay every 2 s so the screen stays
@@ -132,7 +160,11 @@ class MapViewModel extends ChangeNotifier {
       final loc = _currentLocation;
       if (loc != null &&
           _navigationViewModel.navigationStatus == NavigationStatus.navigating) {
-        _arViewModel.updateAROverlay(loc);
+        _arViewModel.updateAROverlay(
+          loc,
+          heading: _currentHeading,
+          speed: _currentSpeed,
+        );
       }
     });
   }
@@ -144,6 +176,7 @@ class MapViewModel extends ChangeNotifier {
     _navRefreshTimer = null;
     _trackingStarted = false;
     _lastClosestSegmentIndex = 0;
+    _offRouteStreak = 0;
     _locationService.stopLocationStream();
     _currentSpeed = null;
     notifyListeners();
@@ -221,6 +254,7 @@ class MapViewModel extends ChangeNotifier {
       final routes = await _routeRepository.getRoute(
         origin: origin,
         destination: _selectedDestination!.coordinates,
+        avoidTolls: _settingsViewModel.avoidTolls,
       );
       if (generation != _fetchGeneration) return;
 
@@ -255,6 +289,7 @@ class MapViewModel extends ChangeNotifier {
         final retryRoutes = await _routeRepository.getRoute(
           origin: retryOrigin,
           destination: _selectedDestination!.coordinates,
+          avoidTolls: _settingsViewModel.avoidTolls,
         );
         if (generation != _fetchGeneration) return;
         _previewRoutes = retryRoutes;
@@ -318,6 +353,13 @@ class MapViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Beyond this, the windowed search result is untrustworthy — the user's
+  // real position has drifted outside the search window entirely (e.g. after
+  // a GPS gap) rather than just being off-route, so the index needs
+  // re-anchoring via a full scan instead of being left to lag behind
+  // indefinitely.
+  static const double _segmentSearchFallbackThreshold = 300.0;
+
   bool _isOffRoute(LatLng location, RouteModel route) {
     final points = route.polylinePoints;
     if (points.length < 2) return false;
@@ -340,6 +382,20 @@ class MapViewModel extends ChangeNotifier {
       if (d < closestDist) {
         closestDist = d;
         closestIdx = i;
+      }
+    }
+
+    if (closestDist > _segmentSearchFallbackThreshold) {
+      for (int i = 0; i < points.length - 1; i++) {
+        final d = _distanceToSegment(
+          location,
+          LatLng(points[i].latitude, points[i].longitude),
+          LatLng(points[i + 1].latitude, points[i + 1].longitude),
+        );
+        if (d < closestDist) {
+          closestDist = d;
+          closestIdx = i;
+        }
       }
     }
 

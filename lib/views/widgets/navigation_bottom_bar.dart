@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:smart_ar_navigation/core/utils/distance_formatter.dart';
 import 'package:smart_ar_navigation/viewmodels/map_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/navigation_viewmodel.dart';
+import 'package:smart_ar_navigation/viewmodels/settings_viewmodel.dart';
 import 'package:smart_ar_navigation/views/screens/ar_navigation_screen.dart';
 
 class NavigationBottomBar extends StatefulWidget {
@@ -18,12 +20,13 @@ class _NavigationBottomBarState extends State<NavigationBottomBar> {
   @override
   Widget build(BuildContext context) {
     final navVM = context.watch<NavigationViewModel>();
+    final settingsVM = context.watch<SettingsViewModel>();
 
     final route = navVM.currentRoute;
     final etaMinutes =
         route != null ? (navVM.remainingDuration / 60).ceil() : 0;
-    final distanceKm = route != null
-        ? (navVM.remainingDistance / 1000).toStringAsFixed(1)
+    final distanceStr = route != null
+        ? formatDistance(navVM.remainingDistance, settingsVM.distanceUnit)
         : '--';
 
     final arrival = DateTime.now().add(Duration(minutes: etaMinutes));
@@ -44,7 +47,7 @@ class _NavigationBottomBarState extends State<NavigationBottomBar> {
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
           child: Row(
             children: [
               // ── Left: Stop button (✕, no text) ───────────────────
@@ -81,25 +84,32 @@ class _NavigationBottomBarState extends State<NavigationBottomBar> {
               ),
 
               // ── Centre: ETA info ──────────────────────────────────
+              // Distance remaining stays visible regardless of showETA —
+              // that setting only governs the arrival-time/minutes display,
+              // a separate concern from remaining distance.
               Expanded(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      '$etaMinutes min',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        height: 1.0,
+                    if (settingsVM.showETA) ...[
+                      Text(
+                        '$etaMinutes min',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 32,
+                          fontWeight: FontWeight.w800,
+                          height: 1.0,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
+                      const SizedBox(height: 6),
+                    ],
                     Text(
-                      '$arrivalStr  ·  $distanceKm km',
+                      settingsVM.showETA
+                          ? '$arrivalStr  ·  $distanceStr'
+                          : distanceStr,
                       style: const TextStyle(
                         color: Colors.white60,
-                        fontSize: 13,
+                        fontSize: 18,
                         fontWeight: FontWeight.w500,
                       ),
                     ),

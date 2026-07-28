@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import 'package:smart_ar_navigation/core/constants/app_colors.dart';
+import 'package:smart_ar_navigation/core/utils/distance_formatter.dart';
 import 'package:smart_ar_navigation/viewmodels/plan_drive_viewmodel.dart';
+import 'package:smart_ar_navigation/viewmodels/settings_viewmodel.dart';
 
 class RouteAlternativesStrip extends StatelessWidget {
   const RouteAlternativesStrip({
@@ -13,13 +16,9 @@ class RouteAlternativesStrip extends StatelessWidget {
   final PlanDriveViewModel vm;
   final ValueChanged<int> onSelectRoute;
 
-  String _formatDistance(double metres) {
-    if (metres >= 1000) return '${(metres / 1000).toStringAsFixed(1)} km';
-    return '${metres.toInt()} m';
-  }
-
   @override
   Widget build(BuildContext context) {
+    final distanceUnit = context.watch<SettingsViewModel>().distanceUnit;
     final fastestIndex = vm.routes
         .asMap()
         .entries
@@ -123,7 +122,7 @@ class RouteAlternativesStrip extends StatelessWidget {
                   Row(
                     children: [
                       Text(
-                        _formatDistance(route.totalDistance),
+                        formatDistance(route.totalDistance, distanceUnit),
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w500,

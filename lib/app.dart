@@ -67,14 +67,22 @@ class SmartARNavigationApp extends StatelessWidget {
           create: (_) => ProfileViewModel(),
         ),
 
-        // ARViewModel only needs ARService
+        // SettingsViewModel — no external dependencies, persists via shared_preferences.
+        // Registered before NavigationViewModel/MapViewModel so they can read it
+        // (avoidTolls) at construction time.
+        ChangeNotifierProvider<SettingsViewModel>(
+          create: (_) => SettingsViewModel(),
+        ),
+
+        // ARViewModel needs ARService + SettingsViewModel (voice mute state)
         ChangeNotifierProvider<ARViewModel>(
           create: (ctx) => ARViewModel(
             arService: ctx.read<ARService>(),
+            settingsViewModel: ctx.read<SettingsViewModel>(),
           ),
         ),
 
-        // NavigationViewModel needs ARViewModel + services + repository + ProfileViewModel
+        // NavigationViewModel needs ARViewModel + services + repository + ProfileViewModel + SettingsViewModel
         ChangeNotifierProvider<NavigationViewModel>(
           create: (ctx) => NavigationViewModel(
             routeRepository: ctx.read<RouteRepository>(),
@@ -82,6 +90,7 @@ class SmartARNavigationApp extends StatelessWidget {
             arService: ctx.read<ARService>(),
             arViewModel: ctx.read<ARViewModel>(),
             profileViewModel: ctx.read<ProfileViewModel>(),
+            settingsViewModel: ctx.read<SettingsViewModel>(),
           ),
         ),
 
@@ -93,12 +102,8 @@ class SmartARNavigationApp extends StatelessWidget {
             routeRepository: ctx.read<RouteRepository>(),
             navigationViewModel: ctx.read<NavigationViewModel>(),
             arViewModel: ctx.read<ARViewModel>(),
+            settingsViewModel: ctx.read<SettingsViewModel>(),
           ),
-        ),
-
-        // SettingsViewModel — no external dependencies, persists via shared_preferences
-        ChangeNotifierProvider<SettingsViewModel>(
-          create: (_) => SettingsViewModel(),
         ),
 
         // SavedPlacesViewModel — persists Home / Work / Favourite via shared_preferences

@@ -29,7 +29,9 @@ List<RouteModel> parseRouteResponse(Map<String, dynamic> json) {
     final List<TurnInstruction> turns = [];
     final List<LatLng> waypoints = [];
 
-    for (final step in leg['steps']) {
+    final steps = leg['steps'] as List<dynamic>;
+    for (var i = 0; i < steps.length; i++) {
+      final step = steps[i] as Map<String, dynamic>;
       final startLoc = step['start_location'];
       final position = LatLng(
         (startLoc['lat'] as num).toDouble(),
@@ -40,7 +42,12 @@ List<RouteModel> parseRouteResponse(Map<String, dynamic> json) {
       final rawManeuver = step['maneuver'] as String? ?? 'straight';
       final direction = _parseManeuver(rawManeuver);
       final stepDistance = (step['distance']['value'] as num).toDouble();
-      if (stepDistance >= 15.0) {
+      // The last step is never filtered, even when short — Google often
+      // emits a short final "turn onto X; destination is on the Y" step
+      // when the destination sits close to the last turn, and dropping it
+      // would leave the final turn without an arrow or voice announcement.
+      final isLastStep = i == steps.length - 1;
+      if (stepDistance >= 15.0 || isLastStep) {
         turns.add(TurnInstruction(
           direction: direction,
           distanceFromPrev: stepDistance,
@@ -106,24 +113,89 @@ TurnDirection _parseManeuver(String maneuver) {
   return map[maneuver] ?? TurnDirection.forward;
 }
 
-// Strips HTML then extracts the road name that follows "onto", "on", or "toward".
-// Only inspects the main instruction text (before any supplementary <div> blocks
-// that Google Maps appends, e.g. "Partial result", "Destination on the right").
-// Returns null when no keyword is found. Never returns an empty string.
-// Truncates to 25 characters with "..." if the name is longer.
+// Extracts the road name from the <b>...</b> segment Google's Directions API
+// puts right after "on"/"onto"/"stay on" — that bold tag is how the API
+// visually distinguishes the actual road from any destination/signage list
+// that follows (e.g. ", follow signs for Klang/Shah Alam" or "(signs for
+// Klang)"), so matching against the raw HTML (before any tag-stripping)
+// lets the capture stop cleanly at the closing </b> instead of running into
+// that trailing text. Only inspects the main instruction text (before any
+// supplementary <div> blocks that Google Maps appends, e.g. "Partial
+// result", "Destination on the right"). Never returns an empty string.
+//
+// Instructions with no named road to leave (the first step of a route,
+// or a same-road bearing change like "Slight left"/"Slight right") have no
+// "on"/"onto" at all — Google instead writes "toward <b>Road</b>", e.g.
+// "Head south toward <b>Jalan Tun Ismail</b>". When the primary match
+// fails, _extractTowardFallback() below handles that case, but only when
+// the toward-introduced bold text is a single road (optionally with a
+// same-road alt-name joined by "/<wbr/>", e.g. "<b>Lebuhraya Damansara -
+// Puchong</b>/<wbr/><b>E11</b>") — not a multi-item destination/signage
+// list (e.g. "toward <b>E1</b>/<wbr/><b>Ipoh</b>/<wbr/><b>Klang</b>/<wbr/>
+// <b>E2</b>/<wbr/><b>KLIA</b>"), which must keep returning null.
 String? _extractStreetName(String html) {
   // The main instruction text always precedes the first supplementary <div>.
   final mainHtml = html.split(RegExp(r'<div')).first;
-  final text = _stripHtml(mainHtml).trim();
   final match = RegExp(
-    r'(?:onto|on|toward)\s+(.+)',
+    r'\bon(?:to)?\b\s*<b>(.*?)</b>',
     caseSensitive: false,
-  ).firstMatch(text);
+  ).firstMatch(mainHtml);
+  if (match != null) {
+    final name = _stripHtml(match.group(1)!).trim();
+    if (name.isNotEmpty) return name;
+  }
+  return _extractTowardFallback(mainHtml);
+}
+
+// Fallback for instructions with no "on"/"onto" (see _extractStreetName).
+// Matches "toward <b>Road</b>" plus up to one immediately-chained
+// "/<wbr/><b>...</b>" segment, plus (only to detect and reject) any further
+// chained segments beyond that.
+//
+// A 3rd+ chained segment (e.g. "E1/Ipoh/Klang/E2/KLIA") always means a
+// destination/signage list, not a road, and is rejected.
+//
+// A single chained segment is ambiguous — Google uses the exact same
+// "Road</b>/<wbr/><b>X</b>" shape both for one road's route-code alt-name
+// (e.g. "Jln Sungai Pusu</b>/<wbr/><b>B38", "Jalan Tambun</b>/<wbr/><b>A13")
+// and for a genuine 2-item destination list (e.g. "Ipoh</b>/<wbr/><b>Klang",
+// "Klang</b>/<wbr/><b>Shah Alam"). Tested against 926 real Directions API
+// steps, blanket-accepting every 2-segment case produced 12 false-positive
+// destination lists for only 3 true-positive route-code pairs — so it's
+// only accepted when the second segment itself looks like a route code
+// (letters+digits, e.g. "A13"/"B38"/"E1"/"AH141", or "Route 2") via
+// _looksLikeRouteCode(); a plain place name (e.g. "Klang") is rejected.
+String? _extractTowardFallback(String mainHtml) {
+  final match = RegExp(
+    r'\btoward\b\s*<b>(.*?)</b>((?:/<wbr/><b>.*?</b>)*)',
+    caseSensitive: false,
+  ).firstMatch(mainHtml);
   if (match == null) return null;
-  final name = match.group(1)!.trim();
+
+  final chainedSegments = RegExp(r'<b>(.*?)</b>')
+      .allMatches(match.group(2)!)
+      .map((m) => m.group(1)!)
+      .toList();
+  if (chainedSegments.length >= 2) return null; // 3+ total segments — a list.
+  if (chainedSegments.length == 1 && !_looksLikeRouteCode(chainedSegments.first)) {
+    return null; // 2 total segments, 2nd isn't a route code — a 2-item list.
+  }
+
+  final name = _stripHtml(match.group(1)!).trim();
   if (name.isEmpty) return null;
-  if (name.length <= 25) return name;
-  return '${name.substring(0, 25)}...';
+  return name;
+}
+
+// Malaysian road route codes are short and alphanumeric (e.g. "A13", "B38",
+// "E1", "AH141") or the word "Route" followed by a number (e.g. "Route 2").
+// Distinguishes a road's route-code alt-name from a second destination in a
+// "toward <b>Road</b>/<wbr/><b>X</b>" chain — see _extractTowardFallback().
+bool _looksLikeRouteCode(String html) {
+  final text = _stripHtml(html).trim();
+  return RegExp(
+    r'^(?:Route\s*\d+|[A-Za-z]{1,3}\d+[A-Za-z]?)$',
+    caseSensitive: false,
+  ).hasMatch(text);
 }
 
 // Reads the roundabout exit number from the step JSON.

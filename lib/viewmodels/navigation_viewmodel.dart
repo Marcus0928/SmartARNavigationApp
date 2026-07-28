@@ -7,12 +7,14 @@ import 'package:smart_ar_navigation/core/enums/navigation_status.dart';
 import 'package:smart_ar_navigation/core/utils/location_utils.dart';
 import 'package:smart_ar_navigation/models/place_model.dart';
 import 'package:smart_ar_navigation/models/route_model.dart';
+import 'package:smart_ar_navigation/models/traffic_segment_info.dart';
 import 'package:smart_ar_navigation/repositories/route_repository.dart';
 import 'package:smart_ar_navigation/services/ar_service.dart';
 import 'package:smart_ar_navigation/services/location_service.dart';
 import 'package:smart_ar_navigation/viewmodels/ar_viewmodel.dart';
 import 'package:smart_ar_navigation/services/navigation_foreground_service.dart';
 import 'package:smart_ar_navigation/viewmodels/profile_viewmodel.dart';
+import 'package:smart_ar_navigation/viewmodels/settings_viewmodel.dart';
 
 class NavigationViewModel extends ChangeNotifier {
   final RouteRepository _routeRepository;
@@ -20,6 +22,7 @@ class NavigationViewModel extends ChangeNotifier {
   final ARService _arService;
   final ARViewModel _arViewModel;
   final ProfileViewModel _profileViewModel;
+  final SettingsViewModel _settingsViewModel;
 
   static NavigationViewModel? _instance;
   static NavigationViewModel? get instance => _instance;
@@ -30,11 +33,13 @@ class NavigationViewModel extends ChangeNotifier {
     required ARService arService,
     required ARViewModel arViewModel,
     required ProfileViewModel profileViewModel,
+    required SettingsViewModel settingsViewModel,
   })  : _routeRepository = routeRepository,
         _locationService = locationService,
         _arService = arService,
         _arViewModel = arViewModel,
-        _profileViewModel = profileViewModel {
+        _profileViewModel = profileViewModel,
+        _settingsViewModel = settingsViewModel {
     _instance = this;
   }
 
@@ -56,6 +61,9 @@ class NavigationViewModel extends ChangeNotifier {
   int? _dismissedRouteDuration;
   bool _isStartingNavigation = false;
   int _lastRemainingPolylineIndex = 0;
+  TrafficSegmentInfo? _trafficSegmentInfo;
+  Timer? _trafficTimer;
+  bool _hasEnteredTrafficSegment = false;
 
   PlaceModel? get currentDestination => _currentDestination;
   RouteModel? get currentRoute => _currentRoute;
@@ -91,6 +99,8 @@ class NavigationViewModel extends ChangeNotifier {
   RouteModel? get suggestedFasterRoute => _suggestedFasterRoute;
   bool get showFasterRouteMap => _showFasterRouteMap;
   bool get isStartingNavigation => _isStartingNavigation;
+  TrafficSegmentInfo? get trafficSegmentInfo => _trafficSegmentInfo;
+  bool get hasEnteredTrafficSegment => _hasEnteredTrafficSegment;
 
   Future<void> startNavigation(
     PlaceModel destination, {
@@ -116,6 +126,7 @@ class NavigationViewModel extends ChangeNotifier {
         final routes = await _routeRepository.getRoute(
           origin: origin,
           destination: destination.coordinates,
+          avoidTolls: _settingsViewModel.avoidTolls,
           heading: _locationService.currentHeading,
         );
         _currentRoute = routes.first;
@@ -123,28 +134,39 @@ class NavigationViewModel extends ChangeNotifier {
       }
       _arViewModel.setDestination(_currentDestination?.coordinates);
       _remainingPolyline = List.from(_currentRoute!.polylinePoints);
-      await Future.wait<void>([
-        _arViewModel.initializeOverlay(
-          _currentRoute!,
-          heading: _locationService.currentHeading,
-        ),
-        NavigationForegroundService.startService(
-          destination: _currentDestination?.name ?? '',
-          eta: '${(_currentRoute!.estimatedDuration / 60).ceil()} min',
-        ).then((ok) {
-          if (!ok) {
-            debugPrint(
-              'Warning: foreground service did not start — '
-              'app may be killed in background',
-            );
-          }
-        }),
-      ]);
+
+      // Fire-and-forget: nothing on the AR screen or in ARViewModel depends
+      // on the foreground service having finished starting, so it shouldn't
+      // block the screen transition — that transition is what gates
+      // ARCore's native session init, the actual expensive step.
+      NavigationForegroundService.startService(
+        destination: _currentDestination?.name ?? '',
+        eta: '${(_currentRoute!.estimatedDuration / 60).ceil()} min',
+      ).then((ok) {
+        if (!ok) {
+          debugPrint(
+            'Warning: foreground service did not start — '
+            'app may be killed in background',
+          );
+        }
+      }).catchError((e) {
+        debugPrint('Foreground service start threw: $e');
+      });
+
+      await _arViewModel.initializeOverlay(
+        _currentRoute!,
+        heading: _locationService.currentHeading,
+      );
       _navigationStatus = NavigationStatus.navigating;
       _fasterRouteTimer?.cancel();
       _fasterRouteTimer = Timer.periodic(
         const Duration(minutes: 5),
         (_) => _checkForFasterRoute(),
+      );
+      _trafficTimer?.cancel();
+      _trafficTimer = Timer.periodic(
+        const Duration(minutes: 3),
+        (_) => _checkTrafficSegment(),
       );
     } catch (e) {
       _errorMessage = e.toString();
@@ -155,13 +177,23 @@ class NavigationViewModel extends ChangeNotifier {
     }
   }
 
+  // Does not touch _isStartingNavigation — that guard is owned exclusively
+  // by startNavigation(), including when this runs as its internal
+  // "stop the old session first" sub-step. Resetting it here would
+  // re-enable the Start/Go button mid-switch and let a second tap start a
+  // second, concurrent startNavigation() call — which creates a second
+  // ArView/ARCore Session and fatally crashes when both sessions' frame
+  // loops contend for the camera.
   Future<void> stopNavigation({bool stopService = true}) async {
     _fasterRouteTimer?.cancel();
     _fasterRouteTimer = null;
-    _isStartingNavigation = false;
     _suggestedFasterRoute = null;
     _showFasterRouteMap = false;
     _dismissedRouteDuration = null;
+    _trafficTimer?.cancel();
+    _trafficTimer = null;
+    _trafficSegmentInfo = null;
+    _hasEnteredTrafficSegment = false;
     _arService.clearOverlays();
     _arViewModel.resetOverlay();
     _currentRoute = null;
@@ -188,6 +220,7 @@ class NavigationViewModel extends ChangeNotifier {
       final routes = await _routeRepository.getRoute(
         origin: from,
         destination: _currentDestination!.coordinates,
+        avoidTolls: _settingsViewModel.avoidTolls,
         heading: _locationService.currentHeading,
       );
       _currentRoute = routes.first;
@@ -205,6 +238,13 @@ class NavigationViewModel extends ChangeNotifier {
     }
     notifyListeners();
   }
+
+  // Beyond this, the windowed search result is untrustworthy — the user's
+  // real position has drifted outside the search window entirely (e.g. after
+  // a GPS gap or an app-backgrounded pause) rather than just jittering, so
+  // the index needs re-anchoring via a full scan instead of being left to
+  // lag behind indefinitely.
+  static const double _polylineSearchFallbackThreshold = 300.0;
 
   void updateRemainingPolyline(LatLng location) {
     if (_currentRoute == null) return;
@@ -229,6 +269,19 @@ class NavigationViewModel extends ChangeNotifier {
       if (d < closestDist) {
         closestDist = d;
         closestIndex = i;
+      }
+    }
+
+    if (closestDist > _polylineSearchFallbackThreshold) {
+      for (int i = 0; i < points.length; i++) {
+        final d = calculateDistance(
+          location,
+          LatLng(points[i].latitude, points[i].longitude),
+        );
+        if (d < closestDist) {
+          closestDist = d;
+          closestIndex = i;
+        }
       }
     }
 
@@ -275,6 +328,7 @@ class NavigationViewModel extends ChangeNotifier {
       final routes = await _routeRepository.getRoute(
         origin: origin,
         destination: _currentDestination!.coordinates,
+        avoidTolls: _settingsViewModel.avoidTolls,
         heading: _locationService.currentHeading,
       );
       if (routes.isEmpty) return;
@@ -298,6 +352,68 @@ class NavigationViewModel extends ChangeNotifier {
     } catch (_) {
       // Best-effort — silently ignore network/API errors
     }
+  }
+
+  Future<void> _checkTrafficSegment() async {
+    if (_currentDestination == null ||
+        _navigationStatus != NavigationStatus.navigating ||
+        _currentRoute == null) {
+      return;
+    }
+
+    try {
+      final origin = await _locationService.getLastKnownLocation();
+      if (origin == null) return;
+      final info = await _routeRepository.getTrafficSeverityAhead(
+        currentLocation: origin,
+        remainingPolyline: _remainingPolyline,
+      );
+      _trafficSegmentInfo = info;
+      _hasEnteredTrafficSegment = false;
+      notifyListeners();
+    } catch (_) {
+      // Best-effort — silently ignore network/API errors
+    }
+  }
+
+  /// Classifies [location] against the active [_trafficSegmentInfo] on every
+  /// GPS tick — has the vehicle entered the checked segment, or passed it
+  /// entirely — using the triangle-inequality relationship between the
+  /// three distances (start→location, location→end, start→end): a location
+  /// can only be farther from one endpoint than the full segment span if it
+  /// lies outside that endpoint, so this avoids needing a full vector
+  /// projection for a short (~2 km) lookahead segment.
+  void updateTrafficSegmentProgress(LatLng location) {
+    final info = _trafficSegmentInfo;
+    if (info == null) return;
+
+    final totalDistance =
+        calculateDistance(info.segmentStartPosition, info.segmentEndPosition);
+    if (totalDistance <= 0) {
+      _clearTrafficSegment();
+      return;
+    }
+
+    final distanceFromStart =
+        calculateDistance(info.segmentStartPosition, location);
+    final distanceFromEnd = calculateDistance(location, info.segmentEndPosition);
+
+    if (distanceFromStart > totalDistance) {
+      // Passed the end of the segment.
+      _clearTrafficSegment();
+      return;
+    }
+
+    // Hasn't reached the start of the segment yet if farther from the end
+    // than the segment's own length — otherwise, inside it.
+    _hasEnteredTrafficSegment = distanceFromEnd <= totalDistance;
+    notifyListeners();
+  }
+
+  void _clearTrafficSegment() {
+    _trafficSegmentInfo = null;
+    _hasEnteredTrafficSegment = false;
+    notifyListeners();
   }
 
   void checkIfArrived(LatLng currentLocation) {

@@ -1,0 +1,4 @@
+enum TrafficSeverity {
+  moderate,
+  heavy,
+}

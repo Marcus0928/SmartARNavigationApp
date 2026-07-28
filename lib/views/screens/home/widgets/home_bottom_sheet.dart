@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import 'package:smart_ar_navigation/core/utils/distance_formatter.dart';
 import 'package:smart_ar_navigation/core/utils/location_utils.dart';
 import 'package:smart_ar_navigation/viewmodels/map_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/recent_places_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/saved_locations_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/saved_places_viewmodel.dart';
+import 'package:smart_ar_navigation/viewmodels/settings_viewmodel.dart';
 import 'package:smart_ar_navigation/views/screens/home/save_place_page.dart';
 import 'package:smart_ar_navigation/views/screens/home/widgets/place_options_sheet.dart';
 import 'package:smart_ar_navigation/views/screens/home/widgets/quick_actions_section.dart';
@@ -36,13 +39,6 @@ class HomeBottomSheet extends StatelessWidget {
   final VoidCallback onSearchFocused;
   final VoidCallback onStartNavigation;
   final VoidCallback onCancelRoute;
-
-  // ── Utilities ─────────────────────────────────────────────────────────────
-
-  String _formatDistance(double metres) {
-    if (metres >= 1000) return '${(metres / 1000).toStringAsFixed(1)} km';
-    return '${metres.round()} m';
-  }
 
   // ── Modal sheets ──────────────────────────────────────────────────────────
 
@@ -170,14 +166,16 @@ class HomeBottomSheet extends StatelessWidget {
   }
 
   Widget _buildSearchResults(BuildContext context) {
+    final distanceUnit = context.watch<SettingsViewModel>().distanceUnit;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         const SizedBox(height: 8),
         ...mapVM.searchResults.map((place) {
           final distStr = mapVM.currentLocation != null
-              ? _formatDistance(
-                  calculateDistance(mapVM.currentLocation!, place.coordinates))
+              ? formatDistance(
+                  calculateDistance(mapVM.currentLocation!, place.coordinates),
+                  distanceUnit)
               : null;
           return SearchResultItem(
             place: place,
