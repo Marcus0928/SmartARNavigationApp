@@ -11,6 +11,7 @@ import 'package:smart_ar_navigation/models/route_model.dart';
 import 'package:smart_ar_navigation/models/turn_instruction.dart';
 import 'package:smart_ar_navigation/services/ar_service.dart';
 import 'package:smart_ar_navigation/services/voice_service.dart';
+import 'package:smart_ar_navigation/viewmodels/settings_viewmodel.dart';
 
 enum VoiceAnnouncement {
   none,
@@ -25,13 +26,44 @@ enum VoiceAnnouncement {
 class ARViewModel extends ChangeNotifier {
   final ARService _arService;
   final VoiceService _voiceService;
+  final SettingsViewModel _settingsViewModel;
 
-  ARViewModel({required ARService arService, VoiceService? voiceService})
-      : _arService = arService,
+  // Tracks the mute state as of the last SettingsViewModel change, so the
+  // listener below can tell "just muted" (stop in-progress speech) apart
+  // from any other settings change or from unmuting.
+  bool _wasVoiceMuted = false;
+
+  ARViewModel({
+    required ARService arService,
+    required SettingsViewModel settingsViewModel,
+    VoiceService? voiceService,
+  })  : _arService = arService,
+        _settingsViewModel = settingsViewModel,
         _voiceService = voiceService ?? VoiceService() {
     // Fire-and-forget: ARViewModel is constructed once at app startup, well
     // before a navigation session can start and any speak() call could fire.
     _voiceService.initialize();
+    _wasVoiceMuted = _settingsViewModel.voiceMuted;
+    // SettingsViewModel is the single source of truth for mute state (AR
+    // screen button and Settings page toggle both write through it) — this
+    // listens for the mute transition specifically so muting from either
+    // place stops any in-progress speech immediately, rather than letting
+    // the current announcement finish.
+    _settingsViewModel.addListener(_onSettingsChanged);
+  }
+
+  void _onSettingsChanged() {
+    final muted = _settingsViewModel.voiceMuted;
+    if (muted && !_wasVoiceMuted) {
+      _voiceService.stop();
+    }
+    _wasVoiceMuted = muted;
+  }
+
+  @override
+  void dispose() {
+    _settingsViewModel.removeListener(_onSettingsChanged);
+    super.dispose();
   }
 
   TurnDirection? _nextTurnDirection;
@@ -55,7 +87,6 @@ class ARViewModel extends ChangeNotifier {
   double? _previousDistanceToNextTurn;
   TurnDirection? _upcomingTurnDirection;
   String? _upcomingTurnStreet;
-  bool voiceGuidanceEnabled = true;
 
   // Bug 34: whether the CURRENT head turn's displayed distance has already
   // reached _distanceFloorMetres at least once. Reset whenever a new turn
@@ -165,11 +196,6 @@ class ARViewModel extends ChangeNotifier {
   static const double _rerouteRemainingDistancePlausibilityMarginMetres =
       3000.0;
 
-  // TEMPORARY - remove after voice guidance testing is complete
-  bool _debugOverrideActive = false;
-  // TEMPORARY - remove after voice guidance testing is complete
-  bool get debugOverrideActive => _debugOverrideActive;
-
   TurnDirection? get nextTurnDirection => _nextTurnDirection;
   double? get distanceToNextTurn => _distanceToNextTurn;
   String get instructionText => _instructionText;
@@ -269,9 +295,6 @@ class ARViewModel extends ChangeNotifier {
   }
 
   void updateAROverlay(LatLng currentLocation, {double? heading, double? speed}) {
-    // TEMPORARY - remove after voice guidance testing is complete
-    if (_debugOverrideActive) return;
-
     if (_remainingTurns.isEmpty) {
       _nextTurnDirection = TurnDirection.forward;
       _distanceToNextTurn = _destinationCoordinates != null
@@ -646,61 +669,10 @@ class ARViewModel extends ChangeNotifier {
     _destinationCoordinates = destination;
   }
 
-  // Toggles the voice guidance mute button on the AR screen. Stops any
-  // in-progress speech immediately when muting, rather than letting the
-  // current announcement finish.
-  void toggleVoiceGuidance() {
-    voiceGuidanceEnabled = !voiceGuidanceEnabled;
-    if (!voiceGuidanceEnabled) {
-      _voiceService.stop();
-    }
-    notifyListeners();
-  }
-
-  // ── Static testing hooks (debug buttons) — no GPS/route required ──────────
-
-  // Lets the debug direction buttons drive the real direction/exit state
-  // (instead of a widget-local override) so testVoiceAnnouncement() below
-  // speaks the same direction the arrow is currently showing.
-  void testSetDirection(TurnDirection? direction, {int? exitNumber}) {
-    // TEMPORARY - remove after voice guidance testing is complete
-    _debugOverrideActive = true;
-    _nextTurnDirection = direction;
-    _roundaboutExit = exitNumber;
-    // TEMPORARY - remove after voice guidance testing is complete
-    // Debug buttons only drive nextTurnDirection above, but farLive/midLive
-    // read from _upcomingTurnDirection/_upcomingTurnStreet (only populated by
-    // the real GPS logic in updateAROverlay(), which never runs in test
-    // mode) — mirror the test direction/street here so those tiers speak
-    // the button that was actually pressed instead of a stale value.
-    _upcomingTurnDirection = direction;
-    _upcomingTurnStreet = 'Jalan Universiti';
-    notifyListeners();
-  }
-
-  // Forces distanceToNextTurn to a representative test value, clears the
-  // announcement dedup so the press is treated as a fresh turn, then runs
-  // the real announcement check — same path GPS updates use.
-  void testVoiceAnnouncement(double distance) {
-    // TEMPORARY - remove after voice guidance testing is complete
-    _debugOverrideActive = true;
-    _distanceToNextTurn = distance;
-    _lastAnnounced = VoiceAnnouncement.none;
-    _checkVoiceAnnouncement();
-    notifyListeners();
-  }
-
-  // TEMPORARY - remove after voice guidance testing is complete
-  // "Exit Test Mode" — resumes real GPS-driven overlay updates immediately.
-  void exitTestMode() {
-    _debugOverrideActive = false;
-    notifyListeners();
-  }
-
   // Closest zone first — defends against GPS jumps that could otherwise
   // skip straight past an intermediate zone without announcing it.
   void _checkVoiceAnnouncement() {
-    if (!voiceGuidanceEnabled) return;
+    if (_settingsViewModel.voiceMuted) return;
 
     final d = _distanceToNextTurn;
     if (d == null) return;
@@ -834,7 +806,7 @@ class ARViewModel extends ChangeNotifier {
     if (_finalLegAnnounced) return;
     _finalLegAnnounced = true;
     if (distanceToDestination < 50.0) return;
-    if (!voiceGuidanceEnabled) return;
+    if (_settingsViewModel.voiceMuted) return;
 
     final distance = distanceToDestination > 1000
         ? _liveDistanceKm(distanceToDestination)
@@ -855,7 +827,7 @@ class ARViewModel extends ChangeNotifier {
     }
     _arrivalAnnounced = true;
 
-    if (!voiceGuidanceEnabled) {
+    if (_settingsViewModel.voiceMuted) {
       onSpeechComplete();
       return;
     }

@@ -10,6 +10,7 @@ class SettingsViewModel extends ChangeNotifier {
   static const _keyOverlayOpacity = 'overlay_opacity';
   static const _keyAvoidTolls = 'avoid_tolls';
   static const _keyAutoBrightness = 'auto_brightness';
+  static const _keyVoiceMuted = 'voice_muted';
 
   String _navigationMode = 'AR';
   String _distanceUnit = 'km';
@@ -19,6 +20,7 @@ class SettingsViewModel extends ChangeNotifier {
   double _overlayOpacity = 1.0;
   bool _avoidTolls = false;
   bool _autoBrightness = true;
+  bool _voiceMuted = false;
 
   String get navigationMode => _navigationMode;
   String get distanceUnit => _distanceUnit;
@@ -28,6 +30,7 @@ class SettingsViewModel extends ChangeNotifier {
   double get overlayOpacity => _overlayOpacity;
   bool get avoidTolls => _avoidTolls;
   bool get autoBrightness => _autoBrightness;
+  bool get voiceMuted => _voiceMuted;
 
   SettingsViewModel() {
     _loadSettings();
@@ -43,6 +46,7 @@ class SettingsViewModel extends ChangeNotifier {
     _overlayOpacity = prefs.getDouble(_keyOverlayOpacity) ?? 1.0;
     _avoidTolls = prefs.getBool(_keyAvoidTolls) ?? false;
     _autoBrightness = prefs.getBool(_keyAutoBrightness) ?? true;
+    _voiceMuted = prefs.getBool(_keyVoiceMuted) ?? false;
     notifyListeners();
   }
 
@@ -100,5 +104,12 @@ class SettingsViewModel extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyAutoBrightness, value);
+  }
+
+  Future<void> setVoiceMuted(bool value) async {
+    _voiceMuted = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyVoiceMuted, value);
   }
 }

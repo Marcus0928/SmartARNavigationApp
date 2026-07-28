@@ -3,19 +3,16 @@ import 'package:ar_flutter_plugin_2/managers/ar_anchor_manager.dart';
 import 'package:ar_flutter_plugin_2/managers/ar_location_manager.dart';
 import 'package:ar_flutter_plugin_2/managers/ar_object_manager.dart';
 import 'package:ar_flutter_plugin_2/managers/ar_session_manager.dart';
-import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart' show LatLng;
 import 'package:latlong2/latlong.dart' as ll;
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'package:smart_ar_navigation/models/route_model.dart';
 import 'package:smart_ar_navigation/core/enums/navigation_status.dart';
-import 'package:smart_ar_navigation/core/enums/turn_direction.dart';
 import 'package:smart_ar_navigation/core/utils/distance_formatter.dart';
 import 'package:smart_ar_navigation/core/utils/location_utils.dart';
 import 'package:smart_ar_navigation/services/ambient_light_service.dart';
@@ -63,8 +60,6 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
   // inactive always overwrote it before resumed could see paused. This
   // flag survives those intermediate states instead.
   bool _wasGenuinelyPaused = false;
-
-  TurnDirection? _debugDirection;
 
   final _ambientLight = AmbientLightService();
   bool? _lastAutoBrightness;
@@ -396,78 +391,6 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
             ),
           ),
 
-          // ── Layer 4: DEBUG direction + distance buttons (remove before release) ─
-          Positioned(
-            bottom: 100,
-            left: 0,
-            right: 0,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // TEMPORARY - remove after voice guidance testing is complete
-                if (arVM.debugOverrideActive)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: GestureDetector(
-                      onTap: () =>
-                          context.read<ARViewModel>().exitTestMode(),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFF5252),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.white),
-                        ),
-                        child: const Text(
-                          'Exit Test Mode',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                _DebugDirectionBar(
-                  selected: _debugDirection,
-                  onSelect: (d) {
-                    setState(
-                      () => _debugDirection = _debugDirection == d ? null : d,
-                    );
-                    context.read<ARViewModel>().testSetDirection(
-                          _debugDirection,
-                          exitNumber:
-                              _debugDirection == TurnDirection.roundabout
-                                  ? 2
-                                  : null,
-                        );
-                  },
-                ),
-                const SizedBox(height: 6),
-                _DebugDistanceBar(
-                  onSelect: (distance) => context
-                      .read<ARViewModel>()
-                      .testVoiceAnnouncement(distance),
-                ),
-                // TEMPORARY - remove after traffic delay testing is complete
-                if (kDebugMode) ...[
-                  const SizedBox(height: 6),
-                  _DebugTrafficTestButton(
-                    stage: navVM.trafficTestStage,
-                    onTap: () => navVM.testCycleTrafficDelay(
-                      mapVM.currentLocation ??
-                          const LatLng(3.0738, 101.5077),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-
           // ── Layer 5: Bottom navigation bar + speed indicator ─────
           Positioned(
             bottom: 0,
@@ -480,14 +403,15 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
                 Padding(
                   padding: const EdgeInsets.only(right: 16, bottom: 8),
                   child: FloatingIconButton(
-                    icon: arVM.voiceGuidanceEnabled
-                        ? Icons.volume_up
-                        : Icons.volume_off,
-                    tooltip: arVM.voiceGuidanceEnabled
-                        ? 'Mute voice guidance'
-                        : 'Unmute voice guidance',
-                    onPressed: () =>
-                        context.read<ARViewModel>().toggleVoiceGuidance(),
+                    icon: settingsVM.voiceMuted
+                        ? Icons.volume_off
+                        : Icons.volume_up,
+                    tooltip: settingsVM.voiceMuted
+                        ? 'Unmute voice guidance'
+                        : 'Mute voice guidance',
+                    onPressed: () => context
+                        .read<SettingsViewModel>()
+                        .setVoiceMuted(!settingsVM.voiceMuted),
                   ),
                 ),
                 // SpeedIndicator's own Padding/position is unchanged below —
@@ -962,153 +886,4 @@ class _AnimatedCancelButton extends StatelessWidget {
   }
 }
 
-// ── DEBUG: temporary direction buttons — remove before release ────────────────
-
-class _DebugDirectionBar extends StatelessWidget {
-  const _DebugDirectionBar({required this.selected, required this.onSelect});
-
-  final TurnDirection? selected;
-  final ValueChanged<TurnDirection> onSelect;
-
-  static const _buttons = [
-    (TurnDirection.right,     'Right'),
-    (TurnDirection.left,      'Left'),
-    (TurnDirection.keepRight, 'Keep R'),
-    (TurnDirection.keepLeft,  'Keep L'),
-    (TurnDirection.uTurn,     'U-Turn'),
-    (TurnDirection.roundabout,'Rndabt'),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Wrap(
-        alignment: WrapAlignment.center,
-        spacing: 6,
-        runSpacing: 6,
-        children: _buttons.map((entry) {
-          final (dir, label) = entry;
-          final isActive = selected == dir;
-          return GestureDetector(
-            onTap: () => onSelect(dir),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: isActive
-                    ? const Color(0xFF00E676)
-                    : const Color(0xCC000000),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: isActive
-                      ? const Color(0xFF00E676)
-                      : Colors.white38,
-                ),
-              ),
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: isActive ? Colors.black : Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-}
-
-// ── DEBUG: temporary voice-distance buttons — remove before release ───────────
-
-class _DebugDistanceBar extends StatelessWidget {
-  const _DebugDistanceBar({required this.onSelect});
-
-  final ValueChanged<double> onSelect;
-
-  static const _buttons = [
-    (1500.0, '>1km'),
-    (650.0,  '650m'),
-    (150.0,  '150m'),
-    (30.0,   '<50m'),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Wrap(
-        alignment: WrapAlignment.center,
-        spacing: 6,
-        runSpacing: 6,
-        children: _buttons.map((entry) {
-          final (distance, label) = entry;
-          return GestureDetector(
-            onTap: () => onSelect(distance),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xCC000000),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.white38),
-              ),
-              child: Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-}
-
-// ── DEBUG: temporary traffic-delay test button — remove before release ────────
-
-class _DebugTrafficTestButton extends StatelessWidget {
-  const _DebugTrafficTestButton({required this.stage, required this.onTap});
-
-  final int stage;
-  final VoidCallback onTap;
-
-  static const _labels = [
-    'Traffic Test: Off',
-    'Traffic Test: Moderate',
-    'Traffic Test: Heavy',
-    'Traffic Test: In Jam',
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final isActive = stage != 0;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: isActive ? const Color(0xFF00E676) : const Color(0xCC000000),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isActive ? const Color(0xFF00E676) : Colors.white38,
-          ),
-        ),
-        child: Text(
-          _labels[stage],
-          style: TextStyle(
-            color: isActive ? Colors.black : Colors.white,
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-    );
-  }
-}
 

@@ -74,10 +74,11 @@ class SmartARNavigationApp extends StatelessWidget {
           create: (_) => SettingsViewModel(),
         ),
 
-        // ARViewModel only needs ARService
+        // ARViewModel needs ARService + SettingsViewModel (voice mute state)
         ChangeNotifierProvider<ARViewModel>(
           create: (ctx) => ARViewModel(
             arService: ctx.read<ARService>(),
+            settingsViewModel: ctx.read<SettingsViewModel>(),
           ),
         ),
 
