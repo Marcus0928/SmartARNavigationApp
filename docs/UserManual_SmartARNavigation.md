@@ -11,7 +11,7 @@
 | **Supervisor** | Dr Javid Iqbal Thirupattur |
 | **Institution** | Sunway University — School of Computing and Artificial Intelligence |
 | **Programme** | Bachelor of Software Engineering (Hons) |
-| **App Version** | 1.6 |
+| **App Version** | 1.7 |
 | **Last Updated** | July 2026 |
 
 ---
@@ -23,6 +23,7 @@
 3. [Installation Guide](#3-installation-guide)
 4. [Getting Started](#4-getting-started)
 5. [Using the App](#5-using-the-app)
+   - [5.12 Traffic Delay Notification](#512-traffic-delay-notification)
 6. [Understanding the AR Overlays](#6-understanding-the-ar-overlays)
 7. [Tips for Best Results](#7-tips-for-best-results)
 8. [Troubleshooting](#8-troubleshooting)
@@ -281,14 +282,14 @@ While navigating, you will see the following on screen:
 │  Turn Left        50m         [↑]   │  ← Top info card (semi-transparent black)
 │  Jalan Universiti                   │    instruction · distance · mini arrow · street name
 │  Recalculating route...             │  ← Rerouting banner (appears when off-route)
-│  Faster route available—Save 4 min  │  ← Faster route banner (appears when found)
-│  [Switch]               [Dismiss]   │
 ├─────────────────────────────────────┤
 │                                     │
 │         [ LIVE CAMERA FEED ]        │  ← Full-screen AR camera view
 │                                     │
 │              [ ←←← ]               │  ← Large animated arrow (turns amber/red as you get closer)
 │                                     │
+│           🚗 6 min jam              │  ← Traffic delay pill (appears when a jam is detected ahead)
+│           1.4 km ahead              │
 ├─────────────────────────────────────┤
 │ [✕]    5 min · 1.2 km    [Routes]   │  ← Bottom bar
 │         Arrive 2:45 PM              │    Stop · ETA · Routes button
@@ -299,11 +300,13 @@ While navigating, you will see the following on screen:
 |---|---|
 | **Top info card** | Shows the instruction, distance to next turn, mini direction arrow, and street name |
 | **Rerouting banner** | Dark strip reading "Recalculating route…" — appears when the app detects you have left the route and is fetching a new one; disappears automatically when done |
-| **Faster route banner** | Appears when a route saving more than 2 minutes is found; tap **Switch** to use it or **Dismiss** to keep the current route; auto-disappears after 15 seconds |
 | **Large centre arrow** | The direction you need to go — colour changes as you approach the turn |
+| **Traffic delay pill** | Amber or red rounded badge — appears when a jam is detected on the road ahead; see [5.12](#512-traffic-delay-notification) |
 | **✕ Stop button** | Tap to end navigation and return to the map |
 | **ETA / Distance** | Estimated minutes remaining and total distance left |
 | **Routes button** | Returns to the route selection screen, automatically showing the route from your current location |
+
+> 💡 A faster-route suggestion (see [5.9](#59-faster-route-suggestion)), when found, opens as a full-screen preview rather than a banner on this view — it temporarily covers the camera feed until you tap Switch or Dismiss.
 
 > 💡 **Tip:** The screen will stay on automatically throughout navigation — you do not need to tap it to prevent it from sleeping.
 
@@ -347,19 +350,14 @@ If you drive off the planned route, the app will automatically recalculate:
 
 ### 5.9 Faster Route Suggestion
 
-While navigating, the app checks for a faster route every **2 minutes** in the background. If real-time traffic or road conditions have changed and a significantly faster route is found, you will see:
-
-```
-│  Faster route available — Save 4 min   │
-│  [Switch]                  [Dismiss]   │
-```
+While navigating, the app checks for a faster route every **5 minutes** in the background (it skips the check if you're within 500 m of a turn). If a route is found that saves at least **5 minutes** and at least **10%** of your remaining trip time, a full-screen preview opens over the camera view showing the suggested route and time saved, with **Switch** and **Dismiss** buttons.
 
 | Action | Result |
 |---|---|
 | **Switch** | The app immediately switches to the faster route and updates the AR arrows |
-| **Dismiss** | The banner disappears; the app continues on the current route |
+| **Dismiss** | The preview closes; the app continues on the current route |
 
-If you do not tap either button, the banner disappears automatically after **15 seconds** and the app continues on the current route.
+The preview does **not** disappear on its own — you need to tap either Switch or Dismiss to return to the camera view.
 
 ---
 
@@ -418,7 +416,37 @@ Each of these is spoken only **once** per turn — the app won't repeat itself a
 
 **Rerouting and voice guidance:** If the app recalculates your route (see [5.8](#58-if-the-route-changes-rerouting)) while your upcoming turn hasn't actually changed, it won't interrupt itself and repeat the same announcement. If the reroute genuinely changes your next turn, you'll hear a new announcement for it instead.
 
-> ℹ️ There is currently no in-app toggle to mute voice guidance — it uses your device's media volume. Turn your phone's media volume down or use silent/vibrate mode if you'd prefer navigation without sound.
+**Muting voice guidance:** Tap the speaker icon at the bottom-right of the AR Navigation Screen to mute or unmute — the icon switches between 🔊 and 🔇 to show the current state. The same setting is also available as a **"Mute Voice Guidance"** switch on the Settings screen (Navigation section); the two controls always agree with each other, and muting from either one immediately silences any announcement currently playing. Your choice is remembered the next time you open the app.
+
+> ℹ️ There is still no separate in-app volume control — voice guidance plays at your device's media volume. Muting stops speech entirely rather than lowering the volume.
+
+---
+
+### 5.12 Traffic Delay Notification
+
+While navigating, the app checks the traffic-aware travel time for the road roughly **2 km ahead** every **3 minutes**. If that stretch is running significantly slower than free-flow traffic, a rounded pill appears near the bottom of the AR screen:
+
+```
+🚗 6 min jam
+1.4 km ahead
+```
+
+| Colour | Meaning |
+|---|---|
+| 🟠 Amber | Moderate delay — traffic is 20–50% slower than usual on that stretch |
+| 🔴 Red | Heavy delay — traffic is more than 50% slower than usual |
+
+The pill's first line always shows the estimated delay in minutes. The second line changes depending on where you are relative to the jam:
+
+| Your position | Second line reads |
+|---|---|
+| More than 2 km from the jam | *(pill is hidden)* |
+| Within 2 km, not yet in the jam | "X.X km ahead" — distance remaining to the jam |
+| Inside the jam | "X.X km jam" — the length of the slow stretch |
+
+The pill disappears automatically once you drive past the affected stretch, or if a later check finds the delay has cleared.
+
+> 💡 **Tip:** This is a lookahead check along your current route, not a live traffic layer on the map — it only reports on the ~2 km immediately ahead of you, refreshed every 3 minutes.
 
 ---
 
@@ -538,20 +566,20 @@ When you are within **1 km** of an upcoming turn (left, right, keep, U-turn, or 
 
 ## 9. Known Limitations
 
-These are known limitations of the current Version 1.6 of the app. They are documented for transparency and may be addressed in future versions.
+These are known limitations of the current Version 1.7 of the app. They are documented for transparency and may be addressed in future versions.
 
 | Limitation | Detail |
 |---|---|
 | **Android only** | The app does not support iOS devices |
 | **Driving speeds** | Optimised for normal urban driving speeds — performance at highway speeds may vary |
 | **No offline navigation** | An internet connection is required at all times |
-| **No voice guidance mute toggle** | Spoken turn announcements (see [5.11](#511-voice-guidance)) are always on — there's no in-app mute or volume control yet; use your device's media volume |
+| **No in-app voice volume control** | Voice guidance can be muted in-app (see [5.11](#511-voice-guidance)), but there's no separate in-app volume slider — use your device's media volume |
 | **No 2D map view** | Only AR camera view is available in this version |
 | **GPS accuracy** | Distance accuracy is ± 10 metres — dependent on device GPS quality |
 | **Tunnel / underpass** | AR and GPS performance degrades in tunnels or underpasses |
 | **Lighting sensitivity** | The AR arrow's opacity/colour adapts automatically to ambient light (see [5.10](#510-auto-brightness-ar-arrow-appearance)), but this only adjusts the overlay — it does not improve the underlying camera feed or ARCore tracking quality in very bright sunlight or at night |
 | **No ambient light sensor** | On devices without an ambient light sensor, Auto Brightness has no effect and the arrow stays at its default fixed appearance; turn Auto Brightness off and use the manual opacity slider instead |
-| **No traffic data** | The app does not account for real-time traffic conditions |
+| **Traffic data is lookahead-only** | The traffic delay pill (see [5.12](#512-traffic-delay-notification)) only checks the ~2 km immediately ahead on a 3-minute timer — there is no live traffic overlay on the map, and traffic is not factored into which route is suggested when navigation starts |
 | **Camera after backgrounding** | If the app is sent to the background and returned, the AR camera feed restarts automatically — there may be a brief black flash during the restart |
 
 ---
@@ -631,6 +659,6 @@ build/app/outputs/flutter-apk/app-release.apk
 
 ---
 
-*End of User Manual — Version 1.6*
+*End of User Manual — Version 1.7*
 
 *Prepared by: Liew Sau Yang | Sunway University | Bachelor of Software Engineering (Hons)*

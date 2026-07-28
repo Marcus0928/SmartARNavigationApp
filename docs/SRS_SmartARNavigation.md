@@ -12,7 +12,7 @@
 | **Institution** | Sunway University — School of Computing and Artificial Intelligence |
 | **Programme** | Bachelor of Software Engineering (Hons) |
 | **Semester** | September 2025 |
-| **Version** | 2.5 |
+| **Version** | 2.6 |
 | **Last Updated** | July 2026 |
 
 ---
@@ -30,6 +30,7 @@
    - [3.12 Home Screen Route Selection](#312-home-screen-route-selection)
    - [3.13 Recent Search History](#313-recent-search-history)
    - [3.14 Voice Guidance](#314-voice-guidance)
+   - [3.15 Traffic Delay Notification](#315-traffic-delay-notification)
 4. [Non-Functional Requirements](#4-non-functional-requirements)
 5. [External Interface Requirements](#5-external-interface-requirements)
 6. [Technology Stack](#6-technology-stack)
@@ -219,7 +220,7 @@ Primary users are assumed to be comfortable with basic smartphone usage. No tech
 | FR-34 | The hamburger menu drawer shall contain the following items, in order: a Profile section (avatar + name) separated by a divider, then Plan a drive, Inbox, Settings, Help & Feedback, and Shutdown. |
 | FR-35 | The map shall animate to the user's location with a smooth eased transition (approximately 650 ms, ease-in-out curve) when the location button is tapped or on the first GPS fix after app launch. |
 | FR-81 | During active navigation, when the system is recalculating the route (i.e. `NavigationStatus.rerouting`), the AR Navigation Screen shall display a prominent "Recalculating route…" banner. The banner shall disappear automatically once the new route is loaded. |
-| FR-82 | During active navigation, the system shall check for a faster route in the background every 2 minutes using the Google Maps Directions API. If a new route is found that saves more than 120 seconds compared to the current route's remaining duration, the system shall display a "Faster route available — Save X min" banner on the AR Navigation Screen. The user may tap **Switch** to accept the new route or **Dismiss** to keep the current one. The banner shall auto-dismiss after 15 seconds if the user does not interact. |
+| FR-82 | During active navigation, the system shall check for a faster route in the background every 5 minutes using the Google Maps Directions API (skipped while a turn is within 500 m). If a new route is found that saves at least 300 seconds (5 minutes) **and** at least 10% of the current route's remaining duration, the system shall display a full-screen route preview on the AR Navigation Screen showing the suggested route and the time saved. The user may tap **Switch** to accept the new route or **Dismiss** to keep the current one; the preview remains until the user chooses one of the two — there is no automatic dismissal. |
 
 ---
 
@@ -364,6 +365,19 @@ Primary users are assumed to be comfortable with basic smartphone usage. No tech
 | FR-86 | Street names included in a spoken announcement shall be sanitized for speech: slashes and dashes shall be expanded to spoken words ("slash", "dash"), and consecutive all-caps letters (e.g. road codes) shall be spelled out letter-by-letter. |
 | FR-87 | When the route is recalculated (rerouting or accepting a faster route) while the upcoming turn is unchanged, the system shall not re-trigger an already-spoken announcement for that turn. When the upcoming turn does genuinely change, the system shall announce the new turn normally. |
 | FR-88 | Starting a new announcement shall immediately stop any announcement still playing, rather than queuing behind it. |
+| FR-89 | The system shall provide a single, persisted mute toggle for voice guidance, controllable from both a button on the AR Navigation Screen and a switch on the Settings screen. Muting or unmuting from either control shall immediately update the other, and the chosen state shall be restored on the next app launch. Muting shall immediately stop any announcement currently playing, and shall prevent any further announcement from being spoken while active. |
+
+---
+
+### 3.15 Traffic Delay Notification
+
+**Description:** The app shall periodically check for traffic delays on the road immediately ahead during active navigation and surface them as an on-screen notification, without requiring the driver to open a separate traffic map.
+
+| ID | Requirement |
+|---|---|
+| FR-90 | During active navigation, the system shall check the traffic-aware travel time for the approximately 2 km of route immediately ahead of the driver's current position every 3 minutes, by comparing the Google Maps Directions API's traffic-aware duration against its free-flow duration for that segment. |
+| FR-91 | If the traffic-aware duration exceeds the free-flow duration by 20% or more, the system shall classify the delay as **moderate** (20–50% over free-flow) or **heavy** (more than 50% over free-flow) and display a colour-coded notification (amber for moderate, red for heavy) showing the estimated delay in minutes. |
+| FR-92 | While the detected delay segment is more than 2 km ahead of the driver, the notification shall remain hidden; once within 2 km, it shall display the estimated delay and the remaining distance to the segment. Once the driver's GPS position enters the segment, the notification shall instead display the segment's length until the driver passes it, at which point the notification shall be cleared. |
 
 ---
 
@@ -500,7 +514,8 @@ dependencies:
 | **AR Hardware** | Device must support ARCore (not all Android devices do) |
 | **Internet Dependency** | Offline navigation is not supported |
 | **HUD Integration** | The app will not integrate with any vehicle head-up display |
-| **Voice Guidance Controls** | Spoken turn announcements are always on — there is no in-app mute toggle or volume control in this phase; the device's media volume applies |
+| **Voice Guidance Controls** | Spoken turn announcements can be muted in-app (AR screen button or Settings toggle, kept in sync and persisted); there is no in-app volume control — the device's media volume applies |
+| **Traffic Data Scope** | Traffic delay detection only checks the ~2 km of route immediately ahead on a timer; it is not a live traffic overlay on the map and does not factor traffic into initial route selection |
 | **Speed** | Intended for pedestrian or very low-speed use — not validated for highway speeds |
 | **Lighting** | AR performance may degrade in very low-light or high-glare environments |
 | **GPS Accuracy** | Navigation accuracy is subject to device GPS hardware quality |
@@ -528,6 +543,6 @@ dependencies:
 
 ---
 
-*End of SRS Document — Version 2.4*
+*End of SRS Document — Version 2.6*
 
 *Prepared by: Liew Sau Yang | Sunway University | Bachelor of Software Engineering (Hons)*

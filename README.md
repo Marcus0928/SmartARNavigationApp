@@ -38,6 +38,8 @@ Think of it as **Google Maps or Waze, but with AR directions on your camera view
 - 🔖 **Bookmarked Locations** — Bookmark any search result; a SQLite-backed list of saved places is accessible via the "Saved Places" button in the bottom sheet
 - 💡 **Auto Brightness (Ambient Light Sensor)** — The AR arrow's opacity and colour automatically adapt to real-world lighting (bright / normal / dark) via the device's ambient light sensor, with a 2-second debounce to prevent flicker; can be toggled off in Settings to use a manual opacity slider instead
 - 🔊 **Voice Guidance** — Spoken turn-by-turn announcements via `flutter_tts`, staged across four distance tiers (>1 km, 200 m–1 km, 50–200 m, <50 m); distances are read naturally (e.g. "1 kilometre" instead of "1.0 kilometres"), street names are sanitized for speech (slashes/dashes spelled out, all-caps road codes letter-spelled), and announcements survive a mid-route reroute without restarting or repeating
+- 🔇 **Persistent Voice Mute** — A mute toggle on the AR screen's speaker button and a matching "Mute Voice Guidance" switch in Settings both read/write the same `SettingsViewModel.voiceMuted` value, so muting from either place updates the other immediately and survives an app restart via `shared_preferences`
+- 🚦 **Traffic Delay Notification** — Checks the Google Directions API's traffic-aware duration ~2 km ahead every 3 minutes during navigation; when a jam is detected (≥20% delay vs free-flow), a colour-coded pill (amber = moderate, red = heavy) shows the estimated delay and either the distance to the jam or, once inside it, the jam's length
 
 ---
 
@@ -272,6 +274,8 @@ All project documentation is located in the `/docs` folder:
 - [x] Roundabout exit number fallback — parses ordinal from `html_instructions` when structured `exit` field is absent
 - [x] Auto Brightness — ambient light sensor (`light` package) adjusts AR arrow opacity/colour (bright/normal/dark), 2 s debounce, toggle + fallback manual opacity slider in Settings
 - [x] Voice guidance — spoken turn-by-turn announcements via `flutter_tts`, staged across 4 distance tiers with hysteresis-style dedup (`ARViewModel._checkVoiceAnnouncement()`); natural distance phrasing, speech-safe street name sanitization, reroute-safe (announcements are not repeated when a reroute swaps in new turn objects for the same real-world turn)
+- [x] Persistent voice mute — single `SettingsViewModel.voiceMuted` source of truth read/written by both the AR screen mute button and the Settings toggle; persisted via `shared_preferences`
+- [x] Traffic delay notification — `RouteRepository.getTrafficSeverityAhead()` compares traffic-aware vs free-flow duration ~2 km ahead every 3 minutes; colour-coded `TrafficDelayBadge` pill on the AR screen shows delay minutes plus distance-ahead or in-jam length
 - [ ] Manual testing & bug fixes
 - [ ] Final APK build & submission
 
@@ -281,7 +285,8 @@ All project documentation is located in the `/docs` folder:
 
 - Android only — no iOS support
 - Requires active internet connection
-- Voice guidance has no in-app mute/volume control yet — uses the device's media volume
+- Voice guidance can be muted in-app, but there is no in-app volume control — volume follows the device's media volume
+- Traffic delay detection is a ~2 km lookahead check along the active route, not a live traffic overlay on the map
 - AR performance may vary in tunnels or low-light conditions
 
 ---

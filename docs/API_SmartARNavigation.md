@@ -11,7 +11,7 @@
 | **Supervisor** | Dr Javid Iqbal Thirupattur |
 | **Institution** | Sunway University — School of Computing and Artificial Intelligence |
 | **Programme** | Bachelor of Software Engineering (Hons) |
-| **Version** | 1.6 |
+| **Version** | 1.7 |
 | **Last Updated** | July 2026 |
 
 ---
@@ -34,6 +34,7 @@
 14. [DynamicArrowWidget](#14-dynamicarrowwidget)
 15. [AmbientLightService](#15-ambientlightservice)
 16. [VoiceService](#16-voiceservice)
+17. [TrafficDelayBadge](#17-trafficdelaybadge)
 
 ---
 
@@ -201,6 +202,36 @@ List<RouteModel> parseRouteResponse(Map<String, dynamic> json)
 - Extracts the road name from the first non-compass, non-ordinal `<b>` tag in `html_instructions`
 - Extracts roundabout exit numbers via `_parseRoundaboutExit()`: tries the structured `step['exit']` integer field first; falls back to parsing the ordinal in `html_instructions` (e.g. "take the **3rd** exit") when the field is absent — common in Malaysian API responses
 - Drops any step shorter than 15 m from the `turns` list (filters GPS/API noise steps that would otherwise be popped almost instantly by `ARViewModel`'s turn-pruning), **except** the last step in a leg, which is always kept regardless of length — Google often emits a short final "turn onto X; destination is on the Y" step when the destination sits close to the last turn, and dropping it would leave the final turn without an arrow or voice announcement
+
+---
+
+### `getTrafficSeverityAhead()`
+
+```dart
+Future<TrafficSegmentInfo?> getTrafficSeverityAhead({
+  required LatLng currentLocation,
+  required List<LatLng> remainingPolyline,
+})
+```
+
+**Purpose:** Checks live traffic conditions over the next ~2 km of the active route and classifies the delay.
+
+**Parameters:**
+| Parameter | Type | Description |
+|---|---|---|
+| `currentLocation` | `LatLng` | The user's current GPS position |
+| `remainingPolyline` | `List<LatLng>` | The not-yet-driven portion of the route polyline |
+
+**Returns:** `TrafficSegmentInfo?` — `null` when there's no significant delay (or on any network/parsing failure); otherwise a segment with `delayMinutes`, `segmentStartPosition`, `segmentEndPosition`, and `severity`
+
+**Notes:**
+- Walks `remainingPolyline` forward from `currentLocation` to find the point ~2 000 m ahead (`_pointAhead()`), then requests a Directions API route for just that short segment
+- Compares that segment's traffic-aware `duration_in_traffic` against its free-flow `duration`; `delayRatio = (durationInTraffic - duration) / duration`
+- Returns `null` if `delayRatio < 0.2` (not worth surfacing) — this is a normal "no traffic" outcome, not an error
+- Classifies `TrafficSeverity.heavy` when `delayRatio > 0.5`, otherwise `TrafficSeverity.moderate`
+- `delayMinutes` is `(durationInTraffic - duration) / 60`, rounded
+- Best-effort like `_checkForFasterRoute()` — any network or parsing exception is swallowed and returns `null` rather than throwing
+- Called by `NavigationViewModel._checkTrafficSegment()` on a 3-minute timer during active navigation
 
 ---
 
@@ -374,7 +405,7 @@ Future<void> startNavigation(
 - Passes `heading: _locationService.currentHeading` to both `getRoute()` and `initializeOverlay()` so route direction matches the driver's travel direction
 - Sets `navigationStatus` to `NavigationStatus.navigating`
 - Records `activeRouteIndex` so the route selection UI can show Resume vs Go labels
-- Starts the background faster-route check timer (`Timer.periodic` every 2 min) after a successful route fetch
+- Starts the background faster-route check timer (`Timer.periodic` every 5 min) and the traffic segment check timer (`Timer.periodic` every 3 min) after a successful route fetch
 - Notifies listeners so the UI navigates to the AR screen
 - **Not** for resuming an already-active session on the same route: calling this while `navigationStatus == navigating` fully stops and restarts the session (fresh route fetch, `ARViewModel.initializeOverlay()` reseeded). The Home Screen's "Resume" button (shown when the selected route already matches `activeRouteIndex`) skips calling this entirely and just re-pushes the AR screen, to avoid an unnecessary restart
 
@@ -394,8 +425,8 @@ void stopNavigation()
 
 **Notes:**
 - Sets `navigationStatus` to `NavigationStatus.idle`
-- Cancels the faster-route check timer and the faster-route auto-dismiss timer
-- Clears `_suggestedFasterRoute`
+- Cancels the faster-route check timer and the traffic segment check timer
+- Clears `_suggestedFasterRoute` and `_trafficSegmentInfo`
 - Calls `LocationService.stopLocationStream()`
 - Calls `ARService.clearOverlays()`
 - Notifies listeners so the UI returns to the Home Screen
@@ -451,11 +482,13 @@ void checkIfArrived(LatLng currentLocation)
 RouteModel? get suggestedFasterRoute
 ```
 
-**Purpose:** Exposes the most recently found faster route candidate for the AR screen to show the `_FasterRouteBanner`.
+**Purpose:** Exposes the most recently found faster route candidate for the AR screen to show the full-screen `_FasterRouteMapWidget` preview.
 
 **Notes:**
-- Set by `_checkForFasterRoute()` when a new route saves more than 120 seconds vs the current route
-- Cleared after 15 seconds (auto-dismiss timer), when the user taps **Switch**, or when navigation stops
+- Set by `_checkForFasterRoute()` (`Timer.periodic`, every 5 min) when a candidate saves at least 300 seconds (5 min) **and** that saving is at least 10% of the remaining duration — both conditions must hold
+- Skipped entirely if a turn is imminent (`distanceToNextTurn < 500`), so the suggestion never interrupts a turn
+- A previously dismissed duration is remembered (`_dismissedRouteDuration`) so the same route isn't re-suggested immediately after the user dismisses it
+- Cleared when the user taps **Switch** (`acceptFasterRoute()`) or **Dismiss** (`dismissFasterRoute()`), or when navigation stops — there is no auto-dismiss timer; the preview stays up until the user acts
 
 ---
 
@@ -473,7 +506,7 @@ Future<void> acceptFasterRoute()
 
 **Notes:**
 - Calls `initializeOverlay()` with the faster route and heading
-- Clears `_suggestedFasterRoute` and cancels the auto-dismiss timer
+- Clears `_suggestedFasterRoute`
 - Notifies listeners so the AR screen rebuilds with the new route
 
 ---
@@ -484,15 +517,69 @@ Future<void> acceptFasterRoute()
 void dismissFasterRoute()
 ```
 
-**Purpose:** Dismisses the faster-route banner without switching routes.
+**Purpose:** Dismisses the faster-route preview without switching routes.
 
 **Parameters:** None
 
 **Returns:** Nothing
 
 **Notes:**
-- Clears `_suggestedFasterRoute` and cancels the auto-dismiss timer
-- The next `_checkForFasterRoute()` tick may surface another suggestion if savings remain > 120 s
+- Clears `_suggestedFasterRoute` and records its duration as `_dismissedRouteDuration`
+- The next `_checkForFasterRoute()` tick may surface another suggestion if a candidate saves more time than the dismissed one
+
+---
+
+### `trafficSegmentInfo` / `hasEnteredTrafficSegment`
+
+```dart
+TrafficSegmentInfo? get trafficSegmentInfo
+bool get hasEnteredTrafficSegment
+```
+
+**Purpose:** Exposes the current traffic-delay segment (if any) and whether the driver's GPS position currently sits inside it, so the AR screen can render `TrafficDelayBadge`.
+
+**Notes:**
+- `trafficSegmentInfo` is set by `_checkTrafficSegment()` and cleared by `_clearTrafficSegment()`, `stopNavigation()`, or a fresh `_checkTrafficSegment()` result
+- `hasEnteredTrafficSegment` is recomputed on every GPS tick by `updateTrafficSegmentProgress()`
+
+---
+
+### `_checkTrafficSegment()`
+
+```dart
+Future<void> _checkTrafficSegment()
+```
+
+**Purpose:** Polls `RouteRepository.getTrafficSeverityAhead()` for the current position and stores the result.
+
+**Notes:**
+- Called by a `Timer.periodic` (every 3 min) started in `startNavigation()` and cancelled in `stopNavigation()`
+- No-ops if there's no active destination/route, or if `navigationStatus != navigating`
+- On a fresh result, resets `hasEnteredTrafficSegment` to `false` — the newly (re)fetched segment hasn't been entered yet even if the previous one had been
+- Best-effort — network/parsing errors are silently ignored, leaving the previous segment (if any) in place
+
+---
+
+### `updateTrafficSegmentProgress()`
+
+```dart
+void updateTrafficSegmentProgress(LatLng location)
+```
+
+**Purpose:** Classifies the driver's current GPS position against the active traffic segment on every GPS tick — entered, not yet reached, or passed.
+
+**Parameters:**
+| Parameter | Type | Description |
+|---|---|---|
+| `location` | `LatLng` | The user's current GPS position |
+
+**Returns:** Nothing
+
+**Notes:**
+- Called on every GPS update alongside `checkIfArrived()` and `ARViewModel.updateAROverlay()`
+- Uses the triangle-inequality relationship between `start→location`, `location→end`, and `start→end` distances to classify the position without a full vector projection — appropriate for the short (~2 km) lookahead segment
+- If `location` is farther from the segment start than the segment's own length, the segment has been passed and is cleared via `_clearTrafficSegment()`
+- No-ops if `trafficSegmentInfo` is `null`
 
 ---
 
@@ -553,17 +640,14 @@ Future<void> initializeOverlay(RouteModel route, {double? heading})
 
 ---
 
-### `voiceGuidanceEnabled`
+### Voice mute (`SettingsViewModel.voiceMuted`)
 
-```dart
-bool voiceGuidanceEnabled
-```
-
-**Purpose:** Enables/disables spoken turn announcements. `true` by default.
+**Purpose:** `ARViewModel` no longer owns its own mute flag — `SettingsViewModel.voiceMuted` (see [§11](#11-settingsviewmodel)) is the single source of truth, so the AR screen's mute button and the Settings screen's "Mute Voice Guidance" toggle always agree and the choice survives an app restart.
 
 **Notes:**
-- Read by `updateAROverlay()`'s internal `_checkVoiceAnnouncement()` step; when `false`, no `VoiceService.speak()` calls are made
-- Not currently exposed as a Settings toggle
+- `ARViewModel`'s constructor now requires a `SettingsViewModel settingsViewModel` argument (in addition to `arService`); it reads `_settingsViewModel.voiceMuted` directly wherever `voiceGuidanceEnabled` used to be checked — inside `_checkVoiceAnnouncement()`, `_checkFinalLegAnnouncement()`, and `announceArrival()` — skipping the `VoiceService.speak()` call entirely when muted
+- `ARViewModel` also registers a listener on `SettingsViewModel` (`_onSettingsChanged`) that detects the specific `false → true` mute transition — regardless of which UI triggered it — and calls `VoiceService.stop()` immediately, so muting cuts off an in-progress announcement rather than letting it finish. `dispose()` removes this listener.
+- There is no `toggleVoiceGuidance()` method anymore; UI code toggles the setting directly via `settingsVM.setVoiceMuted(!settingsVM.voiceMuted)`
 
 ---
 
@@ -905,273 +989,84 @@ Future<void> clear()
 
 > **Dependency:** Add `shared_preferences: ^2.2.0` to `pubspec.yaml`.
 
----
+Every preference follows the same shape: a synchronous getter reads the in-memory field (already loaded at startup by `_loadSettings()`), and an async `setXxx()` method updates the field, calls `notifyListeners()`, then persists the new value to `shared_preferences` — in that order, so the UI updates immediately and doesn't wait on the write. All getters are populated from `shared_preferences` once, in `_loadSettings()`, which runs from the constructor and is awaited nowhere (fire-and-forget); until it completes, getters return the hardcoded defaults listed below.
 
-### `getNavigationMode()`
-
-```dart
-Future<String> getNavigationMode()
-```
-
-**Purpose:** Reads the saved navigation mode preference from persistent storage.
-
-**Parameters:** None
-
-**Returns:** `String` — `'AR'` (default; locked to AR in the current version)
-
-**Notes:**
-- Key: `'navigation_mode'`
-- Always returns `'AR'` for now; the toggle is visible but disabled until 2D mode is implemented
+| Property | Type | Default | Key | Setter |
+|---|---|---|---|---|
+| `navigationMode` | `String` | `'AR'` | `'navigation_mode'` | `setNavigationMode(String mode)` |
+| `distanceUnit` | `String` | `'km'` | `'distance_unit'` | `setDistanceUnit(String unit)` |
+| `showSpeed` | `bool` | `true` | `'show_speed'` | `setShowSpeed(bool value)` |
+| `showETA` | `bool` | `true` | `'show_eta'` | `setShowETA(bool value)` |
+| `arrowSize` | `String` | `'Medium'` | `'arrow_size'` | `setArrowSize(String size)` |
+| `overlayOpacity` | `double` | `1.0` | `'overlay_opacity'` | `setOverlayOpacity(double opacity)` |
+| `avoidTolls` | `bool` | `false` | `'avoid_tolls'` | `setAvoidTolls(bool value)` |
+| `autoBrightness` | `bool` | `true` | `'auto_brightness'` | `setAutoBrightness(bool value)` |
+| `voiceMuted` | `bool` | `false` | `'voice_muted'` | `setVoiceMuted(bool value)` |
 
 ---
 
-### `setNavigationMode()`
+### `navigationMode` / `setNavigationMode()`
 
-```dart
-Future<void> setNavigationMode(String mode)
-```
-
-**Purpose:** Saves the navigation mode preference.
-
-**Parameters:**
-| Parameter | Type | Description |
-|---|---|---|
-| `mode` | `String` | Navigation mode — `'AR'` or `'2D'` |
-
-**Returns:** Nothing
-
-**Notes:**
-- Key: `'navigation_mode'`
-- Currently only `'AR'` is accepted; setting `'2D'` has no effect until the 2D screen is built
+**Purpose:** Active navigation mode — locked to AR in the current version; the toggle is visible in Settings but disabled until 2D mode is implemented. Setting `'2D'` has no effect until the 2D screen is built.
 
 ---
 
-### `getDistanceUnit()`
+### `distanceUnit` / `setDistanceUnit()`
 
-```dart
-Future<String> getDistanceUnit()
-```
-
-**Purpose:** Reads the saved distance unit preference.
-
-**Parameters:** None
-
-**Returns:** `String` — `'km'` (default) or `'miles'`
-
-**Notes:**
-- Key: `'distance_unit'`
-- Used by `ARViewModel` when formatting distance labels on the AR overlay
+**Purpose:** Preferred distance unit — `'km'` or `'miles'`. Read by `ARViewModel`/`DynamicArrowWidget` when formatting distance labels on the AR overlay.
 
 ---
 
-### `setDistanceUnit()`
+### `showSpeed` / `setShowSpeed()`
 
-```dart
-Future<void> setDistanceUnit(String unit)
-```
-
-**Purpose:** Saves the distance unit preference.
-
-**Parameters:**
-| Parameter | Type | Description |
-|---|---|---|
-| `unit` | `String` | `'km'` or `'miles'` |
-
-**Returns:** Nothing
-
-**Notes:**
-- Key: `'distance_unit'`
-- Notifies listeners so the AR overlay updates immediately
+**Purpose:** Whether the speed display is shown during navigation.
 
 ---
 
-### `getShowSpeed()`
+### `showETA` / `setShowETA()`
 
-```dart
-Future<bool> getShowSpeed()
-```
-
-**Purpose:** Reads whether the speed display should be visible during navigation.
-
-**Parameters:** None
-
-**Returns:** `bool` — `true` (default, speed shown) or `false`
-
-**Notes:**
-- Key: `'show_speed'`
+**Purpose:** Whether the ETA display is shown during navigation.
 
 ---
 
-### `setShowSpeed()`
+### `arrowSize` / `setArrowSize()`
 
-```dart
-Future<void> setShowSpeed(bool value)
-```
-
-**Purpose:** Saves the show-speed toggle state.
-
-**Parameters:**
-| Parameter | Type | Description |
-|---|---|---|
-| `value` | `bool` | `true` to show speed, `false` to hide it |
-
-**Returns:** Nothing
-
-**Notes:**
-- Key: `'show_speed'`
+**Purpose:** Preferred AR arrow size — `'Small'`, `'Medium'`, or `'Large'`.
 
 ---
 
-### `getShowETA()`
+### `overlayOpacity` / `setOverlayOpacity()`
 
-```dart
-Future<bool> getShowETA()
-```
-
-**Purpose:** Reads whether the ETA display should be visible during navigation.
-
-**Parameters:** None
-
-**Returns:** `bool` — `true` (default, ETA shown) or `false`
+**Purpose:** AR overlay opacity, applied to the AR overlay widget's `Opacity` wrapper when `autoBrightness` is `false`.
 
 **Notes:**
-- Key: `'show_eta'`
+- `setOverlayOpacity()` clamps the incoming value to `[0.5, 1.0]` before storing and persisting it
 
 ---
 
-### `setShowETA()`
+### `avoidTolls` / `setAvoidTolls()`
 
-```dart
-Future<void> setShowETA(bool value)
-```
-
-**Purpose:** Saves the show-ETA toggle state.
-
-**Parameters:**
-| Parameter | Type | Description |
-|---|---|---|
-| `value` | `bool` | `true` to show ETA, `false` to hide it |
-
-**Returns:** Nothing
-
-**Notes:**
-- Key: `'show_eta'`
+**Purpose:** Whether toll roads should be avoided when routing. Read by `NavigationViewModel`/`MapViewModel` and passed as `avoidTolls` to `RouteRepository.getRoute()`.
 
 ---
 
-### `getArrowSize()`
+### `autoBrightness` / `setAutoBrightness()`
 
-```dart
-Future<String> getArrowSize()
-```
-
-**Purpose:** Reads the preferred AR arrow size.
-
-**Parameters:** None
-
-**Returns:** `String` — `'Medium'` (default), `'Small'`, or `'Large'`
+**Purpose:** Whether the AR arrow's opacity/colour is driven automatically by the ambient light sensor (default `true`).
 
 **Notes:**
-- Key: `'arrow_size'`
-- Used by `ARService` when placing or updating AR arrow anchors
-
----
-
-### `setArrowSize()`
-
-```dart
-Future<void> setArrowSize(String size)
-```
-
-**Purpose:** Saves the AR arrow size preference.
-
-**Parameters:**
-| Parameter | Type | Description |
-|---|---|---|
-| `size` | `String` | `'Small'`, `'Medium'`, or `'Large'` |
-
-**Returns:** Nothing
-
-**Notes:**
-- Key: `'arrow_size'`
-
----
-
-### `getOverlayOpacity()`
-
-```dart
-Future<double> getOverlayOpacity()
-```
-
-**Purpose:** Reads the preferred AR overlay opacity.
-
-**Parameters:** None
-
-**Returns:** `double` — value between `0.5` and `1.0`; default is `1.0`
-
-**Notes:**
-- Key: `'overlay_opacity'`
-- Applied to the AR overlay widget's `Opacity` wrapper
-
----
-
-### `setOverlayOpacity()`
-
-```dart
-Future<void> setOverlayOpacity(double opacity)
-```
-
-**Purpose:** Saves the AR overlay opacity preference.
-
-**Parameters:**
-| Parameter | Type | Description |
-|---|---|---|
-| `opacity` | `double` | Opacity value clamped to `0.5`–`1.0` |
-
-**Returns:** Nothing
-
-**Notes:**
-- Key: `'overlay_opacity'`
-- Values outside `[0.5, 1.0]` are clamped before saving
-
----
-
-### `getAutoBrightness()`
-
-```dart
-Future<bool> getAutoBrightness()
-```
-
-**Purpose:** Reads whether the AR arrow's opacity/colour should be driven automatically by the ambient light sensor.
-
-**Parameters:** None
-
-**Returns:** `bool` — `true` (default, auto brightness on) or `false`
-
-**Notes:**
-- Key: `'auto_brightness'`
 - When `true`, `ARNavigationScreen` starts `AmbientLightService` and ignores `overlayOpacity` for the main AR arrow; when `false`, the sensor is stopped and `overlayOpacity` is used instead
+- `ARNavigationScreenState._syncAmbientLight()` starts/stops `AmbientLightService` in response to this value changing, without restarting the sensor on every rebuild
 
 ---
 
-### `setAutoBrightness()`
+### `voiceMuted` / `setVoiceMuted()`
 
-```dart
-Future<void> setAutoBrightness(bool value)
-```
-
-**Purpose:** Saves the auto-brightness toggle state.
-
-**Parameters:**
-| Parameter | Type | Description |
-|---|---|---|
-| `value` | `bool` | `true` to enable ambient-light-driven brightness, `false` to use the manual opacity slider |
-
-**Returns:** Nothing
+**Purpose:** Single source of truth for whether spoken turn-by-turn voice guidance is muted. Read directly by `ARViewModel` wherever it used to check its own (now-removed) `voiceGuidanceEnabled` flag — see [§7](#7-arviewmodel).
 
 **Notes:**
-- Key: `'auto_brightness'`
-- `ARNavigationScreenState._syncAmbientLight()` starts/stops `AmbientLightService` in response to this value changing, without restarting the sensor on every rebuild
+- Written by both the AR screen's mute button (`onPressed: () => settingsVM.setVoiceMuted(!settingsVM.voiceMuted)`) and the Settings screen's "Mute Voice Guidance" `SwitchListTile` in `NavigationSection` — since both write through the same field and the AR screen reads it via `context.watch<SettingsViewModel>()`, muting from either place is immediately reflected in the other and on next AR screen load
+- `ARViewModel` additionally listens for the mute transition specifically (not just any settings change) so it can stop an in-progress announcement the instant the app is muted — see [§7](#7-arviewmodel)
 
 ---
 
@@ -1298,6 +1193,34 @@ Used by `DynamicArrowWidget` to drive arrow colour and pulse animation speed. `A
 - `d == null || d > 200` → `far`
 - `d > 50` → `approaching`
 - otherwise → `imminent`
+
+---
+
+**File:** `lib/core/enums/traffic_severity.dart`
+
+```dart
+enum TrafficSeverity {
+  moderate, // 20–50% delay vs free-flow duration — amber badge
+  heavy,    // > 50% delay vs free-flow duration — red badge
+}
+```
+
+Set by `RouteRepository.getTrafficSeverityAhead()` and carried on `TrafficSegmentInfo.severity`; consumed by `TrafficDelayBadge` (see [§17](#17-trafficdelaybadge)) to pick the badge's background/foreground colours.
+
+---
+
+**File:** `lib/models/traffic_segment_info.dart`
+
+```dart
+class TrafficSegmentInfo {
+  final int delayMinutes;             // Estimated delay in minutes vs free-flow
+  final LatLng segmentStartPosition;  // Where the checked ~2 km segment begins (current location at check time)
+  final LatLng segmentEndPosition;    // Where the checked segment ends
+  final TrafficSeverity severity;     // moderate or heavy
+}
+```
+
+Immutable value object returned by `RouteRepository.getTrafficSeverityAhead()` and stored on `NavigationViewModel.trafficSegmentInfo`.
 
 ---
 
@@ -1521,6 +1444,42 @@ void dispose()
 
 ---
 
-*End of API & Function Documentation — Version 1.6*
+## 17. TrafficDelayBadge
+
+**File:** `lib/views/widgets/traffic_delay_badge.dart`  
+**Purpose:** A `StatelessWidget` that renders the traffic-delay pill shown on the AR screen when `NavigationViewModel.trafficSegmentInfo` is non-null and the driver is within range.
+
+### Constructor
+
+```dart
+TrafficDelayBadge({
+  required TrafficSegmentInfo segmentInfo,
+  required bool hasEnteredSegment,
+  double? distanceAheadKm, // required when hasEnteredSegment == false
+  double? jamLengthKm,     // required when hasEnteredSegment == true
+})
+```
+
+### Behaviour
+
+| Parameter | Effect |
+|---|---|
+| `segmentInfo` | Supplies `delayMinutes` (first line, e.g. "6 min jam") and `severity`, which selects the pill's colours |
+| `hasEnteredSegment` | Selects which of the two second-line states to render — the pill's shape/colour/icon is identical either way, only the text changes |
+| `distanceAheadKm` | Second line reads "X.X km ahead" when `hasEnteredSegment == false` |
+| `jamLengthKm` | Second line reads "X.X km jam" when `hasEnteredSegment == true` |
+
+**Colours:** `TrafficSeverity.moderate` → amber background (`0xFFFFA726`) with a near-black amber foreground (`0xFF3D2400`, ~7:1 contrast); `TrafficSeverity.heavy` → red background (`0xFFE53935`) with a near-black red foreground (`0xFF260000`, ~4.6:1 contrast). Foreground shades are drawn from the same hue family as the background rather than a generic dark grey, so the two severities stay visually distinct even to a driver glancing quickly.
+
+### Placement & lifecycle (in `ARNavigationScreen`)
+
+- Not rendered at all when `trafficSegmentInfo == null`
+- When `hasEnteredTrafficSegment == true`: always shown, with `hasEnteredSegment: true` and `jamLengthKm` computed as the distance between the segment's start/end positions
+- When `hasEnteredTrafficSegment == false`: only shown once `distanceAheadKm` (distance from the current GPS position to the segment start) is `≤ 2.0` — suppressed entirely while farther away, so the badge doesn't appear the moment a distant jam is detected
+- Positioned centred, anchored to the same row as `SpeedIndicator` near the bottom of the AR screen
+
+---
+
+*End of API & Function Documentation — Version 1.7*
 
 *Prepared by: Liew Sau Yang | Sunway University | Bachelor of Software Engineering (Hons)*

@@ -11,7 +11,7 @@
 | **Supervisor** | Dr Javid Iqbal Thirupattur |
 | **Institution** | Sunway University — School of Computing and Artificial Intelligence |
 | **Programme** | Bachelor of Software Engineering (Hons) |
-| **Version** | 3.4 |
+| **Version** | 3.5 |
 | **Last Updated** | July 2026 |
 
 ---
@@ -328,14 +328,18 @@ Check Location Permission
 | `currentRoute` | `RouteModel?` | Active route data from Google Maps API |
 | `navigationStatus` | `NavigationStatus` | Enum: idle / loading / navigating / rerouting / arrived |
 | `activeRouteIndex` | `int?` | Index of the route that is currently being navigated; `null` when not navigating |
-| `suggestedFasterRoute` | `RouteModel?` | A faster route found by the background check; shown in `_FasterRouteBanner`; `null` when no suggestion is pending |
+| `suggestedFasterRoute` | `RouteModel?` | A faster route found by the background check; shown as a full-screen `_FasterRouteMapWidget` preview; `null` when no suggestion is pending |
+| `trafficSegmentInfo` | `TrafficSegmentInfo?` | The current traffic-delay segment ~2 km ahead, if any; drives the `TrafficDelayBadge` pill |
+| `hasEnteredTrafficSegment` | `bool` | Whether the driver's GPS position currently sits inside `trafficSegmentInfo`'s start/end span |
 | `errorMessage` | `String?` | Last navigation error, if any |
-| `startNavigation(destination, {route, routeIndex})` | `Future<void>` | Fetches route (or uses pre-fetched route), passes current heading to `getRoute()` and `initializeOverlay()`, starts faster-route check timer, records `activeRouteIndex` |
-| `stopNavigation()` | `void` | Ends navigation session; cancels faster-route timers; clears `suggestedFasterRoute` and `activeRouteIndex` |
+| `startNavigation(destination, {route, routeIndex})` | `Future<void>` | Fetches route (or uses pre-fetched route), passes current heading to `getRoute()` and `initializeOverlay()`, starts the faster-route check timer (5 min) and traffic segment check timer (3 min), records `activeRouteIndex` |
+| `stopNavigation()` | `void` | Ends navigation session; cancels the faster-route and traffic segment timers; clears `suggestedFasterRoute`, `trafficSegmentInfo`, and `activeRouteIndex` |
 | `recalculateRoute()` | `Future<void>` | Re-fetches route from current location with heading; sets status to `rerouting` (shows banner) then back to `navigating`; 30 s cooldown |
 | `checkIfArrived(location)` | `void` | Detects arrival (< 20 m from destination); on arrival calls `ProfileViewModel.incrementDriveCount()` and `ProfileViewModel.addDistance()` |
-| `acceptFasterRoute()` | `Future<void>` | Switches active navigation to `suggestedFasterRoute`; clears suggestion and dismiss timer |
-| `dismissFasterRoute()` | `void` | Dismisses the faster-route banner without switching; clears suggestion and dismiss timer |
+| `acceptFasterRoute()` | `Future<void>` | Switches active navigation to `suggestedFasterRoute`; clears suggestion |
+| `dismissFasterRoute()` | `void` | Dismisses the faster-route preview without switching; clears suggestion (no auto-dismiss timer — the preview stays until the user acts) |
+| `_checkTrafficSegment()` | `Future<void>` | Polls `RouteRepository.getTrafficSeverityAhead()` on the 3-minute timer and stores the result in `trafficSegmentInfo`; best-effort, silently ignores network/parsing errors |
+| `updateTrafficSegmentProgress(location)` | `void` | Called on every GPS tick; classifies `location` against `trafficSegmentInfo` (not yet reached / entered / passed) via a triangle-inequality distance check, updating `hasEnteredTrafficSegment` and clearing the segment once passed |
 
 #### `ARViewModel`
 **Responsibility:** Manages AR overlay state and rendering instructions.
@@ -350,9 +354,10 @@ Check Location Permission
 | `isARInitialized` | `bool` | Whether ARCore session is ready |
 | `initializeAR(sessionManager, objectManager)` | `Future<void>` | Initialises the ARCore session via `ARService` |
 | `initializeOverlay(route, {heading})` | `Future<void>` | Seeds the turn queue from a `RouteModel`; when `heading` is non-null and the first step is a U-turn, discards that step (phantom U-turn guard); if the new head turn matches the previous head turn by direction and position (within 20 m), carries the old `_lastHeadTurn` reference forward instead of letting it look like a new turn — prevents a reroute from resetting the voice-announcement dedup state and re-speaking the same announcement mid-utterance |
-| `updateAROverlay(location)` | `void` | Drops passed turns (< 25 m); finds the first upcoming non-forward turn; applies a 1 000 m engage / 1 100 m disengage hysteresis gate for **all** non-forward turns (not just roundabout); within gate: shows upcoming turn early; outside gate: shows forward; `distanceToNextTurn` always reflects the upcoming non-forward turn; also drives the voice-announcement check (see `voiceGuidanceEnabled` below) |
+| `updateAROverlay(location)` | `void` | Drops passed turns (< 25 m); finds the first upcoming non-forward turn; applies a 1 000 m engage / 1 100 m disengage hysteresis gate for **all** non-forward turns (not just roundabout); within gate: shows upcoming turn early; outside gate: shows forward; `distanceToNextTurn` always reflects the upcoming non-forward turn; also drives the voice-announcement check, which speaks via `VoiceService` at four distance tiers (>1 km once, 200 m–1 km, 50–200 m, <50 m), each tier at most once per turn via a `_lastAnnounced` dedup flag that resets when the head turn genuinely changes — gated on `SettingsViewModel.voiceMuted` (see below) |
 | `resetOverlay()` | `void` | Clears all overlay state and stops any in-progress speech (called on navigation stop or arrival) |
-| `voiceGuidanceEnabled` | `bool` | When `true` (default), `updateAROverlay()` triggers spoken turn announcements via `VoiceService` at four distance tiers: >1 km (once), 200 m–1 km, 50–200 m, and <50 m. Each tier is announced at most once per turn via a `_lastAnnounced` dedup flag, which resets when the head turn genuinely changes |
+
+**Dependency:** `ARViewModel`'s constructor now takes a `SettingsViewModel` (in addition to `ARService`) so it can read `voiceMuted` as the single source of truth for the mute state — see `SettingsViewModel` below. It also registers a listener on `SettingsViewModel` that detects the mute transition specifically (`false → true`, regardless of which UI caused it) and calls `VoiceService.stop()` immediately, so muting cuts off an in-progress announcement; the listener is removed in `dispose()`. There is no `voiceGuidanceEnabled` field or `toggleVoiceGuidance()` method on `ARViewModel` anymore.
 
 #### `MapViewModel`
 **Responsibility:** Handles GPS location tracking and map data.
@@ -410,6 +415,7 @@ Check Location Permission
 | `overlayOpacity` | `double` | AR overlay opacity between `0.5` and `1.0` |
 | `avoidTolls` | `bool` | Whether toll roads should be avoided when routing |
 | `autoBrightness` | `bool` | Whether the AR arrow's opacity/colour is driven automatically by `AmbientLightService` (default `true`); when `false`, `overlayOpacity` is used instead |
+| `voiceMuted` | `bool` | Single source of truth for whether voice guidance is muted (default `false`); read directly by `ARViewModel`, written by both the AR screen's mute button and the Settings "Mute Voice Guidance" toggle |
 | `setNavigationMode(mode)` | `Future<void>` | Saves navigation mode preference |
 | `setDistanceUnit(unit)` | `Future<void>` | Saves distance unit preference |
 | `setShowSpeed(value)` | `Future<void>` | Saves show-speed toggle state |
@@ -418,6 +424,7 @@ Check Location Permission
 | `setOverlayOpacity(opacity)` | `Future<void>` | Saves AR overlay opacity value (clamped to 0.5–1.0) |
 | `setAvoidTolls(value)` | `Future<void>` | Saves avoid-tolls toggle state |
 | `setAutoBrightness(value)` | `Future<void>` | Saves auto-brightness toggle state |
+| `setVoiceMuted(value)` | `Future<void>` | Saves voice-mute toggle state; notifies listeners before persisting so both UIs update immediately |
 
 #### `ProfileViewModel`
 **Responsibility:** Manages the user's profile data (name, email) and driving statistics, persisted via `shared_preferences`.
@@ -523,6 +530,28 @@ class PlaceModel {
 }
 ```
 
+#### `TrafficSeverity` (enum)
+
+```dart
+enum TrafficSeverity { moderate, heavy }
+```
+
+| Value | Trigger | Badge colour |
+|---|---|---|
+| `moderate` | 20–50% delay vs free-flow duration | Amber |
+| `heavy` | > 50% delay vs free-flow duration | Red |
+
+#### `TrafficSegmentInfo`
+```dart
+class TrafficSegmentInfo {
+  final int delayMinutes;             // Estimated delay in minutes vs free-flow
+  final LatLng segmentStartPosition;  // Start of the checked ~2 km lookahead segment
+  final LatLng segmentEndPosition;    // End of the checked segment
+  final TrafficSeverity severity;     // moderate or heavy
+}
+```
+Returned by `RouteRepository.getTrafficSeverityAhead()`; stored on `NavigationViewModel.trafficSegmentInfo` and rendered by `TrafficDelayBadge`.
+
 ---
 
 ### 5.3 Services & Repositories
@@ -536,6 +565,7 @@ class PlaceModel {
 - Makes HTTP calls to **Google Maps Directions API**
 - Parses JSON response into `RouteModel` objects
 - Handles API errors and network failures
+- `getTrafficSeverityAhead(currentLocation, remainingPolyline)` — walks the remaining polyline to a point ~2 km ahead, requests that short segment's traffic-aware (`duration_in_traffic`) vs free-flow (`duration`) time from the same Directions endpoint, and returns a `TrafficSegmentInfo` classified `moderate`/`heavy` when the delay ratio is ≥ 20%, or `null` otherwise (including on any network/parsing failure — best-effort, like the faster-route check)
 
 #### `PlacesRepository`
 - Makes HTTP calls to **Google Maps Places API** (Text Search + Place Details endpoints)
@@ -677,7 +707,8 @@ smart_ar_navigation/
 │   │   ├── enums/
 │   │   │   ├── turn_direction.dart            # forward, left, right, keepLeft, keepRight, uTurn, roundabout
 │   │   │   ├── navigation_status.dart         # idle, loading, navigating, rerouting, arrived
-│   │   │   └── navigation_approach_stage.dart # far, approaching, imminent — drives arrow colour & pulse speed
+│   │   │   ├── navigation_approach_stage.dart # far, approaching, imminent — drives arrow colour & pulse speed
+│   │   │   └── traffic_severity.dart          # moderate, heavy — drives TrafficDelayBadge colour
 │   │   └── utils/
 │   │       ├── location_utils.dart    # Distance / findNextTurn helpers
 │   │       ├── route_parser.dart      # Parses Google Maps JSON; extracts street name & roundabout exit number
@@ -686,7 +717,8 @@ smart_ar_navigation/
 │   ├── models/                      # Data classes (Model layer)
 │   │   ├── route_model.dart
 │   │   ├── turn_instruction.dart    # Includes exitNumber for roundabout steps
-│   │   └── place_model.dart
+│   │   ├── place_model.dart
+│   │   └── traffic_segment_info.dart # delayMinutes, segment start/end, severity — returned by getTrafficSeverityAhead()
 │   │
 │   ├── services/                    # External service wrappers (Model layer)
 │   │   ├── location_service.dart        # GPS / geolocator wrapper
@@ -705,7 +737,7 @@ smart_ar_navigation/
 │   │   ├── navigation_viewmodel.dart     # Session state; updates ProfileViewModel on arrival
 │   │   ├── ar_viewmodel.dart             # Tracks nextTurnDirection, exitNumber, streetName
 │   │   ├── map_viewmodel.dart            # GPS stream, heading, accuracy, place search
-│   │   ├── settings_viewmodel.dart       # Preferences: unit, speed, ETA, arrow size, opacity, avoidTolls, autoBrightness
+│   │   ├── settings_viewmodel.dart       # Preferences: unit, speed, ETA, arrow size, opacity, avoidTolls, autoBrightness, voiceMuted
 │   │   ├── profile_viewmodel.dart        # Name, email, drive stats (SharedPreferences)
 │   │   ├── plan_drive_viewmodel.dart     # Plan Drive screen: search, routes, options
 │   │   ├── saved_places_viewmodel.dart   # Home / Work / Favourite slots (SharedPreferences)
@@ -761,7 +793,8 @@ smart_ar_navigation/
 │   │   └── widgets/                 # Reusable UI components (shared across screens)
 │   │       ├── dynamic_arrow_widget.dart   # CustomPainter: chevron arrows for all 7 TurnDirection values with animated glow, colour pulse, and flow wave; opacityOverride/colorOverride params feed ambient auto-brightness
 │   │       ├── search_bar_widget.dart      # Destination search input
-│   │       └── navigation_bottom_bar.dart  # ETA / distance bottom panel
+│   │       ├── navigation_bottom_bar.dart  # ETA / distance bottom panel
+│   │       └── traffic_delay_badge.dart    # Amber/red pill: delay minutes + distance-ahead or in-jam length
 │   │
 │   └── app.dart                     # MaterialApp setup, routing & MultiProvider tree
 │
@@ -1034,7 +1067,8 @@ Search overlay (shown when a field is focused):
 │                                 │
 │           [↑↑↑]                 │  ← DynamicArrowWidget (large, centred)
 │                                 │    colour: cyan/amber/red by approach stage
-│                                 │
+│         🚗 6 min jam            │  ← TrafficDelayBadge (only when a segment is detected)
+│         1.4 km ahead            │    amber = moderate, red = heavy
 ├─────────────────────────────────┤
 │ [✕]   5 min · 1.2 km   [Routes] │  ← NavigationBottomBar
 │       Arrive 2:45 PM             │    Stop circle · ETA · Routes button
@@ -1061,7 +1095,9 @@ These features are **out of scope for the current FYP phase** but the design has
 | Feature | Status | Design Note |
 |---|---|---|
 | **Auto Rerouting** | ✅ Implemented | `MapViewModel._isOffRoute()` checks perpendicular distance to every route segment (> 50 m threshold, 30 s cooldown). `recalculateRoute()` sets status to `rerouting` (shows `_ReroutingBanner`), fetches with heading, then re-seeds `ARViewModel`. |
-| **Faster Route Suggestion** | ✅ Implemented | `NavigationViewModel._checkForFasterRoute()` runs via `Timer.periodic` every 2 min. If new route saves > 120 s, sets `suggestedFasterRoute` and shows `_FasterRouteBanner` with Switch/Dismiss; auto-dismisses after 15 s. |
+| **Faster Route Suggestion** | ✅ Implemented | `NavigationViewModel._checkForFasterRoute()` runs via `Timer.periodic` every 5 min (skipped when a turn is within 500 m). If a candidate saves ≥ 300 s **and** ≥ 10% of the remaining duration, sets `suggestedFasterRoute` and shows the full-screen `_FasterRouteMapWidget` preview with Switch/Dismiss; no auto-dismiss — the user must act. |
+| **Traffic Delay Notification** | ✅ Implemented | `NavigationViewModel._checkTrafficSegment()` runs via `Timer.periodic` every 3 min, calling `RouteRepository.getTrafficSeverityAhead()` for the ~2 km segment ahead. A delay ratio ≥ 20% (vs free-flow duration) sets `trafficSegmentInfo` (moderate 20–50%, heavy > 50%); `updateTrafficSegmentProgress()` tracks entry/exit on every GPS tick. `TrafficDelayBadge` renders the amber/red pill, suppressed until within 2 km of the segment start. |
+| **Voice Guidance Mute Toggle** | ✅ Implemented | `SettingsViewModel.voiceMuted` is the single persisted source of truth (`shared_preferences` key `voice_muted`), read/written by both the AR screen's mute button and the Settings "Mute Voice Guidance" toggle. `ARViewModel` reads it directly at every `speak()` gate and listens for the mute transition to stop in-progress speech immediately. |
 | **Heading-Biased Route Fetch** | ✅ Implemented | `RouteRepository.getRoute()` accepts optional `heading`; appended as `&heading=N` to the Directions API request. `startNavigation()` and `recalculateRoute()` pass `_locationService.currentHeading`. `initializeOverlay()` discards a phantom step-1 U-turn when heading is provided. |
 | **Screen Wake Lock** | ✅ Implemented | `WakelockPlus.enable()` in `ARNavigationScreen.initState()`; disabled on dispose. |
 | **Edge-to-Edge Status Bar** | ✅ Implemented | `SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge)` in `main()`; per-screen `AnnotatedRegion<SystemUiOverlayStyle>` for icon brightness. |
@@ -1075,6 +1111,6 @@ These features are **out of scope for the current FYP phase** but the design has
 
 ---
 
-*End of SDD Document — Version 3.3*
+*End of SDD Document — Version 3.5*
 
 *Prepared by: Liew Sau Yang | Sunway University | Bachelor of Software Engineering (Hons)*
