@@ -59,7 +59,7 @@ class MapViewModel extends ChangeNotifier {
   int _lastClosestSegmentIndex = 0;
   bool _isAppInForeground = true;
 
-  // Bug 37: _isOffRoute() used to trigger recalculateRoute() off a single
+  // _isOffRoute() used to trigger recalculateRoute() off a single
   // GPS tick reading >50m from the route polyline — no smoothing, no
   // confirmation. A single noisy fix (multipath, urban canyon, bridge/
   // underpass) was enough to discard a perfectly good route. Mirrors the

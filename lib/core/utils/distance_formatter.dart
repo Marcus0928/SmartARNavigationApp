@@ -1,8 +1,6 @@
-// Bug: Settings screen's distance-unit toggle (km/miles) was persisted but
-// never read anywhere — every display site had its own hardcoded km/m
-// formatting. This is the single shared formatter every site now calls,
-// keyed off SettingsViewModel.distanceUnit ('km' or 'miles'), so a unit
-// change is reflected everywhere at once.
+// Single shared formatter every display site calls, keyed off
+// SettingsViewModel.distanceUnit ('km' or 'miles'), so a unit change is
+// reflected everywhere at once instead of each site formatting independently.
 //
 // Metres round to the nearest 10 below the long-distance threshold (matches
 // the rounding ar_viewmodel.dart's voice announcements already use) so the

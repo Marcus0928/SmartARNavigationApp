@@ -110,14 +110,8 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
       _wasGenuinelyPaused = true;
     } else if (state == AppLifecycleState.resumed) {
       context.read<MapViewModel>().setAppForegroundState(true);
-      // Only recover the camera feed when actually recovering from a
-      // genuine background pause (camera/session were released by the
-      // real Activity onPause()). A transient `inactive` interruption —
-      // e.g. pulling down the notification shade — never paused the
-      // camera, so there is nothing to recover here. _wasGenuinelyPaused
-      // (rather than comparing against only the immediately-preceding
-      // state) survives the hidden/inactive states Flutter fires on the
-      // way back to resumed after a real screen-off.
+      // Only recover the camera after a genuine background pause, not a
+      // transient `inactive` interruption (e.g. notification shade).
       if (_wasGenuinelyPaused) {
         _wasGenuinelyPaused = false;
         _recoverArViewAfterScreenOff();
@@ -125,39 +119,9 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
     }
   }
 
-  // Recovers the camera feed after a genuine screen-off/resume by
-  // replacing this screen via the Navigator — the same mechanism the
-  // "Routes" button already uses successfully. An in-place ArView
-  // recreate driven from inside this lifecycle callback (toggling a bool
-  // to swap ARView for a Container within this same still-mounted State)
-  // was tried and confirmed NOT to work: it necessarily runs in the same
-  // window as the real Activity.onResume(), and every zombie ARSceneView
-  // ever left behind by a prior recreation (see ARService's class doc —
-  // destroy() never unregisters from the Activity's shared Lifecycle)
-  // receives that exact same ON_RESUME callback and contends for the
-  // camera against the freshly (re)created instance. pushReplacementNamed
-  // is a pure Flutter-side Navigator transition — it never touches the
-  // Activity lifecycle, so it can't provoke that collision, the same
-  // reason the Routes button path (pop away, push back later) works.
-  //
-  // NavigationViewModel / MapViewModel / ARViewModel / ARService are
-  // Provider-scoped above MaterialApp's Navigator (see app.dart), so
-  // replacing this screen does not reset the active navigation session —
-  // this is a pure screen/ArView swap, deliberately not calling
-  // startNavigation()/stopNavigation() or touching the route/progress
-  // state (see Bug 25 — "resume restarts navigation").
-  // ARNavigationScreenState.dispose() (which calls
-  // context.read<ARService>().disposeAR()) still fires on this old
-  // screen instance as it's replaced, same cleanup path Bug 25 already
-  // relies on.
-  //
-  // This still permanently leaks one more zombie Lifecycle observer per
-  // screen-off event — same underlying plugin defect described in
-  // ARService's class doc, just no longer visible as a black camera;
-  // there is no fix short of patching the plugin. _recreationCount
-  // (incremented inside ARService.initializeAR, which the fresh screen's
-  // ARView triggers via _onARViewCreated the same as any other AR screen
-  // mount) counts this path's recreations too.
+  // Replaces the screen via Navigator to recover the camera after
+  // screen-off — an in-place recreate doesn't work here. This is a pure
+  // screen/ArView swap; the active navigation session is untouched.
   void _recoverArViewAfterScreenOff() {
     isExiting = true;
     // A plain (non-zero-duration) route transition here would slide/fade in
@@ -182,10 +146,8 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
     ARAnchorManager anchorManager,
     ARLocationManager locationManager,
   ) {
-    // whenComplete (not .then) so _arReady flips on failure too — the
-    // loading overlay is tied to real completion, not just success, and
-    // this doesn't change initializeAR()'s existing unhandled-error
-    // behavior since whenComplete doesn't catch/swallow the Future's error.
+    // whenComplete so the loading overlay clears on failure too, not
+    // just success.
     context
         .read<ARViewModel>()
         .initializeAR(sessionManager, objectManager)
@@ -220,20 +182,10 @@ class ARNavigationScreenState extends State<ARNavigationScreen>
       mapVM.clearDestination();
       mapVM.requestRecenter();
 
-      // Leaving the screen is deferred to the arrival announcement's speech
-      // completion (immediate if voice guidance is muted) so navigation
-      // away doesn't cut "You have reached your destination" off mid-word.
-      //
-      // popUntil(first) rather than a bare pop() (Bug 31): a single pop only
-      // reaches Home when Home is exactly one level below /ar-navigation,
-      // which isn't true for the "Plan a Drive" entry path (Home ->
-      // PlanDriveScreen -> AR, all plain pushNamed) — it would leave the
-      // user on the leftover PlanDriveScreen instead. The first route is
-      // always the real Home (splash_screen.dart replaces '/' with '/home'
-      // immediately after splash), and reusing it here — rather than the
-      // Routes button's pushNamedAndRemoveUntil('/home', ...), which pushes
-      // a brand-new instance on top — avoids accumulating duplicate Home
-      // instances across repeated trips.
+      // Wait for the arrival announcement to finish speaking before leaving,
+      // so navigation away doesn't cut it off mid-word.
+      // popUntil(first) instead of pop() so this reaches Home correctly
+      // regardless of entry path (e.g. via Plan a Drive).
       arVM.announceArrival(() => navigator.popUntil((route) => route.isFirst));
     });
   }

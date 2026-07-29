@@ -4,60 +4,25 @@ import 'package:ar_flutter_plugin_2/managers/ar_object_manager.dart';
 import 'package:smart_ar_navigation/core/enums/turn_direction.dart';
 
 /// Manages the ARCore session lifecycle via ar_flutter_plugin.
-/// Arrow overlays are rendered as Flutter widget overlays in ARNavigationScreen;
-/// placeArrow / updateArrow / clearOverlays notify the widget layer via state
-/// held in ARViewModel rather than placing 3D ARCore nodes directly.
+/// Arrow overlays are rendered as Flutter widget overlays in ARNavigationScreen,
+/// with state held in ARViewModel rather than placing 3D ARCore nodes directly.
 ///
-/// KNOWN THIRD-PARTY DEFECTS AND THE DELIBERATE TRADEOFF AROUND THEM:
-///
-/// 1. Surface reattachment (why ArView is destroyed and recreated on
-///    genuine screen-off resume): live device testing confirmed the
-///    ARCore session itself resumes cleanly at the native level after a
-///    real pause/resume (Session::Resume/ResumeWithAnalytics both return
-///    OK, no exceptions) — but the camera feed's rendering surface never
-///    visibly reattaches to the new Android window after screen-off. This
-///    is a defect inside ar_flutter_plugin_2/sceneview's surface-
-///    reattachment logic, not fixable from Dart/app code, and the plugin
-///    exposes no method to force a reattach. The only known-working
-///    recovery is destroying and recreating the ArView (confirmed to
-///    visually restore the camera, with a brief flash), so
-///    ARNavigationScreenState.didChangeAppLifecycleState unmounts and
-///    remounts ARView specifically on a genuine paused → resumed
-///    transition (previousState == AppLifecycleState.paused). Transient
-///    interruptions (e.g. the notification shade, which only ever
-///    produces inactive → resumed) must NOT trigger this — that guard is
-///    load-bearing, do not remove it.
-///
-/// 2. Zombie Lifecycle observers (the accepted cost of #1): ar_flutter_
-///    plugin_2's native ArView wraps io.github.sceneview:arsceneview,
-///    whose ARSceneView registers itself via `Lifecycle.addObserver(this)`
-///    on the Activity's SHARED lifecycle at construction, but its
-///    destroy() (confirmed via bytecode disassembly of arsceneview 2.2.1
-///    — destroy() tears down the camera node/stream/light estimator/plane
-///    renderer/ARCore session but never calls `Lifecycle.removeObserver`)
-///    never unregisters it. Every ArView created this way leaves a
-///    permanent "zombie" observer that keeps receiving onResume()/
-///    onPause() for the rest of the app's life — concurrent zombies
-///    contending for the camera/GL surface is what eventually causes a
-///    green-flash / device freeze after enough accumulate. Recreating
-///    only on genuine screen-off (not on every resume, as the original
-///    pre-fix behavior did, and not never, which leaves the surface
-///    broken per #1) is a deliberate, documented compromise: it is
-///    meaningfully less frequent than recreating on every resume, but
-///    still accumulates zombies over a long enough session. There is no
-///    other known workaround short of forking the plugin's Kotlin.
-///    _recreationCount below exists to make that accumulation visible.
+/// Known plugin defects:
+/// 1. The camera surface never reattaches after screen-off, so ArView must
+///    be destroyed and recreated on a genuine paused → resumed transition —
+///    not on a transient inactive → resumed interruption like the
+///    notification shade. That guard is load-bearing; do not remove it.
+/// 2. Every recreated ArView leaks a permanent zombie Lifecycle observer
+///    (the plugin's destroy() never unregisters it), so recreation is kept
+///    to only the genuine screen-off case. _recreationCount below tracks
+///    how many have accumulated.
 class ARService {
   ARSessionManager? _sessionManager;
   ARObjectManager? _objectManager;
   bool _isInitialized = false;
 
-  // Counts how many times a new native ArView has been created in this app
-  // session (reroute-triggered re-init, faster-route preview toggle, etc.).
-  // Each one leaves a permanent zombie Lifecycle observer (see class doc),
-  // so this is a defensive telemetry signal, not a fix — if it climbs past
-  // a handful in a single session, that's a sign some other code path is
-  // still recreating the ArView more than it needs to.
+  // Telemetry only, not a fix — see class doc. High counts in one session
+  // mean some code path is recreating the ArView more than it needs to.
   int _recreationCount = 0;
   int get recreationCount => _recreationCount;
   static const int _recreationWarnThreshold = 5;
@@ -68,12 +33,8 @@ class ARService {
     ARSessionManager sessionManager,
     ARObjectManager objectManager,
   ) async {
-    // Release the previous native ARCore session before replacing it —
-    // otherwise the old session's camera/GL resources are never freed and
-    // repeated re-initialization (e.g. leaving and returning to the AR
-    // screen) accumulates sessions until ARCore crashes. Awaited so the old
-    // session's native teardown is confirmed complete before the new one
-    // starts pumping frames.
+    // Release the previous session first, else old camera/GL resources
+    // pile up until ARCore crashes.
     if (_isInitialized) {
       await disposeAR();
       _recreationCount++;
