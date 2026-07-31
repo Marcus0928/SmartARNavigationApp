@@ -12,7 +12,7 @@
 | **Institution** | Sunway University — School of Computing and Artificial Intelligence |
 | **Programme** | Bachelor of Software Engineering (Hons) |
 | **Semester** | September 2025 |
-| **Version** | 2.6 |
+| **Version** | 2.7 |
 | **Last Updated** | July 2026 |
 
 ---
@@ -31,6 +31,7 @@
    - [3.13 Recent Search History](#313-recent-search-history)
    - [3.14 Voice Guidance](#314-voice-guidance)
    - [3.15 Traffic Delay Notification](#315-traffic-delay-notification)
+   - [3.16 Background & Device Behaviour During Navigation](#316-background--device-behaviour-during-navigation)
 4. [Non-Functional Requirements](#4-non-functional-requirements)
 5. [External Interface Requirements](#5-external-interface-requirements)
 6. [Technology Stack](#6-technology-stack)
@@ -167,7 +168,7 @@ Primary users are assumed to be comfortable with basic smartphone usage. No tech
 |---|---|
 | FR-04 | The system shall request location permission from the user on first launch. |
 | FR-05 | The system shall retrieve the user's GPS coordinates in real-time. |
-| FR-06 | The system shall update the user's location at a minimum frequency of once per second. |
+| FR-06 | The system shall update the user's location using a distance-filtered GPS stream (3 metre minimum movement, checked at a 500 ms sampling interval); a stationary user will not receive further location updates until they move at least 3 metres. |
 | FR-07 | The system shall display a notification or error message if GPS signal is unavailable. |
 
 ---
@@ -181,7 +182,7 @@ Primary users are assumed to be comfortable with basic smartphone usage. No tech
 | FR-08 | The system shall allow the user to input a destination address or select a point on a map. |
 | FR-09 | The system shall call the Google Maps Directions API to retrieve turn-by-turn route data. |
 | FR-10 | The system shall parse route data including waypoints, turn types, distances, and — for roundabout steps — the exit number extracted from the step's HTML instruction text. |
-| FR-11 | The system shall recalculate the route automatically if the user deviates from the planned path. Off-route is defined as the perpendicular distance from the current GPS position to the nearest route segment exceeding **50 metres**. A 30-second cooldown prevents repeated reroutes from GPS drift. |
+| FR-11 | The system shall recalculate the route automatically if the user deviates from the planned path. Off-route is defined as the perpendicular distance from the current GPS position to the nearest route segment exceeding **50 metres**, sustained for **3 consecutive location updates** to filter a one-off GPS jump. A 30-second cooldown prevents repeated reroutes from GPS drift. |
 
 ---
 
@@ -196,8 +197,8 @@ Primary users are assumed to be comfortable with basic smartphone usage. No tech
 | FR-12b | The system shall display only the name of the upcoming road on the AR overlay (extracted from the bold text in the Google Maps step instruction), not the full instruction sentence. |
 | FR-13 | The system shall display the distance to the next turn as text on the AR overlay. The distance displayed shall always reflect the upcoming non-forward turn (left, right, keep, U-turn, or roundabout), not merely the end of the current straight segment. |
 | FR-14 | The system shall update AR overlays in real-time as the user's GPS position changes. |
-| FR-15 | The system shall align AR overlays with the real-world environment using ARCore plane detection. |
-| FR-16 | The system shall remove or update AR cues after a turn is completed (within 25 m of the turn waypoint, to accommodate Malaysian urban GPS accuracy of 10–30 m). |
+| FR-15 | The system shall render AR overlays as Flutter widgets composited on top of the live camera feed in screen space. ARCore plane and feature-point detection are explicitly disabled (`showPlanes: false`, `showFeaturePoints: false`); overlays are not anchored to detected real-world surfaces. |
+| FR-16 | The system shall remove or update AR cues after a turn is completed, once the driver is within **10 m** of the turn waypoint (**20 m** for U-turn and roundabout maneuvers). Completion additionally requires either (a) the driver's heading to be confirmed within 55° of the bearing toward the next waypoint, or (b) a "moving away" fallback — driver speed above 2 m/s and clearly past the turn's closest recorded approach — to accommodate Malaysian urban GPS accuracy of 10–30 m. |
 | FR-16a | When the user is within 1 000 m of the next non-forward turn, the system shall pre-emptively switch the AR arrow and instruction to show that upcoming turn's direction — even if the current step is still straight — so the driver has sufficient warning time to prepare. This gate applies to **all** non-forward turn types (left, right, keepLeft, keepRight, U-turn, and roundabout). A hysteresis mechanism (engage at 1 000 m, disengage at 1 100 m) prevents oscillation at the boundary. |
 | FR-16b | When fetching or recalculating a route, the system shall include the device's current compass heading (degrees, 0–360) as a parameter to the Google Maps Directions API request. This biases the returned route to start in the driver's actual direction of travel, reducing phantom U-turn steps at route start. |
 
@@ -214,13 +215,13 @@ Primary users are assumed to be comfortable with basic smartphone usage. No tech
 | FR-17b | The system shall display a hamburger menu icon (≡) at the top-left corner of the Home Screen that opens a side drawer panel when tapped. |
 | FR-18 | The system shall display a "Start AR Navigation" button once the user has selected a destination. |
 | FR-19 | The system shall display a stop/end navigation button during an active session. |
-| FR-20 | The system shall show a status indicator for GPS signal strength. |
+| FR-20 | *(Not implemented.)* The app does not display a dedicated GPS signal-strength indicator (e.g. signal bars); GPS problems are only surfaced via the unavailable-signal notification described in FR-07. |
 | FR-21 | The UI shall follow Material Design guidelines for consistency and accessibility. |
 | FR-33 | The Home Screen map shall use CartoDB Voyager tiles to render a Waze-inspired style (blue water, green parks/forests, amber highways, white local roads) without Google Maps branding. |
-| FR-34 | The hamburger menu drawer shall contain the following items, in order: a Profile section (avatar + name) separated by a divider, then Plan a drive, Inbox, Settings, Help & Feedback, and Shutdown. |
+| FR-34 | The hamburger menu drawer shall contain the following items, in order: a Profile section (avatar + name) separated by a divider, then Plan a drive, Settings, Help & Feedback, and Shut Down. |
 | FR-35 | The map shall animate to the user's location with a smooth eased transition (approximately 650 ms, ease-in-out curve) when the location button is tapped or on the first GPS fix after app launch. |
 | FR-81 | During active navigation, when the system is recalculating the route (i.e. `NavigationStatus.rerouting`), the AR Navigation Screen shall display a prominent "Recalculating route…" banner. The banner shall disappear automatically once the new route is loaded. |
-| FR-82 | During active navigation, the system shall check for a faster route in the background every 5 minutes using the Google Maps Directions API (skipped while a turn is within 500 m). If a new route is found that saves at least 300 seconds (5 minutes) **and** at least 10% of the current route's remaining duration, the system shall display a full-screen route preview on the AR Navigation Screen showing the suggested route and the time saved. The user may tap **Switch** to accept the new route or **Dismiss** to keep the current one; the preview remains until the user chooses one of the two — there is no automatic dismissal. |
+| FR-82 | During active navigation, the system shall check for a faster route in the background every 5 minutes using the Google Maps Directions API (skipped while a turn is within 500 m). If a new route is found that saves at least 300 seconds (5 minutes) **and** at least 10% of the current route's remaining duration, the system shall display a full-screen route preview on the AR Navigation Screen showing the suggested route and the time saved. The user may tap **Change Route** to accept the new route or **Cancel** to keep the current one. The preview also auto-dismisses after **8 seconds** if the user does not respond, shown via a draining countdown progress bar on the Cancel button, in which case the current route is kept. |
 
 ---
 
@@ -245,7 +246,7 @@ Primary users are assumed to be comfortable with basic smartphone usage. No tech
 | FR-25 | The system shall provide a Settings screen accessible via the Settings option in the hamburger menu drawer on the Home Screen. |
 | FR-26 | The Settings screen shall include a Navigation Mode toggle (AR / 2D Map); the toggle shall be locked to AR mode in the current version. |
 | FR-27 | The Settings screen shall allow the user to set a distance unit preference (kilometres or miles). |
-| FR-28 | The Settings screen shall include a toggle to show or hide the speed display during navigation. |
+| FR-28 | The Settings screen shall include a toggle to show or hide the current-speed display. This toggle governs the speed indicator on both the Home Screen (2D map) and the AR Navigation Screen. |
 | FR-29 | The Settings screen shall include a toggle to show or hide the estimated time of arrival (ETA) display during navigation. |
 | FR-30 | The Settings screen shall allow the user to select a preferred AR arrow size (Small / Medium / Large). |
 | FR-31 | The Settings screen shall include an AR overlay opacity slider adjustable between 50% and 100%. |
@@ -360,8 +361,8 @@ Primary users are assumed to be comfortable with basic smartphone usage. No tech
 
 | ID | Requirement |
 |---|---|
-| FR-84 | The system shall speak a turn announcement (direction + street name) when the upcoming turn first comes within 1 000 m, again at 200 m, again at 50 m, and once more inside 50 m — each tier spoken at most once per turn. |
-| FR-85 | Spoken distance values shall be rounded the same way as the on-screen distance label, and whole-kilometre distances shall be read as a natural whole number (e.g. "1 kilometre") rather than with a redundant decimal (e.g. "1.0 kilometres"). |
+| FR-84 | The system shall speak a turn announcement (direction + street name) the first time the upcoming turn becomes active (immediately classified into a far/mid/yellow/red distance tier depending on where the driver already is), then again on crossing each of four checkpoints as the distance closes: **1 000 m**, **500 m**, **200 m** ("yellow"), and **50 m** ("red") — each checkpoint spoken at most once per turn. |
+| FR-85 | Spoken distance values shall be rounded the same way as the on-screen distance label. The literal 1 000 m checkpoint announcement is read as a natural whole number ("In 1 kilometre") rather than with a decimal. Other kilometre-scale distances below 10 km are currently read with one decimal place (e.g. "2.0 kilometres"); only distances of 10 km or more are rounded to a whole number. |
 | FR-86 | Street names included in a spoken announcement shall be sanitized for speech: slashes and dashes shall be expanded to spoken words ("slash", "dash"), and consecutive all-caps letters (e.g. road codes) shall be spelled out letter-by-letter. |
 | FR-87 | When the route is recalculated (rerouting or accepting a faster route) while the upcoming turn is unchanged, the system shall not re-trigger an already-spoken announcement for that turn. When the upcoming turn does genuinely change, the system shall announce the new turn normally. |
 | FR-88 | Starting a new announcement shall immediately stop any announcement still playing, rather than queuing behind it. |
@@ -378,6 +379,18 @@ Primary users are assumed to be comfortable with basic smartphone usage. No tech
 | FR-90 | During active navigation, the system shall check the traffic-aware travel time for the approximately 2 km of route immediately ahead of the driver's current position every 3 minutes, by comparing the Google Maps Directions API's traffic-aware duration against its free-flow duration for that segment. |
 | FR-91 | If the traffic-aware duration exceeds the free-flow duration by 20% or more, the system shall classify the delay as **moderate** (20–50% over free-flow) or **heavy** (more than 50% over free-flow) and display a colour-coded notification (amber for moderate, red for heavy) showing the estimated delay in minutes. |
 | FR-92 | While the detected delay segment is more than 2 km ahead of the driver, the notification shall remain hidden; once within 2 km, it shall display the estimated delay and the remaining distance to the segment. Once the driver's GPS position enters the segment, the notification shall instead display the segment's length until the driver passes it, at which point the notification shall be cleared. |
+
+---
+
+### 3.16 Background & Device Behaviour During Navigation
+
+**Description:** The app shall keep the screen awake and navigation/GPS updates running during an active AR session, including when the app is backgrounded, and shall manage audio focus so that spoken guidance is heard clearly over other audio.
+
+| ID | Requirement |
+|---|---|
+| FR-93 | The system shall keep the device screen awake (disable screen-lock timeout) for the duration of an active AR navigation session, and shall release this lock as soon as the session ends. |
+| FR-94 | The system shall run navigation as an Android foreground service while an AR navigation session is active, displaying a persistent "Navigation Active" notification, so that GPS tracking and route logic continue if the app is moved to the background or the screen is locked. |
+| FR-95 | The system shall request audio focus and configure audio ducking via the device's audio session before speaking a voice guidance announcement, so that other audio (e.g. music) is temporarily lowered rather than voice guidance being inaudible or interrupted. |
 
 ---
 
@@ -406,6 +419,7 @@ Primary users are assumed to be comfortable with basic smartphone usage. No tech
 | NFR-07 | The app shall handle GPS signal loss gracefully without crashing. |
 | NFR-08 | The app shall handle failed API calls with appropriate error messages. |
 | NFR-09 | The app shall not crash during normal navigation usage. |
+| NFR-17 | Active navigation (GPS tracking, route/reroute logic, and voice guidance) shall continue running when the app is moved to the background or the screen is locked, via an Android foreground service. |
 
 ### 4.4 Maintainability
 
@@ -459,6 +473,9 @@ Primary users are assumed to be comfortable with basic smartphone usage. No tech
 | Google Maps Directions API | REST API for fetching route and turn-by-turn data |
 | Google Maps Geocoding API | Converts text address input to GPS coordinates |
 | Flutter Location / Geolocator Package | Retrieves real-time device GPS coordinates |
+| `flutter_foreground_task` | Android foreground service keeping GPS/navigation alive while backgrounded |
+| `wakelock_plus` | Keeps the device screen on during active AR navigation |
+| `audio_session` | Manages audio focus/ducking for spoken voice guidance |
 
 ### 5.4 Communication Interfaces
 
@@ -502,6 +519,10 @@ dependencies:
   path: ^1.9.0                     # File path utilities (required by sqflite)
   light: ^5.0.0                    # Ambient light sensor for AR arrow auto-brightness
   flutter_tts: ^4.2.5              # Text-to-speech engine for voice guidance
+  wakelock_plus: ^1.2.8            # Keeps the screen on during AR navigation
+  flutter_foreground_task: ^8.0.0  # Foreground service — keeps navigation/GPS alive when app is backgrounded
+  audio_session: ^0.1.25           # Requests audio focus / ducking for voice guidance announcements
+  cupertino_icons: ^1.0.8          # iOS-style icon assets (Flutter project template default)
 ```
 
 ---
@@ -543,6 +564,6 @@ dependencies:
 
 ---
 
-*End of SRS Document — Version 2.6*
+*End of SRS Document — Version 2.7*
 
 *Prepared by: Liew Sau Yang | Sunway University | Bachelor of Software Engineering (Hons)*

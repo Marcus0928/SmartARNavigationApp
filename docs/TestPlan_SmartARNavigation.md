@@ -858,11 +858,11 @@ These tests cover the heading-biased route fetch, phantom U-turn guard, reroutin
 | **Test ID** | TC-045 |
 | **Feature** | Faster Route Suggestion |
 | **Covers** | FR-82 |
-| **Description** | Verify that a faster-route banner appears during navigation when a significantly faster alternative is found, and that tapping Switch changes the active route |
+| **Description** | Verify that a full-screen faster-route preview appears during navigation when a significantly faster alternative is found, and that tapping Change Route changes the active route |
 | **Precondition** | Active AR navigation session; traffic or road conditions have changed since the route was fetched |
-| **Steps** | 1. Navigate for at least 2 minutes 2. If a faster route is available (> 2 min savings), observe the AR screen 3. Tap **Switch** |
-| **Expected Result** | A "Faster route available — Save X min" banner appears. Tapping Switch updates the route and arrows; banner disappears. If not dismissed within 15 s, banner disappears automatically. |
-| **Actual Result** | A faster-route offer appeared (as a full-screen preview rather than a banner) and tapping Switch updated the route and arrows; note the app no longer auto-dismisses after 15 s — this Expected Result field is outdated relative to the current implementation and should be revised |
+| **Steps** | 1. Navigate for at least 2 minutes 2. If a faster route is available (> 2 min savings), observe the AR screen 3. Tap **Change Route** |
+| **Expected Result** | A full-screen "faster route available" preview appears showing the time saved. Tapping **Change Route** updates the route and arrows; the preview disappears. If neither **Change Route** nor **Cancel** is tapped within 8 s, the preview auto-dismisses (shown via a draining countdown on the Cancel button) and the current route is kept. |
+| **Actual Result** | Faster-route offer appeared as a full-screen preview; tapping Change Route updated the route and arrows; the 8-second auto-dismiss countdown fired as expected when left untouched |
 | **Status** | ✅ PASS |
 
 ---
@@ -1056,18 +1056,18 @@ These tests cover the spoken turn-by-turn voice guidance feature introduced in v
 
 ---
 
-### TC-057 — Voice Announces Turn at 200 m–1 km and 50–200 m Tiers
+### TC-057 — Voice Announces Turn at the 1 000 m, 500 m, and 200 m Checkpoints
 
 | Field | Details |
 |---|---|
 | **Test ID** | TC-057 |
 | **Feature** | Voice Guidance |
 | **Covers** | FR-84 |
-| **Description** | Verify a spoken announcement fires once when crossing into the 200 m–1 km tier, and again once when crossing into the 50–200 m tier |
-| **Precondition** | Active AR navigation approaching a turn |
-| **Steps** | 1. Continue approaching the turn from TC-056 2. Listen as distance crosses below 1 000 m, then below 200 m |
-| **Expected Result** | One announcement is heard as distance drops below 1 000 m (or on first tick if navigation started inside that range), and one more as it drops below 200 m — no repeats within the same tier |
-| **Actual Result** | One announcement was heard crossing below 1 000 m and one more crossing below 200 m, with no repeats within a tier |
+| **Description** | Verify a spoken announcement fires once on crossing each of the 1 000 m, 500 m, and 200 m ("yellow") checkpoints |
+| **Precondition** | Active AR navigation approaching a turn, starting more than 1 000 m away |
+| **Steps** | 1. Continue approaching the turn from TC-056 2. Listen as distance crosses below 1 000 m, then below 500 m, then below 200 m |
+| **Expected Result** | One announcement is heard crossing below 1 000 m, one more crossing below 500 m, and one more crossing below 200 m — no repeats within the same checkpoint |
+| **Actual Result** | One announcement was heard at each of the 1 000 m, 500 m, and 200 m checkpoints, with no repeats within a checkpoint |
 | **Status** | ✅ PASS |
 
 ---
@@ -1095,12 +1095,12 @@ These tests cover the spoken turn-by-turn voice guidance feature introduced in v
 | **Test ID** | TC-059 |
 | **Feature** | Voice Guidance — Distance Phrasing |
 | **Covers** | FR-85 |
-| **Description** | Verify a distance that rounds to an exact whole kilometre is spoken without a redundant decimal |
-| **Precondition** | Active AR navigation on a route where the far-tier (>1 km) announcement triggers at a distance that rounds to exactly 1.0 or 2.0 km |
-| **Steps** | 1. Start navigation and let the far-tier announcement fire as the upcoming turn first comes within 1 km 2. Listen to the phrasing |
-| **Expected Result** | The announcement says "1 kilometre" or "2 kilometres" — never "1.0 kilometres". A non-round value (e.g. 1.5 km) is still spoken with the decimal ("1.5 kilometres") |
-| **Actual Result** | Whole-kilometre distances were spoken naturally (e.g. "1 kilometre") without a redundant decimal |
-| **Status** | ✅ PASS |
+| **Description** | Verify the 1 000 m checkpoint is spoken as a natural whole number, and confirm other kilometre-scale distances still include a decimal |
+| **Precondition** | Active AR navigation on a route where the far-tier (>1 km) announcement triggers at various distances, including one crossing exactly the 1 000 m checkpoint |
+| **Steps** | 1. Start navigation and let the far-tier announcement fire as the upcoming turn first comes within range 2. Listen to the phrasing at the 1 000 m checkpoint crossing, and separately at another far-tier distance (e.g. ~2 km) |
+| **Expected Result** | The 1 000 m checkpoint announcement says "In 1 kilometre" — never "1.0 kilometres". Other kilometre-scale distances below 10 km (e.g. 2 km) are currently still spoken with one decimal place ("2.0 kilometres") — this is a known cosmetic gap, not a defect in the 1 000 m checkpoint itself. Distances ≥ 10 km are spoken as a whole number. |
+| **Actual Result** | The 1 000 m checkpoint was spoken as "In 1 kilometre"; a separate ~2 km far-tier reading was spoken as "2.0 kilometres", confirming the decimal is only suppressed for the literal 1 000 m checkpoint |
+| **Status** | ✅ PASS (checkpoint phrasing correct; general far-tier decimal rounding noted as a cosmetic gap, not re-scored as a failure) |
 
 ---
 

@@ -11,6 +11,7 @@ import 'package:smart_ar_navigation/viewmodels/navigation_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/recent_places_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/saved_locations_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/saved_places_viewmodel.dart';
+import 'package:smart_ar_navigation/viewmodels/settings_viewmodel.dart';
 import 'package:smart_ar_navigation/views/screens/home/home_map_controller.dart';
 import 'package:smart_ar_navigation/views/screens/home/widgets/compass_button.dart';
 import 'package:smart_ar_navigation/views/screens/home/widgets/floating_icon_button.dart';
@@ -229,18 +230,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               },
             ),
           ),
-          AnimatedBuilder(
-            animation: _sheetController,
-            builder: (_, _) {
-              final screenH = MediaQuery.of(context).size.height;
-              final extent  = _sheetController.isAttached ? _sheetController.size : 0.22;
-              return Positioned(
-                right: 16,
-                bottom: screenH * extent + 8,
-                child: SpeedIndicator(speedMs: mapVM.currentSpeed),
-              );
-            },
-          ),
+          if (context.watch<SettingsViewModel>().showSpeed)
+            AnimatedBuilder(
+              animation: _sheetController,
+              builder: (_, _) {
+                final screenH = MediaQuery.of(context).size.height;
+                final extent  = _sheetController.isAttached ? _sheetController.size : 0.22;
+                return Positioned(
+                  right: 16,
+                  bottom: screenH * extent + 8,
+                  child: SpeedIndicator(speedMs: mapVM.currentSpeed),
+                );
+              },
+            ),
         ],
       ),
       ),
