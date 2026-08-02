@@ -21,6 +21,7 @@ import 'package:smart_ar_navigation/viewmodels/settings_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/plan_drive_viewmodel.dart';
 import 'package:smart_ar_navigation/viewmodels/profile_viewmodel.dart';
 import 'package:smart_ar_navigation/views/screens/ar_navigation_screen.dart';
+import 'package:smart_ar_navigation/views/screens/help_feedback_screen.dart';
 import 'package:smart_ar_navigation/views/screens/home_screen.dart';
 import 'package:smart_ar_navigation/views/screens/plan_drive_screen.dart';
 import 'package:smart_ar_navigation/views/screens/profile_screen.dart';
@@ -144,6 +145,7 @@ class SmartARNavigationApp extends StatelessWidget {
           '/ar-navigation': (_) => const ARNavigationScreen(),
           '/settings': (_) => const SettingsScreen(),
           '/profile': (_) => const ProfileScreen(),
+          '/help-feedback': (_) => const HelpFeedbackScreen(),
           '/arrow-test': (_) => const ArrowTestScreen(),
           '/plan-drive': (ctx) => ChangeNotifierProvider(
                 create: (c) => PlanDriveViewModel(

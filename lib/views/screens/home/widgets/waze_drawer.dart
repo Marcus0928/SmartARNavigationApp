@@ -99,7 +99,10 @@ class WazeDrawer extends StatelessWidget {
           _DrawerMenuItem(
             icon: Icons.help_outline,
             label: 'Help & Feedback',
-            onTap: () => Navigator.of(context).pop(),
+            onTap: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).pushNamed('/help-feedback');
+            },
           ),
           const Spacer(),
           const Divider(height: 1, thickness: 1),
